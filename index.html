@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iT Services — Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e1522;--card:#161f30;--card2:#1c283c;--ink:#e7ecf5;--muted:#9aa6ba;--border:#26324a;--navy:#7ea6e6;--sale:#6aa6e0;--purchase:#4ec4ad;--tech:#b39ae8;--board:#e6a662}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"IBM Plex Sans Thai",system-ui,sans-serif;background:
+    radial-gradient(1200px 600px at 80% -10%,rgba(126,166,230,.12),transparent),
+    var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 20px}
+  .head{text-align:center;margin-bottom:34px}
+  .mark{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#2f6fb8,#17356b);display:grid;place-items:center;font-weight:700;font-size:26px;color:#fff;margin:0 auto 14px}
+  h1{font-size:26px;letter-spacing:.3px}
+  .sub{color:var(--muted);font-size:14px;margin-top:6px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;width:100%;max-width:860px}
+  .app{display:block;text-decoration:none;color:inherit;background:var(--card);border:1px solid var(--border);border-top:3px solid var(--ac,var(--navy));border-radius:14px;padding:20px;transition:.15s}
+  .app:hover{transform:translateY(-3px);background:var(--card2);box-shadow:0 12px 30px rgba(0,0,0,.35)}
+  .app .ico{font-size:30px;margin-bottom:10px}
+  .app h3{font-size:17px;margin-bottom:4px}
+  .app p{color:var(--muted);font-size:12.5px;line-height:1.5}
+  .app .go{display:inline-block;margin-top:12px;font-size:12.5px;font-weight:600;color:var(--ac,var(--navy))}
+  .app.soon{opacity:.55;pointer-events:none}
+  .app.soon .go{color:var(--muted)}
+  .pill{float:right;font-size:10px;font-weight:600;background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:2px 9px;color:var(--muted)}
+  .foot{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="mark">iT</div>
+    <h1>Internal Systems Portal</h1>
+    <div class="sub">เลือกระบบที่ต้องการใช้งาน · เข้าระบบด้วยบัญชี Google เดียว</div>
+  </div>
+
+  <div class="grid">
+    <a class="app" href="salepro/" style="--ac:var(--sale)">
+      <div class="ico">💰</div>
+      <h3>SalePro</h3>
+      <p>ใบเสนอราคา · อนุมัติ · รับชำระเงิน · แคตตาล็อก · ติดตามการขาย</p>
+      <span class="go">เข้าใช้งาน →</span>
+    </a>
+    <div class="app soon" style="--ac:var(--purchase)">
+      <span class="pill">เร็ว ๆ นี้</span>
+      <div class="ico">📦</div>
+      <h3>PurchasePro</h3>
+      <p>ขอราคา/เทียบราคา · ออก PO · จ่ายเงิน · รับของ · Vendor</p>
+      <span class="go">กำลังพัฒนา</span>
+    </div>
+    <div class="app soon" style="--ac:var(--tech)">
+      <span class="pill">เร็ว ๆ นี้</span>
+      <div class="ico">🔧</div>
+      <h3>Tech Portal</h3>
+      <p>พอร์ทัลช่างติดตั้ง · รับงาน · อัปเดตสถานะ · บันทึกค่าใช้จ่าย</p>
+      <span class="go">กำลังพัฒนา</span>
+    </div>
+  </div>
+
+  <div class="foot">© 2026 iT Services Co., Ltd. · ทุกระบบใช้บัญชี Google เดียวกัน</div>
+</body>
+</html>

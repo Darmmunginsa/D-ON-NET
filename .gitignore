@@ -1,0 +1,14 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+
+# archives / temp
+*.zip
+*.tmp
+*.tmp.*
+*.bak
+
+# ไม่ push PDF ตัวอย่าง (ถ้ามี)
+*.pdf

@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "salepro",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "-l", "4178", "."],
+      "port": 4178
+    },
+    {
+      "name": "purchasepro",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "-l", "4179", "../itservices-purchasepro"],
+      "port": 4179
+    },
+    {
+      "name": "portal",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "serve", "-l", "4180", "../itservices-portal"],
+      "port": 4180
+    }
+  ]
+}

@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>SalePro — ระบบใบเสนอราคา | iT Services</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="stylesheet" href="assets/style.css?v=g2">
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen" class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">SP</div>
+    <h1>SalePro</h1>
+    <p>ระบบออกใบเสนอราคาออนไลน์<br>เชื่อมต่อ Google Workspace</p>
+    <div id="gbtn" style="display:flex;justify-content:center;margin-bottom:10px"></div>
+    <button class="btn-ms" id="ms-signin" onclick="msalLogin()" style="background:var(--accent);color:#fff;border:none;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path fill="#fff" d="M21.35 11.1H12v2.8h5.35c-.25 1.3-1 2.4-2.15 3.15v2.6h3.47c2.03-1.87 3.2-4.63 3.2-7.9 0-.6-.05-1.18-.17-1.75z" opacity=".0"/><path fill="#fff" d="M12 22c2.7 0 4.96-.9 6.6-2.43l-3.22-2.5c-.9.6-2.05.95-3.38.95-2.6 0-4.8-1.75-5.58-4.1H3.1v2.58C4.73 19.77 8.1 22 12 22z"/><path fill="#fff" d="M6.42 13.92A5.98 5.98 0 0 1 6.1 12c0-.67.12-1.32.32-1.92V7.5H3.1A9.98 9.98 0 0 0 2 12c0 1.6.38 3.12 1.1 4.5l3.32-2.58z"/><path fill="#fff" d="M12 6.08c1.47 0 2.78.5 3.82 1.5l2.85-2.85C16.96 3.2 14.7 2.3 12 2.3 8.1 2.3 4.73 4.53 3.1 7.9l3.32 2.58C7.2 8.13 9.4 6.08 12 6.08z"/></svg>
+      เข้าสู่ระบบด้วย Google
+    </button>
+    <p style="margin-top:16px;margin-bottom:0;font-size:11px;color:var(--muted)">iT Services Co., Ltd. · Google Sheets</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen" class="app" style="display:none">
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <div class="logo-icon">QP</div>
+        <h1>SalePro</h1>
+      </div>
+      <p><span class="sync-dot"></span>Google Sheets</p>
+    </div>
+    <nav class="nav">
+      <div class="nav-group">
+        <div class="nav-label">Overview</div>
+        <div class="nav-item active" onclick="showPage('dashboard',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">Quotation</div>
+        <div class="nav-item" onclick="showPage('quotes',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          ใบเสนอราคา
+        </div>
+        <div class="nav-item" onclick="showPage('newquote',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          สร้างใหม่
+        </div>
+        <div class="nav-item" onclick="showPage('approve',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          อนุมัติ
+          <span class="nav-badge" id="badge-approve">0</span>
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">Finance</div>
+        <div class="nav-item" onclick="showPage('payment',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          ติดตามชำระเงิน
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">Settings</div>
+        <div class="nav-item" onclick="showPage('catalog',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+          Catalog สินค้า
+        </div>
+        <div class="nav-item" onclick="showPage('customers',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          ลูกค้า (CRM)
+        </div>
+        <div class="nav-item" onclick="showPage('forecast',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-5 3 3 5-7"/></svg>
+          Sale Forecast
+        </div>
+        <div class="nav-item" onclick="showPage('contracts',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+          สัญญา
+        </div>
+        <div class="nav-item nav-admin-only" onclick="showPage('company',this)" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          ตั้งค่าบริษัท
+        </div>
+        <div class="nav-item nav-admin-only" onclick="showPage('settings',this)" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Approve Settings
+        </div>
+      </div>
+    </nav>
+    <div class="user-section">
+      <div class="user-card">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div style="flex:1;min-width:0">
+          <div class="user-name" id="user-name">กำลังโหลด...</div>
+          <div class="user-role" id="user-email"></div>
+          <div id="user-role-badge" style="font-size:9px;margin-top:1px"></div>
+        </div>
+        <button class="btn-logout" onclick="logout()" title="ออกจากระบบ">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <h2 id="page-title">Dashboard</h2>
+      <button class="btn btn-sm" id="topbar-btn" onclick="showPage('newquote',null)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        สร้างใบเสนอราคา
+      </button>
+      <button class="btn btn-sm" onclick="syncAll()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Sync
+      </button>
+      <button class="btn btn-sm" onclick="openThemeModal()" title="ปรับธีม">🎨 ธีม</button>
+    </div>
+
+    <div class="content">
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid">
+          <div class="stat blue"><div class="stat-label">ใบเสนอราคาทั้งหมด</div><div class="stat-value" id="d-total">—</div><div class="stat-sub">เดือนนี้</div></div>
+          <div class="stat amber"><div class="stat-label">รอการอนุมัติ</div><div class="stat-value" id="d-pending">—</div><div class="stat-sub">รายการ</div></div>
+          <div class="stat green"><div class="stat-label">อนุมัติแล้ว</div><div class="stat-value" id="d-approved">—</div><div class="stat-sub">รายการ</div></div>
+          <div class="stat red"><div class="stat-label">ค้างชำระ</div><div class="stat-value" id="d-unpaid">—</div><div class="stat-sub">รายการ</div></div>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header"><h3>📊 ภาพรวมยอดขาย</h3>
+            <select id="sales-period" onchange="setSalesPeriod(this.value)" style="margin-left:auto;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:5px 10px;font-size:12px;color:var(--text);font-family:var(--font);cursor:pointer">
+              <option value="month">เดือนนี้</option>
+              <option value="quarter">ไตรมาสนี้</option>
+              <option value="year">ปีนี้</option>
+              <option value="6m" selected>6 เดือนล่าสุด</option>
+              <option value="12m">12 เดือนล่าสุด</option>
+              <option value="all">ทั้งหมด</option>
+            </select>
+          </div>
+          <div id="sales-report" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;padding:16px"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="card">
+            <div class="card-header"><h3>ใบเสนอราคาล่าสุด</h3></div>
+            <table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>มูลค่า</th><th>สถานะ</th></tr></thead>
+            <tbody id="d-recent"></tbody></table>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>รออนุมัติ</h3></div>
+            <table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>มูลค่า</th><th></th></tr></thead>
+            <tbody id="d-approve-list"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUOTES -->
+      <div class="page" id="page-quotes">
+        <div class="filter-row">
+          <input id="f-search" placeholder="ค้นหาเลขที่ / ลูกค้า..." oninput="searchQuotes()" style="max-width:220px;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none">
+          <select id="f-status" onchange="renderQuotes()"><option value="">ทุกสถานะ</option><option>Draft</option><option>Pending</option><option>Approved</option><option>Rejected</option><option>Cancelled</option></select>
+          <div class="spacer"></div>
+          <button class="btn btn-primary btn-sm" onclick="showPage('newquote',null)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            สร้างใหม่
+          </button>
+        </div>
+        <div id="basket-bar" style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:0 0 12px"></div>
+        <div class="card">
+          <table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>Tag / Project</th><th>วันที่</th><th>มูลค่า (บาท)</th><th>วิธีชำระ</th><th>สถานะ</th><th>ชำระเงิน</th><th>ติดตาม</th><th></th></tr></thead>
+          <tbody id="quotes-body"></tbody></table>
+        </div>
+      </div>
+
+      <!-- NEW QUOTE -->
+      <div class="page" id="page-newquote">
+        <div class="card" id="nq-zone-info">
+          <div id="edit-banner" style="display:none;align-items:center;gap:10px;padding:10px 16px;background:rgba(251,191,36,0.1);border-bottom:1px solid rgba(251,191,36,0.2);font-size:13px;color:var(--amber)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>กำลังแก้ไขใบเสนอราคา <strong class="edit-quote-no"></strong></span>
+            <button class="btn btn-sm" style="margin-left:auto;font-size:11px" onclick="cancelEdit()">ยกเลิกการแก้ไข</button>
+          </div>
+          <div class="card-header" style="flex-wrap:wrap;gap:6px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+            <h3>ข้อมูลใบเสนอราคา</h3>
+            <div class="fontctl" style="margin-left:auto">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h6"/></svg>
+              <span class="lbl">ตัวอักษร</span>
+              <input type="range" id="fs-info" min="8" max="24" value="12" step="1" oninput="setZoneFont('info',+this.value)">
+              <span class="val" id="fs-info-val">12px</span>
+            </div>
+            <button class="btn btn-sm" onclick="openCustomerPicker()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              เลือกลูกค้า
+            </button>
+          </div>
+          <div style="padding:16px">
+            <div class="form-grid">
+              <div class="form-group"><label>เลขที่ใบเสนอราคา</label><input id="q-no" readonly style="opacity:0.6"></div>
+              <div class="form-group"><label>วันที่</label><input id="q-date" type="date" onchange="updateAutoDates()"></div>
+              <div class="form-group"><label>ชื่อลูกค้า / บริษัท</label><div style="position:relative;width:100%">
+                <input id="q-client" placeholder="บริษัท / ชื่อลูกค้า" oninput="showClientSuggest(this.value)" autocomplete="off" style="width:100%">
+                <div id="client-suggest" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border2);border-radius:7px;z-index:99;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.3)"></div>
+              </div></div>
+              <div class="form-group"><label>Tag / ชื่อ Project <span style="color:var(--muted);font-weight:400;font-size:10px">(ไว้ค้นหา/กรอง)</span></label><input id="q-tag" placeholder="เช่น Meeting Room MS-INS, ติดตั้ง CCTV..."></div>
+              <div class="form-group"><label>ช่องทางที่มา (Inquiry)</label><select id="q-source"></select></div>
+              <div class="form-group"><label>ผู้ติดต่อ</label><input id="q-contact" placeholder="ชื่อผู้ติดต่อ"></div>
+              <div class="form-group"><label>เบอร์โทร</label><input id="q-phone" placeholder="08x-xxx-xxxx"></div>
+              <div class="form-group"><label>อีเมล</label><input id="q-email" placeholder="email@company.com"></div>
+              <div class="form-group"><label>วิธีชำระเงิน</label>
+                <select id="q-payment"><option>เงินสด</option><option>โอนเงิน</option><option>เครดิต 30 วัน</option><option>เครดิต 60 วัน</option><option>Cheque</option></select>
+              </div>
+              <div class="form-group"><label>อายุใบเสนอราคา</label>
+                <select id="q-validity" onchange="updateAutoDates()"><option>14 วัน</option><option selected>30 วัน</option><option>45 วัน</option><option>60 วัน</option><option>90 วัน</option></select>
+              </div>
+              <div class="form-group"><label>Date <span style="color:var(--muted);font-weight:400;font-size:10px">(อัตโนมัติ)</span></label><input id="q-start" type="date" readonly tabindex="-1" style="opacity:0.75;cursor:not-allowed"></div>
+              <div class="form-group"><label>Expire <span style="color:var(--muted);font-weight:400;font-size:10px">(อัตโนมัติ)</span></label><input id="q-end" type="date" readonly tabindex="-1" style="opacity:0.75;cursor:not-allowed"></div>
+              <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ลูกค้า (สำหรับออกใบ)</label><textarea id="q-cust-address" placeholder="ที่อยู่ลูกค้า..." style="min-height:64px"></textarea></div>
+              <div class="form-group"><label>เลขประจำตัวผู้เสียภาษีลูกค้า</label><input id="q-cust-taxid" placeholder="0000000000000"></div>
+              <div class="form-group"><label>เบอร์โทรลูกค้า</label><input id="q-cust-tel" placeholder="02-xxx-xxxx"></div>
+              <div class="form-group"><label>Fax ลูกค้า</label><input id="q-cust-fax" placeholder="02-xxx-xxxx"></div>
+              <div class="form-group" style="grid-column:1/-1"><label>ชื่อบริษัท (EN) — ใช้ในใบเสนอราคา</label><input id="q-client-en" placeholder="Company Co., Ltd. (เว้นว่าง = ใช้จากทะเบียนลูกค้า)"></div>
+              <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ (ภาษาอังกฤษ) — ใช้ในใบเสนอราคา</label><textarea id="q-cust-address-en" placeholder="English address (เว้นว่าง = ใช้จากทะเบียนลูกค้า)..." style="min-height:64px"></textarea></div>
+              <div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px;font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em">ข้อมูล Sale</div>
+              <div class="form-group"><label>ชื่อ Sale</label><input id="q-sale-name" placeholder="ชื่อพนักงานขาย" onchange="saveSaleInfo()"></div>
+              <div class="form-group"><label>เบอร์ Sale</label><input id="q-sale-tel" placeholder="08x-xxx-xxxx" onchange="saveSaleInfo()"></div>
+              <div class="form-group" style="grid-column:1/-1"><label>Email Sale</label><input id="q-sale-email" placeholder="sale@itservices.co.th" onchange="saveSaleInfo()"></div>
+              <div class="form-group" style="grid-column:1/-1">
+                <label>ลายเซ็นผู้จัดทำ (แสดงใน Quoted By)</label>
+                <div style="display:flex;align-items:center;gap:14px;margin-top:4px">
+                  <div id="q-sig-preview" style="width:140px;height:60px;border:1.5px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;background:var(--surface2)" onclick="document.getElementById('q-sig-file').click()">
+                    <span style="font-size:11px;color:var(--muted);text-align:center;padding:4px">คลิกเพื่ออัปโหลด<br>ลายเซ็น</span>
+                  </div>
+                  <div>
+                    <input type="file" id="q-sig-file" accept="image/*" style="display:none" onchange="handleQuoteSigUpload(this)">
+                    <button class="btn btn-sm" onclick="document.getElementById('q-sig-file').click()">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      อัปโหลดลายเซ็น
+                    </button>
+                    <button class="btn btn-sm" onclick="loadMySignature()" style="margin-left:6px" title="โหลดลายเซ็นที่บันทึกไว้">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                      ใช้ลายเซ็นเดิม
+                    </button>
+                    <div style="font-size:11px;color:var(--muted);margin-top:6px">ระบบจะจำลายเซ็นของคุณสำหรับครั้งถัดไป</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header" style="flex-wrap:wrap;gap:6px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            <h3>รายการสินค้า/บริการ</h3>
+            <!-- Font size slider (zone: items) -->
+            <div class="fontctl" style="margin-left:auto">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h6"/></svg>
+              <span class="lbl">ตัวอักษร</span>
+              <input type="range" id="fs-items" min="8" max="24" value="12" step="1" oninput="setZoneFont('items',+this.value)">
+              <span class="val" id="fs-items-val">12px</span>
+            </div>
+            <!-- ⬇ เครื่องมือทั้งหมด (จะถูกย้ายไปวิดเจ็ตลอยตัว) -->
+            <span id="nq-tools" style="display:contents">
+            <!-- Column toggle -->
+            <div style="position:relative">
+              <button class="btn btn-sm" onclick="toggleColPanel(event)" title="แสดง/ซ่อน คอลัมน์">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+                คอลัมน์
+              </button>
+              <div class="col-toggle-panel" id="col-toggle-panel">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">แสดง / ซ่อน คอลัมน์</div>
+                <label><input type="checkbox" id="colcb-pn" checked onchange="toggleCol('pn',this.checked)"> Part No.</label>
+                <label><input type="checkbox" id="colcb-qty" checked onchange="toggleCol('qty',this.checked)"> จำนวน</label>
+                <label><input type="checkbox" id="colcb-unit" checked onchange="toggleCol('unit',this.checked)"> หน่วย</label>
+                <label><input type="checkbox" id="colcb-price" checked onchange="toggleCol('price',this.checked)"> ราคา/หน่วย</label>
+                <label><input type="checkbox" id="colcb-disc" checked onchange="toggleCol('disc',this.checked)"> ส่วนลด%</label>
+                <label><input type="checkbox" id="colcb-total" checked onchange="toggleCol('total',this.checked)"> รวม</label>
+                <div style="font-size:10px;color:var(--muted);margin:6px 0;border-top:1px solid var(--border);padding-top:6px;text-transform:uppercase;letter-spacing:0.05em">เส้นตาราง</div>
+                <label><input type="checkbox" id="colcb-lines" onchange="toggleColLines(this.checked)"> เส้นแบ่งคอลัมน์ (แนวตั้ง)</label>
+              </div>
+            </div>
+            <!-- Row spacing -->
+            <div style="position:relative">
+              <button class="btn btn-sm" onclick="toggleSpacingPanel(event)" title="ปรับระยะห่างแถว">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/><polyline points="8 9 12 5 16 9"/><polyline points="8 15 12 19 16 15"/></svg>
+                ระยะห่าง
+              </button>
+              <div class="col-toggle-panel" id="spacing-panel" style="min-width:210px" onclick="event.stopPropagation()">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">ระยะห่างแถว (PDF)</div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                  <span style="font-size:11px;color:var(--text);width:64px">ช่องไฟแถว</span>
+                  <input type="range" id="sp-pad" min="0" max="14" value="4" step="1" oninput="setRowSpacing('pad',+this.value)" style="flex:1;accent-color:var(--accent);cursor:pointer">
+                  <span id="sp-pad-val" style="font-size:11px;font-family:var(--mono);color:var(--accent2);min-width:30px;text-align:right">4px</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:11px;color:var(--text);width:64px">ระยะบรรทัด</span>
+                  <input type="range" id="sp-lh" min="100" max="200" value="135" step="5" oninput="setRowSpacing('lineH',this.value/100)" style="flex:1;accent-color:var(--accent);cursor:pointer">
+                  <span id="sp-lh-val" style="font-size:11px;font-family:var(--mono);color:var(--accent2);min-width:30px;text-align:right">1.35</span>
+                </div>
+              </div>
+            </div>
+            <!-- Add group -->
+            <button class="btn btn-sm" onclick="addGroupRow()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h8m-8 6h16"/></svg>
+              เพิ่มหัวข้อกลุ่ม
+            </button>
+            <button class="btn btn-sm" onclick="addBlankRow()" title="เพิ่มบรรทัดว่างเพื่อเติมช่องว่าง">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="12" x2="21" y2="12" stroke-dasharray="2 2"/></svg>
+              เพิ่มบรรทัดว่าง
+            </button>
+            <button class="btn btn-sm" onclick="addNoteRow()" title="แทรกแถวหมายเหตุ (ข้อความอิสระ) ในรายการ">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>
+              แทรกหมายเหตุ
+            </button>
+            <button class="btn btn-sm" onclick="addPageBreak()" title="แทรกตัวแบ่งหน้า — รายการหลังจุดนี้ขึ้นหน้าใหม่ใน PDF">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v6m12-6v6M4 9h16M8 21l4-4 4 4" stroke-dasharray="2 2"/></svg>
+              แทรกตัวแบ่งหน้า
+            </button>
+            <button class="btn btn-sm" onclick="openCatalogPicker()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+              เลือกจาก Catalog
+            </button>
+            <button class="btn btn-sm" onclick="addItem()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              เพิ่มรายการ
+            </button>
+            </span><!-- /nq-tools -->
+          </div>
+          <div style="padding:12px">
+            <div class="items-wrap">
+              <datalist id="qi-unit-opts"><option value="Year"></option><option value="Month"></option><option value="ปี"></option><option value="เดือน"></option><option value="ชิ้น"></option><option value="ชุด"></option><option value="งาน"></option></datalist>
+              <table class="items-table">
+                <thead><tr id="items-thead-row"><th style="width:24px;padding:8px 4px"></th><th style="width:66px">#</th><th class="col-pn" style="width:112px">Part No.</th><th>รายการ / รายละเอียด</th><th class="col-qty" style="width:70px">จำนวน</th><th class="col-unit" style="width:70px">หน่วย</th><th class="col-price" style="width:120px;text-align:center;padding:2px"><select id="price-period-sel" onchange="setPricePeriod(this.value)" title="เลือกงวดราคาต่อหน่วย" style="font-size:11px;font-weight:600;width:100%;background:transparent;color:inherit;border:1px solid rgba(255,255,255,0.3);border-radius:4px;padding:2px"><option value="">ราคา/หน่วย</option><option value="month">ราคา/เดือน</option><option value="year">ราคา/ปี</option></select></th><th class="col-disc" style="width:70px;text-align:right">ส่วนลด%</th><th class="col-total num" style="width:90px">รวม</th><th style="width:32px"></th></tr></thead>
+                <tbody id="items-body"></tbody>
+              </table>
+            </div>
+            <div class="total-box" id="nq-zone-totals">
+              <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+                <div class="fontctl">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h6"/></svg>
+                  <span class="lbl">ตัวอักษร</span>
+                  <input type="range" id="fs-totals" min="8" max="24" value="13" step="1" oninput="setZoneFont('totals',+this.value)">
+                  <span class="val" id="fs-totals-val">13px</span>
+                </div>
+              </div>
+              <div class="total-row"><span>ยอดรวมก่อนส่วนลด</span><span id="t-sub">฿0.00</span></div>
+              <div class="total-row">
+                <span>ส่วนลดรวม <input id="g-disc" type="number" min="0" value="0" style="width:70px;background:var(--surface);border:1px solid var(--border2);border-radius:4px;padding:1px 5px;font-size:12px;color:var(--text);font-family:var(--mono)"><select id="g-disc-mode" onchange="calcTotalsAndApprover()" style="background:var(--surface);border:1px solid var(--border2);border-radius:4px;padding:1px 4px;font-size:11px;color:var(--text);margin-left:3px"><option value="pct">%</option><option value="amt">฿</option></select></span>
+                <span id="t-disc">฿0.00</span>
+              </div>
+              <div class="total-row"><span>ยอดหลังส่วนลด</span><span id="t-after">฿0.00</span></div>
+              <div class="total-row"><span>VAT 7%</span><span id="t-vat">฿0.00</span></div>
+              <div class="total-row total-grand"><span>ยอดรวมสุทธิ</span><span id="t-grand">฿0.00</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="nq-zone-notes">
+          <div class="card-header" style="flex-wrap:wrap;gap:6px">
+            <h3>หมายเหตุ & เงื่อนไข</h3>
+            <div class="fontctl" style="margin-left:auto">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><path d="M4 7h16M4 12h10M4 17h6"/></svg>
+              <span class="lbl">ตัวอักษร</span>
+              <input type="range" id="fs-notes" min="8" max="24" value="12" step="1" oninput="setZoneFont('notes',+this.value)">
+              <span class="val" id="fs-notes-val">12px</span>
+            </div>
+          </div>
+          <div style="padding:16px">
+            <div class="form-grid">
+              <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ <button type="button" onclick="saveNoteTermsDefault()" style="float:right;font-size:10px;color:var(--accent);background:none;border:none;cursor:pointer">💾 ตั้งเป็นค่าเริ่มต้น</button></label><textarea id="q-note" placeholder="ข้อมูลเพิ่มเติม เช่น ระยะเวลาจัดส่ง..."></textarea></div>
+              <div class="form-group" style="grid-column:1/-1"><label>เงื่อนไขการชำระเงิน</label><textarea id="q-terms" placeholder="เงื่อนไขและข้อกำหนด..."></textarea></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Approver Box -->
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            <h3>ผู้อนุมัติ (คำนวณจากมูลค่าใบเสนอราคา)</h3>
+            <button class="btn btn-sm nav-admin-only" onclick="showPage('settings',null)" style="font-size:11px;display:none">แก้ไข Settings</button>
+          </div>
+          <div style="padding:14px 16px" id="approver-box">
+            <div style="color:var(--muted);font-size:13px">กรอกรายการสินค้าเพื่อดูผู้อนุมัติที่เหมาะสม</div>
+          </div>
+        </div>
+
+        <!-- ยาม "ลดต่ำกว่าทุน" -->
+        <div id="belowcost-banner" style="display:none;margin-bottom:14px"></div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:24px">
+          <button class="btn" onclick="saveQuote('Draft')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            บันทึก Draft
+          </button>
+          <button class="btn btn-warn" onclick="saveQuote('Pending')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            ส่งอนุมัติ
+          </button>
+          <button class="btn btn-primary" onclick="previewPDF()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Preview PDF
+          </button>
+        </div>
+
+        <!-- ════ Floating draggable toolbar ════ -->
+        <div id="nq-fab">
+          <div id="nq-fab-head" onpointerdown="nqFabDragStart(event)">
+            <span class="grip">⠿</span>
+            <span style="font-size:11px;font-weight:600;color:var(--text);flex:1">เครื่องมือ</span>
+            <button id="nq-fab-toggle" onclick="toggleNqFab(event)" title="ย่อ/ขยาย">▾</button>
+          </div>
+          <div id="nq-fab-body"></div>
+        </div>
+      </div>
+
+      <!-- APPROVE -->
+      <div class="page" id="page-approve">
+        <div id="approve-list"></div>
+      </div>
+
+      <!-- PAYMENT -->
+      <div class="page" id="page-payment">
+        <div id="payment-list"></div>
+      </div>
+
+      <!-- CATALOG -->
+      <div class="page" id="page-catalog">
+        <div class="filter-row">
+          <input id="cat-search" placeholder="ค้นหาสินค้า..." oninput="searchCatalog()" style="flex:1;max-width:280px">
+          <select id="cat-filter" onchange="renderCatalog()"><option value="">ทุกหมวดหมู่</option><option>Hardware</option><option>Software</option><option>Service</option><option>Consumable</option></select>
+          <div class="spacer"></div>
+          <span style="font-size:11px;color:var(--muted)">จัดการสินค้า/ราคาทุน ทำที่ PurchasePro</span>
+        </div>
+        <div class="cat-grid" id="cat-grid"></div>
+      </div>
+
+      <!-- CUSTOMERS -->
+      <div class="page" id="page-customers">
+        <div class="filter-row">
+          <input id="cust-search" placeholder="ค้นหาลูกค้า..." oninput="searchCustomers()" style="flex:1;max-width:300px">
+          <div class="spacer"></div>
+          <button class="btn btn-primary btn-sm" onclick="openAddCustomer()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            เพิ่มลูกค้าใหม่
+          </button>
+        </div>
+        <div class="card"><table>
+          <thead><tr><th>รหัส</th><th>ชื่อบริษัท / ลูกค้า</th><th>ผู้ติดต่อ</th><th>เบอร์โทร</th><th>Email</th><th>เลขภาษี</th><th>ที่อยู่</th><th></th></tr></thead>
+          <tbody id="customers-body"></tbody>
+        </table></div>
+      </div>
+
+      <!-- SALE FORECAST -->
+      <div class="page" id="page-forecast">
+        <div class="filter-row" style="flex-wrap:wrap;gap:8px">
+          <input id="fc-search" placeholder="ค้นหา ลูกค้า/โปรเจกต์..." oninput="renderForecast()" style="flex:1;max-width:280px">
+          <select id="fc-filter-status" onchange="renderForecast()"><option value="">ทุกสถานะ</option></select>
+          <div class="spacer"></div>
+          <span id="fc-save-status" style="font-size:11px;color:var(--muted)"></span>
+          <button class="btn btn-sm" onclick="exportForecastCSV()" title="ดาวน์โหลดเป็น CSV (เปิดใน Excel)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="addForecastRow()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            เพิ่มรายการ
+          </button>
+        </div>
+        <div class="card" style="overflow-x:auto">
+          <table class="fc-table" style="min-width:1500px">
+            <thead>
+              <tr>
+                <th rowspan="2" style="width:34px">No</th>
+                <th rowspan="2" style="width:150px">Customer</th>
+                <th rowspan="2" style="width:90px">Time Frame</th>
+                <th rowspan="2" style="width:180px">Project</th>
+                <th colspan="3" style="text-align:center;border-bottom:1px solid var(--border)">Project Value</th>
+                <th rowspan="2" style="width:90px">Selling</th>
+                <th rowspan="2" style="width:90px">Partner</th>
+                <th rowspan="2" style="width:90px">Vendor</th>
+                <th rowspan="2" style="width:120px">Status</th>
+                <th rowspan="2" style="width:80px">Opportunity</th>
+                <th rowspan="2" style="width:100px">Competitor</th>
+                <th rowspan="2" style="width:100px">HOW WIN</th>
+                <th rowspan="2" style="width:90px">Remark</th>
+                <th rowspan="2" style="width:34px"></th>
+              </tr>
+              <tr>
+                <th style="width:110px;text-align:right">One Time</th>
+                <th style="width:110px;text-align:right">Yearly</th>
+                <th style="width:110px;text-align:right">Monthly</th>
+              </tr>
+            </thead>
+            <tbody id="forecast-body"></tbody>
+            <tfoot id="forecast-foot"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- VENDOR -->
+      <div class="page" id="page-vendor">
+        <div class="filter-row" style="flex-wrap:wrap;gap:8px">
+          <input id="vd-search" placeholder="ค้นหา Vendor..." oninput="renderVendors()" style="flex:1;max-width:300px">
+          <div class="spacer"></div>
+          <button class="btn btn-primary btn-sm" onclick="openAddVendor()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            เพิ่ม Vendor
+          </button>
+        </div>
+        <div class="card"><table>
+          <thead><tr><th>Vendor</th><th>ผู้ติดต่อ</th><th>เบอร์โทร</th><th>Email</th><th>สัญญา/เอกสาร</th><th>หมายเหตุ</th><th></th></tr></thead>
+          <tbody id="vendor-body"></tbody>
+        </table></div>
+      </div>
+
+      <!-- CONTRACTS -->
+      <div class="page" id="page-contracts">
+        <div id="ct-reminders"></div>
+        <div class="filter-row" style="flex-wrap:wrap;gap:8px">
+          <input id="ct-search" placeholder="ค้นหา คู่สัญญา/ชื่อสัญญา/PO..." oninput="renderContracts()" style="flex:1;max-width:280px">
+          <select id="ct-filter-status" onchange="renderContracts()"><option value="">ทุกสถานะ</option><option value="active">ปกติ</option><option value="expiring">ใกล้หมดอายุ</option><option value="expired">หมดอายุ</option></select>
+          <div class="spacer"></div>
+          <button class="btn btn-sm" onclick="openContractImport()">📥 นำเข้าจาก Excel</button>
+          <button class="btn btn-primary btn-sm" onclick="openAddContract()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            เพิ่มสัญญา
+          </button>
+        </div>
+        <div class="card" style="overflow-x:auto"><table style="min-width:1100px">
+          <thead><tr>
+            <th>เลขที่ INV</th><th>คู่สัญญา/ผู้ขาย</th><th>ชื่อสัญญา/บริการ</th><th>PO อ้างอิง</th><th>ใบเสนอราคา</th>
+            <th>เริ่ม</th><th>สิ้นสุด</th><th>รูปแบบเก็บเงิน</th><th style="text-align:right">มูลค่า(ก่อน VAT)</th>
+            <th>ผู้ประสานงาน</th><th style="text-align:center">เตือนล่วงหน้า</th><th style="text-align:center">คงเหลือ(วัน)</th>
+            <th>สถานะ</th><th style="text-align:right">เบิกจ่ายสะสม</th><th style="text-align:right">คงเหลือวงเงิน</th><th style="text-align:center">%ใช้ไป</th><th></th>
+          </tr></thead>
+          <tbody id="contracts-body"></tbody>
+        </table></div>
+      </div>
+
+      <!-- COMPANY SETTINGS -->
+      <div class="page" id="page-company">
+        <!-- Admin-only section -->
+        <div id="admin-settings-section" style="display:none">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;font-size:12px;color:var(--amber)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Admin Settings — มองเห็นเฉพาะผู้อนุมัติ/Admin เท่านั้น
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div>
+              <div class="card" style="margin-bottom:14px">
+                <div class="card-header"><h3>Logo บริษัท</h3></div>
+                <div style="padding:16px">
+                  <div id="logo-preview" style="width:180px;height:80px;border:1.5px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;cursor:pointer;overflow:hidden" onclick="document.getElementById('logo-file').click()">
+                    <span style="font-size:12px;color:var(--muted)">คลิกเพื่ออัปโหลด Logo</span>
+                  </div>
+                  <input type="file" id="logo-file" accept="image/*" style="display:none" onchange="previewCompanyImage('logo-file','logo-preview','logo')">
+                  <button class="btn btn-sm" onclick="document.getElementById('logo-file').click()">เปลี่ยน Logo</button>
+                </div>
+              </div>
+              <div class="card" style="margin-bottom:14px">
+                <div class="card-header"><h3>ภาพชื่อบริษัท (หัวเอกสาร)</h3></div>
+                <div style="padding:16px">
+                  <div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.6">ใช้ไฟล์รูปชื่อบริษัท (PNG พื้นหลังโปร่งใส) เพื่อให้ระยะห่างตัวอักษรเป๊ะแบบฟอร์มจริง — ถ้าไม่อัปโหลด จะใช้ข้อความปกติ</div>
+                  <div id="coname-preview" style="width:260px;max-width:100%;min-height:56px;border:1.5px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:12px;cursor:pointer;overflow:hidden;background:#fff" onclick="document.getElementById('coname-file').click()">
+                    <span style="font-size:12px;color:var(--muted)">คลิกเพื่ออัปโหลดภาพชื่อบริษัท</span>
+                  </div>
+                  <input type="file" id="coname-file" accept="image/*" style="display:none" onchange="previewCompanyImage('coname-file','coname-preview','coname')">
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+                    <button class="btn btn-sm" onclick="document.getElementById('coname-file').click()">เปลี่ยนภาพ</button>
+                    <button class="btn btn-sm" onclick="clearConameImage()" style="border:1px solid var(--border2)">ลบภาพ (ใช้ข้อความ)</button>
+                  </div>
+                  <div style="display:flex;gap:14px;flex-wrap:wrap">
+                    <label style="font-size:12px;flex:1;min-width:120px">กว้าง (px) — ดึง/ย่นแนวนอน
+                      <input type="number" id="coname-w" min="80" max="500" step="2" oninput="updateConamePreview()" placeholder="260" style="width:100%;font-size:12px;margin-top:2px">
+                    </label>
+                    <label style="font-size:12px;flex:1;min-width:120px">สูง (px) — ดึง/ย่นแนวตั้ง
+                      <input type="number" id="coname-h" min="20" max="140" step="2" oninput="updateConamePreview()" placeholder="อัตโนมัติ" style="width:100%;font-size:12px;margin-top:2px">
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="card" style="margin-bottom:14px">
+                <div class="card-header"><h3>ข้อมูลบริษัท</h3></div>
+                <div style="padding:16px">
+                  <div class="form-grid">
+                    <div class="form-group" style="grid-column:1/-1"><label>ชื่อบริษัท (ไทย)</label><input id="co-name" placeholder="บริษัท ... จำกัด"></div>
+                    <div class="form-group" style="grid-column:1/-1"><label>ชื่อบริษัท (อังกฤษ) — สำหรับหัวเอกสาร</label><input id="co-name-en" placeholder="... CO.,LTD."></div>
+                    <div class="form-group"><label>เลขประจำตัวผู้เสียภาษี</label><input id="co-taxid" placeholder="0000000000000"></div>
+                    <div class="form-group"><label>เบอร์โทรศัพท์</label><input id="co-phone" placeholder="02-xxx-xxxx"></div>
+                    <div class="form-group"><label>Fax</label><input id="co-fax" placeholder="02-xxx-xxxx"></div>
+                    <div class="form-group"><label>Email</label><input id="co-email" placeholder="info@company.com"></div>
+                    <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ (ไทย)</label><textarea id="co-address" placeholder="ที่อยู่บริษัท..." style="min-height:72px"></textarea></div>
+                    <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ (อังกฤษ) — สำหรับหัวเอกสาร</label><textarea id="co-address-en" placeholder="HEAD OFFICE address (English)..." style="min-height:60px"></textarea></div>
+                    <div class="form-group" style="grid-column:1/-1">
+                      <label>รูปแบบเลขที่เอกสาร (ใบกำกับภาษี/ใบเสร็จ/ใบส่งของ)</label>
+                      <input id="co-docno-format" placeholder="TIS-{YY}{MM}-{NO}" style="font-family:var(--mono)">
+                      <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6">
+                        Token: <b>{YYYY}</b>=ปี ค.ศ.4หลัก · <b>{YY}</b>=ค.ศ.2หลัก · <b>{BBBB}</b>=พ.ศ.4หลัก · <b>{BB}</b>=พ.ศ.2หลัก · <b>{MM}</b>=เดือน · <b>{DD}</b>=วัน · <b>{NO}</b>=เลขรัน(จากใบเสนอราคา) · <b>{NNN}</b>/<b>{NNNN}</b>=เลขรันเติม 0<br>
+                        ตัวอย่าง <code>TIS-{YY}{MM}-{NNNN}</code> → TIS-2607-0026 · เว้นว่าง = ใช้ค่าเดิม <code>TIS-{YY}{MM}-{NO}</code>
+                      </div>
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
+                      <label>ขนาดฟอนต์หัวบริษัทใน PDF</label>
+                      <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+                        <input type="range" id="co-headerfs" min="8" max="20" value="10" step="1" oninput="document.getElementById('co-headerfs-val').textContent=this.value+'px'" style="flex:1;accent-color:var(--accent);cursor:pointer">
+                        <span id="co-headerfs-val" style="font-family:var(--mono);color:var(--accent2);min-width:40px;text-align:right">10px</span>
+                      </div>
+                      <div style="font-size:11px;color:var(--muted);margin-top:4px">คุมขนาดชื่อบริษัท + ที่อยู่ + เลขภาษีของเรา (แยกจากการปรับฟอนต์ในหน้าใบเสนอราคา)</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="card" style="margin-bottom:14px">
+                <div class="card-header"><h3>สีหลักของใบเสนอราคา</h3></div>
+                <div style="padding:16px">
+                  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap" id="color-swatches">
+                    <div onclick="selectColor('#1a3a5c')" style="width:32px;height:32px;border-radius:50%;background:#1a3a5c;cursor:pointer;border:2px solid transparent" data-color="#1a3a5c"></div>
+                    <div onclick="selectColor('#1a5276')" style="width:32px;height:32px;border-radius:50%;background:#1a5276;cursor:pointer;border:2px solid transparent" data-color="#1a5276"></div>
+                    <div onclick="selectColor('#145a32')" style="width:32px;height:32px;border-radius:50%;background:#145a32;cursor:pointer;border:2px solid transparent" data-color="#145a32"></div>
+                    <div onclick="selectColor('#6e2f8f')" style="width:32px;height:32px;border-radius:50%;background:#6e2f8f;cursor:pointer;border:2px solid transparent" data-color="#6e2f8f"></div>
+                    <div onclick="selectColor('#7b241c')" style="width:32px;height:32px;border-radius:50%;background:#7b241c;cursor:pointer;border:2px solid transparent" data-color="#7b241c"></div>
+                    <div onclick="selectColor('#1a252f')" style="width:32px;height:32px;border-radius:50%;background:#1a252f;cursor:pointer;border:2px solid transparent" data-color="#1a252f"></div>
+                    <input type="color" id="co-color" value="#1a3a5c" oninput="selectColor(this.value)" style="width:32px;height:32px;border-radius:50%;border:none;cursor:pointer;padding:0">
+                  </div>
+                  <div style="margin-top:10px;font-size:12px;color:var(--muted)">สีที่เลือก: <span id="co-color-label" style="font-family:var(--mono)">#1a3a5c</span></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header"><h3>Footer / เงื่อนไขมาตรฐาน</h3></div>
+                <div style="padding:16px">
+                  <div class="form-group"><label>ข้อความ Footer</label><textarea id="co-footer" placeholder="เงื่อนไขและข้อกำหนดมาตรฐาน..." style="min-height:80px"></textarea></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:4px;margin-bottom:24px">
+            <button class="btn btn-primary" onclick="saveCompanySettings()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              บันทึกตั้งค่าบริษัท
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="page" id="page-settings">
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <h3>ระดับการอนุมัติตามมูลค่าใบเสนอราคา</h3>
+            <button class="btn btn-primary btn-sm" onclick="addApprovalTier()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              เพิ่มระดับ
+            </button>
+          </div>
+          <div style="padding:16px">
+            <div style="background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--accent2)">
+              <strong>วิธีใช้:</strong> กำหนดวงเงินและ Email ผู้อนุมัติแต่ละระดับ — เมื่อทีมขายส่งใบเสนอราคา ระบบจะแสดงชื่อผู้อนุมัติที่ถูกต้องอัตโนมัติ
+            </div>
+            <table>
+              <thead><tr><th>#</th><th>ชื่อระดับ</th><th>วงเงิน (บาท) ตั้งแต่</th><th>ถึง</th><th>ชื่อผู้อนุมัติ</th><th>Email ผู้อนุมัติ</th><th></th></tr></thead>
+              <tbody id="tiers-body"></tbody>
+            </table>
+            <div style="display:flex;justify-content:flex-end;margin-top:14px">
+              <button class="btn btn-primary" onclick="saveApprovalTiers()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                บันทึก Settings
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ผู้อนุมัติขายต่ำกว่าทุน -->
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <h3>ผู้อนุมัติการขายต่ำกว่าทุน</h3>
+          </div>
+          <div style="padding:16px">
+            <div style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#e9a">
+              <strong>วิธีใช้:</strong> เมื่อมีรายการที่ราคาขายหลังลด <strong>ต่ำกว่าทุน</strong> ทีมขายต้องกด "ขออนุมัติ" ระบบจะส่งเมลถึงผู้อนุมัติด้านล่าง (คั่นหลาย Email ด้วยจุลภาค ,)
+            </div>
+            <input id="bc-approvers" placeholder="approver1@itservices.co.th, approver2@itservices.co.th" style="width:100%;margin-bottom:14px">
+            <div style="display:flex;justify-content:flex-end">
+              <button class="btn btn-primary" onclick="saveBelowCostApprovers()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                บันทึกผู้อนุมัติ
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+  </div>
+  </div>
+</div>
+
+<!-- BELOW-COST APPROVE MODAL -->
+<div class="overlay" id="belowcost-modal" style="z-index:300">
+  <div class="modal" style="width:520px;max-width:94vw">
+    <div class="modal-header">
+      <h3>⚠ อนุมัติการขายต่ำกว่าทุน</h3>
+      <button class="btn btn-sm" onclick="closeModal('belowcost-modal')" style="margin-left:auto">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px">
+      <input type="hidden" id="bc-approve-modal-id">
+      <div id="bc-approve-body"></div>
+      <div id="bc-approve-actions" style="display:none;gap:8px;justify-content:flex-end;margin-top:16px">
+        <button class="btn" onclick="decideBelowCost(false)" style="color:var(--red)">✕ ไม่อนุมัติ</button>
+        <button class="btn btn-primary" onclick="decideBelowCost(true)">✓ อนุมัติ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOLLOW-UP / RENEWAL REMINDER MODAL -->
+<div class="overlay" id="followup-modal" style="z-index:300">
+  <div class="modal" style="width:460px;max-width:94vw">
+    <div class="modal-header">
+      <h3>🔔 ตั้งการติดตาม / ต่อสัญญา</h3>
+      <button class="btn btn-sm" onclick="closeModal('followup-modal')" style="margin-left:auto">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px">
+      <div class="form-grid">
+        <div class="form-group"><label>วันที่แจ้งเตือน</label><input id="fu-date" type="date"></div>
+        <div class="form-group"><label>เรื่อง</label>
+          <select id="fu-subject">
+            <option>ครบกำหนดต่อสัญญา</option>
+            <option>ติดตามลูกค้า</option>
+            <option>ครบกำหนดรับประกัน</option>
+            <option>อื่นๆ</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1"><label>บันทึกเพิ่มเติม</label><textarea id="fu-note" placeholder="เช่น สัญญา MA จะหมดอายุ ควรติดต่อลูกค้าล่วงหน้า..." style="min-height:56px"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Email ผู้เกี่ยวข้อง (คั่นด้วย , หรือขึ้นบรรทัดใหม่)</label>
+          <textarea id="fu-emails" placeholder="sale@itservices.co.th, manager@itservices.co.th" style="min-height:56px;font-family:var(--mono);font-size:12px"></textarea>
+        </div>
+      </div>
+      <div id="fu-status" style="font-size:11px;color:var(--muted);margin-top:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="fu-remove-btn" class="btn btn-sm btn-danger" onclick="removeFollowUp()" style="display:none;margin-right:auto">ลบการติดตาม</button>
+      <button class="btn btn-sm" onclick="closeModal('followup-modal')">ยกเลิก</button>
+      <button class="btn btn-sm btn-primary" onclick="saveFollowUp()">บันทึกการติดตาม</button>
+    </div>
+  </div>
+</div>
+
+<!-- BASKET ASSIGN MODAL -->
+<div class="overlay" id="basket-assign-modal" style="z-index:320">
+  <div class="modal" style="width:420px;max-width:94vw">
+    <div class="modal-header"><h3>🗂 จัดใบนี้เข้าตะกร้า</h3><button class="btn btn-sm" onclick="closeModal('basket-assign-modal')" style="margin-left:auto">✕</button></div>
+    <div class="modal-body" style="padding:16px 20px">
+      <div id="ba-quote" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
+      <div id="ba-list" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+      <div style="display:flex;gap:6px;margin-top:12px">
+        <input id="ba-new" placeholder="สร้างตะกร้าใหม่..." style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none">
+        <button class="btn btn-sm btn-primary" onclick="basketCreateInline()">+ สร้าง</button>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-sm btn-primary" onclick="closeModal('basket-assign-modal')">เสร็จสิ้น</button></div>
+  </div>
+</div>
+
+<!-- BASKET MANAGE MODAL -->
+<div class="overlay" id="basket-manage-modal" style="z-index:320">
+  <div class="modal" style="width:480px;max-width:94vw">
+    <div class="modal-header"><h3>⚙ จัดการตะกร้า</h3><button class="btn btn-sm" onclick="closeModal('basket-manage-modal')" style="margin-left:auto">✕</button></div>
+    <div class="modal-body" style="padding:16px 20px">
+      <div id="bm-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div style="display:flex;gap:6px;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+        <input id="bm-new" placeholder="ชื่อตะกร้าใหม่ เช่น ลูกค้า A, รอตาม..." style="flex:1;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:7px 10px;font-size:12px;color:var(--text);font-family:var(--font);outline:none">
+        <button class="btn btn-sm btn-primary" onclick="basketCreateInline(true)">+ เพิ่มตะกร้า</button>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-sm" onclick="closeModal('basket-manage-modal')">ปิด</button></div>
+  </div>
+</div>
+
+<!-- THEME MODAL -->
+<div class="overlay" id="theme-modal">
+  <div class="modal" style="width:420px;max-width:94vw">
+    <div class="modal-header"><h3>🎨 ปรับแต่งธีม</h3><button class="btn btn-sm" onclick="closeModal('theme-modal')">✕</button></div>
+    <div class="modal-body" style="padding:18px 20px">
+      <div style="margin-bottom:18px">
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:8px">สีหลัก (Accent)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px" id="accent-presets"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="color" id="theme-accent" value="#4f8ef7" oninput="previewTheme()" style="width:46px;height:34px;border:none;border-radius:8px;background:none;cursor:pointer">
+          <span style="font-size:12px;color:var(--muted)">เลือกสีเองได้อิสระ</span>
+        </div>
+      </div>
+      <div style="margin-bottom:18px">
+        <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:8px">สีพื้นหลัง (Background)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px" id="bg-presets"></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="color" id="theme-bg" value="#0f1117" oninput="previewTheme()" style="width:46px;height:34px;border:none;border-radius:8px;background:none;cursor:pointer">
+          <span style="font-size:12px;color:var(--muted)">ระบบจะปรับสีตัวอักษรให้อ่านง่ายอัตโนมัติ</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="resetTheme()">คืนค่าเริ่มต้น</button>
+      <button class="btn btn-sm btn-primary" onclick="saveTheme()">บันทึกธีม</button>
+    </div>
+  </div>
+</div>
+
+<!-- SALE TRACKER MODAL -->
+<div class="overlay" id="sale-tracker-modal">
+  <div class="modal" style="width:720px;max-width:96vw">
+    <div class="modal-header" style="position:sticky;top:0;z-index:10;background:var(--surface)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <h3 id="st-title">ติดตามการขาย</h3>
+      <span id="st-status-badge" style="margin-left:4px"></span>
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        <button id="st-followup-btn" class="btn btn-sm" onclick="openFollowUpModal()" title="ตั้งการติดตาม / แจ้งเตือนต่อสัญญา">
+          🔔 <span id="st-followup-label">ตั้งติดตาม</span>
+        </button>
+        <button id="st-close-deal-btn" class="btn btn-sm btn-success" onclick="confirmCloseDeal()" style="display:none">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          ปิดการขาย
+        </button>
+        <button class="btn btn-sm" onclick="closeModal('sale-tracker-modal')">✕</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);padding:0 20px;overflow-x:auto;flex-wrap:nowrap">
+      <button class="st-tab active" data-tab="timeline" onclick="switchSTTab('timeline',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid var(--accent);color:var(--accent2);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">📋 Timeline / Notes</button>
+      <button id="st-tab-btn-custpo" class="st-tab" data-tab="custpo" onclick="switchSTTab('custpo',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">📋 PO ลูกค้า</button>
+      <button id="st-tab-btn-procurement" class="st-tab" data-tab="procurement" onclick="switchSTTab('procurement',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">📦 แจ้งจัดซื้อ</button>
+      <button id="st-tab-btn-tech" class="st-tab" data-tab="tech" onclick="switchSTTab('tech',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">🔧 ช่างติดตั้ง</button>
+      <button id="st-tab-btn-payment" class="st-tab" data-tab="payment" onclick="switchSTTab('payment',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">💳 บันทึกชำระ</button>
+      <button id="st-tab-btn-expense" class="st-tab" data-tab="expense" onclick="switchSTTab('expense',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">💰 ค่าใช้จ่าย</button>
+      <button class="st-tab" data-tab="docs" onclick="switchSTTab('docs',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">📎 เอกสาร</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px;min-height:320px">
+      <div id="st-tab-timeline">
+        <div style="display:flex;gap:8px;margin-bottom:14px;align-items:flex-start">
+          <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0;margin-top:2px" id="st-user-avatar">?</div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+            <textarea id="st-note-input" placeholder="เพิ่ม note..." style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;resize:vertical;min-height:60px" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
+            <div style="display:flex;justify-content:flex-end">
+              <button class="btn btn-sm btn-primary" onclick="addSaleNote()">+ เพิ่ม Note</button>
+            </div>
+          </div>
+        </div>
+        <div id="st-timeline-list" style="max-height:320px;overflow-y:auto"></div>
+      </div>
+      <div id="st-tab-docs" style="display:none">
+        <!-- Checklist เอกสารส่งมอบ (Flow ขั้น 8) -->
+        <div id="st-delivery-checklist" style="margin-bottom:14px"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:12px;color:var(--muted)">แนบเอกสารสำคัญ</span>
+          <div style="margin-left:auto"><button class="btn btn-sm btn-primary" onclick="document.getElementById('st-file-input').click()">+ เลือกเอกสาร</button></div>
+        </div>
+        <!-- เอกสารที่บันทึกแล้ว -->
+        <div id="st-docs-list" style="margin-bottom:10px"></div>
+        <!-- เอกสารที่รอยืนยัน (pending) -->
+        <div id="st-docs-pending" style="display:none;margin-bottom:10px">
+          <div style="font-size:11px;color:var(--amber);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            รอยืนยันการบันทึก
+          </div>
+          <div id="st-docs-pending-list"></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+            <button class="btn btn-sm" onclick="clearPendingDocs()">ยกเลิก</button>
+            <button class="btn btn-sm btn-primary" onclick="confirmSaveDocs()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              บันทึกเอกสาร
+            </button>
+          </div>
+        </div>
+        <div id="st-drop-zone" onclick="document.getElementById('st-file-input').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--border2)'" ondrop="handleSTDocDrop(event)" style="border:1.5px dashed var(--border2);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:all 0.15s">
+          <div style="font-size:12px;color:var(--muted)">ลากไฟล์มาวาง หรือคลิกเพื่อเลือก</div>
+        </div>
+        <input type="file" id="st-file-input" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip" style="display:none" onchange="handleSTDocSelect(this)">
+      </div>
+      <div id="st-tab-payment" style="display:none">
+        <!-- Payment Due Date -->
+        <div style="margin-bottom:14px;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2)">
+          <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">📅 กำหนดวันชำระ</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="date" id="st-pay-due-date" style="flex:1;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);font-family:var(--font)">
+            <button class="btn btn-sm btn-primary" onclick="savePaymentDueDate()">บันทึก</button>
+          </div>
+          <div id="st-pay-due-display" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
+        </div>
+        <div id="st-pay-summary" style="margin-bottom:14px"></div>
+        <div id="st-pay-history" style="margin-bottom:14px"></div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:10px">+ บันทึกการชำระ</div>
+          <div class="form-grid">
+            <div class="form-group"><label>จำนวนเงิน (บาท)</label><input id="st-pay-amount" type="number" placeholder="0.00" oninput="renderWHTHint()"></div>
+            <div class="form-group"><label>วันที่รับชำระ</label><input id="st-pay-date" type="date"></div>
+            <div class="form-group"><label>วิธีชำระ</label><select id="st-pay-method"><option>เงินสด</option><option>โอนเงิน</option><option>Cheque</option></select></div>
+            <div class="form-group"><label>เลขอ้างอิง</label><input id="st-pay-ref" placeholder="เลขโอน"></div>
+            <div class="form-group"><label>ลูกค้าหัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:6px;align-items:center"><input id="st-pay-wht" type="number" min="0" max="100" step="0.5" placeholder="0" oninput="renderWHTHint()" style="max-width:80px"><button class="action-btn" onclick="document.getElementById('st-pay-wht').value=3;renderWHTHint()" title="ค่าบริการ 3%" style="font-size:11px;padding:3px 8px">3%</button></div></div>
+            <div class="form-group"><label>ยอดหลังหัก (รับจริง)</label><div id="st-pay-wht-hint" style="font-size:12px;color:var(--muted);padding-top:8px">—</div></div>
+            <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="st-pay-note" style="min-height:48px"></textarea></div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>สลิปการโอน</label>
+              <div id="st-slip-drop" onclick="document.getElementById('st-slip-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--border2)'" ondrop="handleSTSlipDrop(event)" style="border:1.5px dashed var(--border2);border-radius:7px;padding:12px;text-align:center;cursor:pointer">
+                <div id="st-slip-label" style="font-size:12px;color:var(--muted)">คลิกหรือลากสลิปมาวาง</div>
+              </div>
+              <input type="file" id="st-slip-file" accept="image/*,.pdf" style="display:none" onchange="handleSTSlipSelect(this)">
+              <div id="st-slip-preview" style="display:none;margin-top:8px"></div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:4px">
+            <button id="st-pay-submit-btn" class="btn btn-success" onclick="saveSTPayment()">บันทึกการชำระ</button>
+          </div>
+        </div>
+      </div>
+      <div id="st-tab-procurement" style="display:none">
+        <div id="pp-progress" style="margin-bottom:14px"></div>
+        <div id="po-saved-list" style="margin-bottom:14px"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div class="form-group"><label>Vendor <span style="color:var(--muted);font-weight:400;font-size:10px">(ถ้ามี — ทีมจัดซื้อเลือก/เทียบราคาเองได้)</span></label><select id="po-vendor-sel" onchange="procVendorChanged()"><option value="">– ยังไม่ระบุ –</option></select></div>
+          <div class="form-group"><label>วันที่ต้องการของ</label><input id="po-required-date" type="date"></div>
+          <div class="form-group"><label>เลขที่ PO / อ้างอิง</label><input id="po-costcenter" placeholder="PO-2026-001"></div>
+          <div class="form-group"><label>งบประมาณ (บาท)</label><input id="po-budget" type="number" placeholder="0.00"></div>
+          <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุถึงฝ่ายจัดซื้อ</label><textarea id="po-note" placeholder="รายละเอียดเพิ่มเติม..." style="min-height:56px"></textarea></div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em">เลือกรายการจัดซื้อ (ราคา = ต้นทุน)</div>
+            <button class="btn btn-sm" onclick="addProcCustomItem()">+ เพิ่มรายการเอง</button>
+          </div>
+          <div id="po-items-preview" style="max-height:220px;overflow-y:auto"></div>
+          <div style="text-align:right;font-size:12px;color:var(--text);margin-top:8px">รวมต้นทุนจัดซื้อ: <span id="po-total" style="color:var(--accent2);font-weight:600;font-family:var(--mono)">฿0.00</span></div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:12px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em">เอกสารจัดซื้อ</div>
+            <label class="btn btn-sm" style="cursor:pointer;margin:0">+ แนบเอกสาร<input type="file" onchange="uploadProcDoc(this)" style="display:none"></label>
+          </div>
+          <span id="po-doc-status" style="font-size:11px;color:var(--muted)"></span>
+          <div id="po-docs-list"></div>
+        </div>
+
+        <!-- Reminder -->
+        <div style="margin-bottom:14px;padding:12px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2)">
+          <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            แจ้งเตือนติดตาม
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="date" id="st-reminder-date" style="flex:1;background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);font-family:var(--font)">
+            <button class="btn btn-sm btn-primary" onclick="saveSTReminder()">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+              ตั้งเตือน
+            </button>
+          </div>
+          <div id="st-reminder-display" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="saveProcurement()">📨 ส่งให้ทีมจัดซื้อ</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:6px">ส่งแล้วทีมจัดซื้อจะรับงานต่อใน PurchasePro — ติดตามสถานะได้ที่แถบด้านบน</div>
+      </div>
+
+      <!-- ════ TAB: ช่างติดตั้ง ════ -->
+      <div id="st-tab-tech" style="display:none">
+        <div id="tech-assign-form" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
+          <div id="tech-form-title" style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:10px">🔧 มอบหมายงานช่าง</div>
+          <div class="form-grid">
+            <div class="form-group"><label>ชื่อช่าง</label><input id="tech-name" placeholder="ชื่อ-นามสกุล"></div>
+            <div class="form-group"><label>Email ช่าง</label><input id="tech-email" type="email" placeholder="tech@company.com"></div>
+            <div class="form-group"><label>ผู้ติดต่อหน้างาน</label><input id="tech-contact-name" placeholder="ชื่อผู้ติดต่อ"></div>
+            <div class="form-group"><label>เบอร์โทรหน้างาน</label><input id="tech-contact-phone" placeholder="08x-xxx-xxxx"></div>
+            <div class="form-group"><label>วันเวลาเข้างาน</label><input id="tech-scheduled-at" type="datetime-local"></div>
+            <div class="form-group"><label>แผนที่ (URL)</label><input id="tech-map-url" placeholder="https://maps.google.com/..."></div>
+            <div class="form-group" style="grid-column:1/-1"><label>วัสดุ/อุปกรณ์ที่ต้องนำไป</label><textarea id="tech-materials" placeholder="เช่น&#10;1. แบตเตอรี่ 12V x2&#10;2. สายไฟ AWG10 10m" style="min-height:72px"></textarea></div>
+            <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุเพิ่มเติม</label><textarea id="tech-note" placeholder="ข้อมูลเพิ่มเติมสำหรับช่าง..." style="min-height:52px"></textarea></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+            <button class="btn" onclick="cancelEditTechJob()">ยกเลิก</button>
+            <button id="tech-save-btn" class="btn btn-primary" onclick="saveTechJob()">📤 มอบหมายและส่ง Email</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">งานที่มอบหมาย</div>
+        <div id="tech-job-list" style="max-height:320px;overflow-y:auto"></div>
+      </div>
+
+      <!-- ════ TAB: ค่าใช้จ่าย / งบประมาณ ════ -->
+      <div id="st-tab-expense" style="display:none">
+        <div id="exp-summary" style="margin-bottom:14px"></div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:10px">➕ บันทึกค่าใช้จ่าย</div>
+          <div class="form-grid">
+            <div class="form-group"><label>ประเภท</label>
+              <select id="exp-cat">
+                <option>เดินทาง</option>
+                <option>ที่พัก</option>
+                <option>ค่ารับรอง/อาหาร</option>
+                <option>ค่าขนส่ง/ส่งของ</option>
+                <option>ค่าแรงช่าง/ติดตั้ง</option>
+                <option>ค่าอุปกรณ์/วัสดุ</option>
+                <option>อื่นๆ</option>
+              </select>
+            </div>
+            <div class="form-group"><label>วันที่</label><input id="exp-date" type="date"></div>
+            <div class="form-group" style="grid-column:1/-1"><label>รายละเอียด</label><input id="exp-detail" placeholder="เช่น เดินทางไปพบลูกค้า สาทร (ค่าน้ำมัน+ทางด่วน)"></div>
+            <div class="form-group"><label>จำนวนเงิน (บาท)</label><input id="exp-amount" type="number" min="0" step="0.01" placeholder="0.00"></div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>แนบรูปใบเสร็จ/สลิป <span style="color:var(--red)">*</span></label>
+              <input type="file" id="exp-receipt" accept="image/*" onchange="onExpReceiptSelect(this)" style="font-size:12px">
+              <div id="exp-receipt-preview" style="display:none;margin-top:8px"></div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:8px">
+            <span id="exp-save-status" style="font-size:11px;color:var(--muted)"></span>
+            <button id="exp-save-btn" class="btn btn-primary" onclick="addExpense()">บันทึกค่าใช้จ่าย</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">รายการค่าใช้จ่าย</div>
+        <div id="exp-list" style="max-height:300px;overflow-y:auto"></div>
+      </div>
+
+      <!-- ════ TAB: PO ลูกค้า ════ -->
+      <div id="st-tab-custpo" style="display:none">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:10px">+ บันทึก PO ลูกค้า</div>
+          <div class="form-grid">
+            <div class="form-group"><label>เลข PO</label><input id="cpo-number" placeholder="PO-2025-001" style="font-family:monospace"></div>
+            <div class="form-group"><label>วันที่ PO</label><input id="cpo-date" type="date"></div>
+            <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="cpo-note" placeholder="รายละเอียด..." style="min-height:52px"></textarea></div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label>แนบไฟล์ PO</label>
+              <div id="cpo-drop-zone" onclick="document.getElementById('cpo-file-input').click()"
+                ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+                ondragleave="this.style.borderColor='var(--border2)'"
+                ondrop="handleCPODrop(event)"
+                style="border:1.5px dashed var(--border2);border-radius:7px;padding:14px;text-align:center;cursor:pointer;transition:all 0.15s">
+                <div id="cpo-drop-label" style="font-size:12px;color:var(--muted)">📎 คลิกหรือลากไฟล์ PO มาวาง (PDF, รูป, Word — สูงสุด 2MB)</div>
+              </div>
+              <input type="file" id="cpo-file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none" onchange="handleCPOFileSelect(this)">
+              <div id="cpo-file-preview" style="margin-top:8px;padding:8px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;display:none;align-items:center;gap:8px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <span id="cpo-file-name" style="font-size:11px;color:var(--text);flex:1"></span>
+                <button onclick="clearCPOFile()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1">✕</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:6px">
+            <button class="btn btn-primary" onclick="saveCustPO()">💾 บันทึก PO</button>
+          </div>
+        </div>
+        <div id="cpo-print-section" style="display:none;margin-bottom:12px;padding:10px 14px;background:rgba(79,142,247,0.06);border:1px solid rgba(79,142,247,0.2);border-radius:8px">
+          <div style="font-size:11px;font-weight:600;color:var(--accent2);margin-bottom:8px">📄 ออกเอกสาร (เลือกทีละใบ)</div>
+          <div style="margin-bottom:10px;padding:8px 10px;border:1px dashed var(--border2);border-radius:6px;background:var(--surface)">
+            <label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer"><input type="checkbox" id="cpo-manual-toggle" onchange="toggleDocManual(this.checked)" style="width:15px;height:15px"> พิมพ์รายการเอง (Manual) — กรอกทุกคอลัมน์เอง (ยอดรวม/VAT ยังคำนวณจากใบเสนอราคาเดิม)</label>
+            <div id="cpo-manual-box" style="display:none;margin-top:8px">
+              <table style="width:100%;border-collapse:collapse;font-size:11px">
+                <thead><tr style="color:var(--muted)">
+                  <th style="width:42px;text-align:center;padding:2px">ลำดับ</th><th style="text-align:left;padding:2px">รายการ</th><th style="width:52px;text-align:center;padding:2px">จำนวน</th><th style="width:76px;text-align:center;padding:2px">ราคา/หน่วย</th><th style="width:76px;text-align:center;padding:2px">จำนวนเงิน</th><th style="width:22px"></th>
+                </tr></thead>
+                <tbody id="cpo-manual-rows"></tbody>
+              </table>
+              <button class="btn btn-sm" onclick="addDocManualRow()" style="font-size:11px;margin-top:6px;border:1px dashed var(--border2);background:none;color:var(--muted)">+ เพิ่มแถว</button>
+            </div>
+          </div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">🧾 ใบกำกับภาษี (TAX INVOICE)</div>
+            <input id="cpo-refnote-tax" onchange="saveDocReferNote('tax',this.value)" placeholder="ข้อความเหนือ E.&O.E. เช่น รบกวนหักภาษี ณ ที่จ่าย (%)" style="width:100%;font-size:11px;margin-bottom:5px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="printCustomerDoc('tax','customer')" style="font-size:12px;padding:5px 12px">ต้นฉบับลูกค้า</button>
+              <button class="btn" onclick="printCustomerDoc('tax','company')" style="font-size:12px;padding:5px 12px;border:1px solid var(--border2)">สำเนาบริษัท</button>
+            </div>
+          </div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">📦 ใบส่งของ / ใบแจ้งหนี้ (DELIVERY ORDER/INVOICE)</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="printCustomerDoc('delivery','customer')" style="font-size:12px;padding:5px 12px">ต้นฉบับลูกค้า</button>
+              <button class="btn" onclick="printCustomerDoc('delivery','company')" style="font-size:12px;padding:5px 12px;border:1px solid var(--border2)">สำเนาบริษัท</button>
+            </div>
+          </div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">💵 ใบเสร็จรับเงิน (RECEIPT)</div>
+            <input id="cpo-refnote-receipt" onchange="saveDocReferNote('receipt',this.value)" placeholder="ข้อความเหนือ E.&O.E. เช่น Refer No. INV..." style="width:100%;font-size:11px;margin-bottom:5px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="printCustomerDoc('receipt','customer')" style="font-size:12px;padding:5px 12px">ต้นฉบับลูกค้า</button>
+              <button class="btn" onclick="printCustomerDoc('receipt','company')" style="font-size:12px;padding:5px 12px;border:1px solid var(--border2)">สำเนาบริษัท</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">📋 ใบส่งของชั่วคราว (ไม่แสดงราคา)</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn" onclick="printCustomerDoc('tempdelivery','customer')" style="font-size:12px;padding:5px 12px;border:1px solid var(--border2)">📋 ออกใบส่งของชั่วคราว</button>
+            </div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">PO ที่ได้รับ</div>
+        <div id="cpo-list" style="max-height:200px;overflow-y:auto"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modals -->
+<div class="overlay" id="catalog-modal">
+  <div class="modal">
+    <div class="modal-header"><h3>เลือกสินค้าจาก Catalog</h3><button class="btn btn-sm" onclick="closeModal('catalog-modal')">✕</button></div>
+    <div class="modal-body">
+      <input id="cat-modal-search" placeholder="ค้นหา..." oninput="renderModalCatalog()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:13px;color:var(--text);margin-bottom:12px;outline:none;font-family:var(--font)">
+      <div class="cat-grid" id="cat-modal-grid" style="grid-template-columns:repeat(2,1fr)"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="product-modal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="pm-title">เพิ่มสินค้าใหม่</h3><button class="btn btn-sm" onclick="closeModal('product-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>ชื่อสินค้า</label><input id="np-name" placeholder="ชื่อสินค้า"></div>
+        <div class="form-group"><label>รหัสสินค้า (SKU)</label><input id="np-sku" placeholder="SKU-001"></div>
+        <div class="form-group"><label>Part No.</label><input id="np-pn" placeholder="Part Number" style="font-family:var(--mono)"></div>
+        <div class="form-group"><label>หน่วย</label><input id="np-unit" placeholder="ชิ้น / ชุด / ชั่วโมง"></div>
+        <div class="form-group"><label>ราคาต้นทุน (บาท)</label><input id="np-cost" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateProductMargin()" style="text-align:right"></div>
+        <div class="form-group"><label>ราคาขาย (บาท)</label><input id="np-price" type="number" min="0" step="0.01" placeholder="0.00" oninput="updateProductMargin()" style="text-align:right"></div>
+        <div class="form-group" style="grid-column:1/-1"><div id="np-margin" style="font-size:12px;color:var(--muted)"></div></div>
+        <div class="form-group"><label>หมวดหมู่</label>
+          <select id="np-cat"><option>Hardware</option><option>Software</option><option>Service</option><option>Consumable</option></select>
+        </div>
+        <div class="form-group"><label>Vendor (ผู้ขาย/ต้นทุน)</label><select id="np-vendor"></select></div>
+        <div class="form-group" style="grid-column:1/-1"><label>รายละเอียด</label><textarea id="np-desc" placeholder="รายละเอียดสินค้า..."></textarea></div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>เอกสารการซื้อ (ใบเสนอราคา Vendor / ใบสั่งซื้อ ฯลฯ)</label>
+          <div id="np-pdoc" style="margin-bottom:6px"></div>
+          <input type="file" id="np-pdoc-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="uploadProductDoc(this)" style="font-size:12px">
+          <div id="np-pdoc-status" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('product-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveProduct()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="approve-modal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="am-title">รายละเอียดใบเสนอราคา</h3><button class="btn btn-sm" onclick="closeModal('approve-modal')">✕</button></div>
+    <div class="modal-body" id="am-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('approve-modal')">ปิด</button>
+      <button class="btn btn-danger" onclick="doApprove('Rejected')">✕ ปฏิเสธ</button>
+      <button class="btn btn-success" onclick="doApprove('Approved')">✓ อนุมัติ</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="payment-modal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="pay-title">บันทึกการชำระเงิน</h3><button class="btn btn-sm" onclick="closeModal('payment-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>จำนวนเงิน (บาท)</label><input id="pay-amount" type="number" placeholder="0.00"></div>
+        <div class="form-group"><label>วันที่รับชำระ</label><input id="pay-date" type="date"></div>
+        <div class="form-group"><label>วิธีชำระ</label>
+          <select id="pay-method"><option>เงินสด</option><option>โอนเงิน</option><option>Cheque</option></select>
+        </div>
+        <div class="form-group"><label>เลขอ้างอิง</label><input id="pay-ref" placeholder="เลขโอน / เลข Cheque"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="pay-note"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>สลิปการโอน / หลักฐานการชำระ</label>
+          <div id="slip-drop-zone" onclick="document.getElementById('slip-file').click()" style="border:1.5px dashed var(--border2);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--surface2)"
+            ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+            ondragleave="this.style.borderColor='var(--border2)'"
+            ondrop="handleSlipDrop(event)">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" style="display:block;margin:0 auto 8px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div id="slip-label" style="font-size:13px;color:var(--muted)">คลิกหรือลากไฟล์มาวางที่นี่</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">รองรับ JPG, PNG, PDF (ขนาดสูงสุด 5MB)</div>
+          </div>
+          <input type="file" id="slip-file" accept="image/*,.pdf" style="display:none" onchange="handleSlipSelect(this)">
+          <div id="slip-preview" style="display:none;margin-top:10px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('payment-modal')">ยกเลิก</button>
+      <button class="btn btn-success" onclick="savePayment()">บันทึกการชำระ</button>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOMER PICKER MODAL (for quote) -->
+<div class="overlay" id="customer-picker-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <h3>เลือกลูกค้า</h3>
+      <button class="btn btn-sm" onclick="closeModal('customer-picker-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input id="cust-picker-search" placeholder="ค้นหาชื่อบริษัท / ผู้ติดต่อ..." oninput="renderCustomerPicker()"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:13px;color:var(--text);margin-bottom:12px;outline:none;font-family:var(--font)">
+      <div id="customer-picker-list"></div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);text-align:center">
+        <button class="btn btn-sm btn-primary" onclick="closeModal('customer-picker-modal');openAddCustomer()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          เพิ่มลูกค้าใหม่
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOMER MODAL -->
+<div class="overlay" id="vendor-modal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="vm-title">เพิ่ม Vendor</h3><button class="btn btn-sm" onclick="closeModal('vendor-modal')" style="margin-left:auto">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1"><label>ชื่อ Vendor / บริษัทผู้ขาย</label><input id="vd-name" placeholder="บริษัท ... จำกัด"></div>
+        <div class="form-group"><label>ผู้ติดต่อ</label><input id="vd-contact" placeholder="ชื่อผู้ติดต่อ"></div>
+        <div class="form-group"><label>เบอร์โทร</label><input id="vd-phone" placeholder="08x-xxx-xxxx"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Email</label><input id="vd-email" placeholder="vendor@company.com"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="vd-note" placeholder="เงื่อนไข/รายละเอียดผู้ขาย..." style="min-height:56px"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>สัญญา / เอกสาร Vendor</label>
+          <div id="vd-contracts" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px"></div>
+          <input type="file" id="vd-file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onchange="uploadVendorContract(this)" style="font-size:12px">
+          <div id="vd-file-status" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('vendor-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveVendor()">บันทึก Vendor</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="contract-modal">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header"><h3 id="ctm-title">เพิ่มสัญญา</h3><button class="btn btn-sm" onclick="closeModal('contract-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>เลขที่ INV</label><input id="ct-invno" placeholder="เช่น IV-2026-001"></div>
+        <div class="form-group"><label>คู่สัญญา / ผู้ขาย</label><input id="ct-party" placeholder="บริษัท ... จำกัด"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>ชื่อสัญญา / บริการ</label><input id="ct-name" placeholder="เช่น Microsoft 365 Business Premium (Annual)"></div>
+        <div class="form-group"><label>เลขผู้เสียภาษีผู้ขาย</label><input id="ct-vendortax" placeholder="0000000000000"></div>
+        <div class="form-group"><label>เลขที่อ้างอิง PO</label><input id="ct-poref" placeholder="เช่น A808-04-2026"></div>
+        <div class="form-group"><label>วันเริ่มสัญญา</label><input id="ct-start" type="date"></div>
+        <div class="form-group"><label>วันสิ้นสุดสัญญา</label><input id="ct-end" type="date"></div>
+        <div class="form-group"><label>รูปแบบการเรียกเก็บเงิน</label><select id="ct-billing"><option>รายปี</option><option>ราย 3 ปี</option><option>รายเดือน</option><option>ครั้งเดียว</option><option>อื่นๆ</option></select></div>
+        <div class="form-group"><label>มูลค่าสัญญารวม (ก่อน VAT)</label><input id="ct-value" type="number" placeholder="0.00"></div>
+        <div class="form-group"><label>ผู้ประสานงาน</label><input id="ct-coordinator" placeholder="ชื่อผู้ประสานงาน"></div>
+        <div class="form-group"><label>แจ้งเตือนล่วงหน้า (วัน)</label><input id="ct-alertdays" type="number" placeholder="30" value="30"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>อีเมลรับแจ้งเตือน (คั่นด้วย , หรือขึ้นบรรทัดใหม่)</label><textarea id="ct-alertemails" placeholder="a@itservices.co.th, b@itservices.co.th" style="min-height:48px;font-family:var(--mono);font-size:12px"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1"><label>ผูกกับใบเสนอราคา (ติ๊กเลือกได้หลายใบ; ยอดเบิกจ่ายดึงจากการชำระอัตโนมัติ)</label><div id="ct-quote-list" style="max-height:170px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px"></div><div style="font-size:11px;color:var(--muted);margin-top:3px">ไม่ติ๊กใบใด = ไม่ผูก (กรอกยอดเบิกจ่ายเอง)</div></div>
+        <div class="form-group" id="ct-manual-wrap"><label>ยอดเบิกจ่ายสะสม (กรอกเอง — เมื่อไม่ผูกใบ)</label><input id="ct-manualdisbursed" type="number" placeholder="0.00"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="ct-note" style="min-height:44px"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ct-acked" style="width:auto"> 🔕 รับทราบแล้ว — ปิดแจ้งเตือนสัญญานี้ (รอบปัจจุบัน)</label></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm btn-danger" id="ct-delete-btn" onclick="deleteContract()" style="display:none;margin-right:auto">ลบสัญญา</button>
+      <button class="btn" onclick="closeModal('contract-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveContract()">บันทึกสัญญา</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="contract-import-modal">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header"><h3>📥 นำเข้าสัญญาจาก Excel</h3><button class="btn btn-sm" onclick="closeModal('contract-import-modal')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:8px">
+        คัดลอกแถวจาก Excel/Google Sheets แล้ววางด้านล่าง (คั่นด้วย Tab) — เรียงคอลัมน์ตามนี้:<br>
+        <code style="font-size:11px">เลขที่INV · คู่สัญญา/ผู้ขาย · ชื่อสัญญา · เลขภาษีผู้ขาย · PO · วันเริ่ม · วันสิ้นสุด · รูปแบบเก็บเงิน · มูลค่า(ก่อนVAT) · ผู้ประสานงาน · เตือนล่วงหน้า(วัน) · [หมายเหตุ]</code><br>
+        <span style="color:var(--amber)">วันที่รับได้ทั้ง DD/MM/YYYY และ YYYY-MM-DD · มีหัวตารางก็ได้ (ระบบข้ามให้) · มูลค่าใส่ , ได้</span>
+      </div>
+      <textarea id="ct-import-text" oninput="previewContractImport()" placeholder="วางข้อมูลที่นี่..." style="width:100%;min-height:180px;font-family:var(--mono);font-size:12px"></textarea>
+      <div id="ct-import-preview" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('contract-import-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" id="ct-import-btn" onclick="confirmContractImport()" disabled>นำเข้า</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="customer-modal">
+  <div class="modal">
+    <div class="modal-header"><h3 id="cm-title">เพิ่มลูกค้าใหม่</h3><button class="btn btn-sm" onclick="closeModal('customer-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>รหัสลูกค้า</label><input id="cu-code" placeholder="เช่น E003"></div>
+        <div class="form-group"><label>ผู้ติดต่อ</label><input id="cu-contact" placeholder="ชื่อผู้ติดต่อ"></div>
+        <div class="form-group"><label>เลขประจำตัวผู้เสียภาษี</label><input id="cu-taxid" placeholder="0000000000000"></div>
+        <div class="form-group"><label>เบอร์โทร</label><input id="cu-phone" placeholder="08x-xxx-xxxx"></div>
+        <div class="form-group"><label>Fax</label><input id="cu-fax" placeholder="02-xxx-xxxx"></div>
+        <div class="form-group"><label>Email</label><input id="cu-email" placeholder="email@company.com"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>ชื่อบริษัท / ชื่อลูกค้า (ภาษาไทย) — ใช้กับเอกสารสำคัญ (SOLD TO)</label><input id="cu-name" placeholder="บริษัท ... จำกัด"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ (ภาษาไทย) — ใช้กับเอกสารสำคัญ</label><textarea id="cu-address" placeholder="ที่อยู่ภาษาไทย..." style="min-height:80px"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1"><label>ชื่อบริษัท (EN) — ใช้ในใบเสนอราคา</label><input id="cu-name-en" placeholder="Company Co., Ltd."></div>
+        <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ (ภาษาอังกฤษ) — ใช้ในใบเสนอราคา</label><textarea id="cu-address-en" placeholder="Address for quotation (English)..." style="min-height:80px"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('customer-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveCustomer()">บันทึกลูกค้า</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="pdf-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header"><h3>Preview ใบเสนอราคา</h3><button class="btn btn-sm" onclick="closeModal('pdf-modal')">✕</button></div>
+    <div class="modal-body"><div id="pdf-content"></div></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('pdf-modal')">ปิด</button>
+      <button class="btn btn-primary" onclick="exportPDF()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- CANCEL QUOTE MODAL -->
+<div class="overlay" id="cancel-quote-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      <h3 style="color:var(--red)">ยกเลิกใบเสนอราคา</h3>
+      <button class="btn btn-sm" onclick="closeModal('cancel-quote-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--red);display:flex;gap:8px;align-items:flex-start">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div>การยกเลิกจะส่ง Email แจ้งผู้อนุมัติ และฝ่ายจัดซื้อ (ถ้ามีการแจ้งจัดซื้อแล้ว) — <strong>ไม่สามารถยกเลิกการกระทำนี้ได้</strong></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>เหตุผลการยกเลิก <span style="color:var(--red)">*</span></label>
+        <textarea id="cancel-reason" placeholder="ระบุเหตุผล เช่น ลูกค้าขอยกเลิก / ราคาไม่ตรง / โปรเจคยกเลิก..." style="min-height:100px"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('cancel-quote-modal')">ยกเลิก</button>
+      <button class="btn btn-danger" onclick="confirmCancelQuote()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        ยืนยันยกเลิกใบเสนอราคา
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="js/config.js?v=g2"></script>
+<script src="js/auth.js?v=g2"></script>
+<script src="js/api.js?v=g2"></script>
+<script src="js/sync.js?v=g2"></script>
+<script src="js/pages/ui.js?v=g2"></script>
+<script src="js/pages/dashboard.js?v=g2"></script>
+<script src="js/pages/quotes.js?v=g2"></script>
+<script src="js/pages/approve.js?v=g2"></script>
+<script src="js/pages/payment.js?v=g2"></script>
+<script src="js/pages/catalog.js?v=g2"></script>
+<script src="js/pages/settings.js?v=g2"></script>
+<script src="js/pages/customers.js?v=g2"></script>
+<script src="js/pages/signature.js?v=g2"></script>
+<script src="js/pages/company.js?v=g2"></script>
+<script src="js/pages/pdf.js?v=g2"></script>
+<script src="js/pages/saletracker.js?v=g2"></script>
+<script src="js/pages/forecast.js?v=g2"></script>
+<script src="js/pages/vendor.js?v=g2"></script>
+<script src="js/pages/belowcost.js?v=g2"></script>
+<script src="js/pages/procurement.js?v=g2"></script>
+<script src="js/pages/contracts.js?v=g2"></script>
+<script src="js/app.js?v=g2"></script>
+<script src="js/tour.js?v=g2"></script>
+<datalist id="doc-type-list">
+  <option value="สัญญา">
+  <option value="PO">
+  <option value="Invoice">
+  <option value="ใบเสร็จ">
+  <option value="ใบส่งของ">
+  <option value="เอกสารอื่น">
+</datalist>
+</body>
+</html>
