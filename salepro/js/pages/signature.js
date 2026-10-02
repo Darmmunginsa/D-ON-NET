@@ -29,6 +29,10 @@ async function loadSaleProfile() {
 
 async function saveSaleProfile(partial) {
   _saleProfile = { ..._saleProfile, ...partial };
+  // ย่อลายเซ็นให้ < 45,000 ตัวอักษร (กันลิมิตเซลล์ 50k)
+  if (_saleProfile.signature && typeof shrinkImageBase64 === 'function') {
+    try { _saleProfile.signature = await shrinkImageBase64(_saleProfile.signature, 600, 45000); } catch(e) {}
+  }
   const email = (currentUser?.email || '').toLowerCase();
   const value = JSON.stringify(_saleProfile);
   try {

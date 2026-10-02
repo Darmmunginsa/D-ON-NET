@@ -121,6 +121,32 @@ function fileToBase64(file) {
   });
 }
 
+// ย่อรูป base64 ให้สั้นกว่า maxChars (Google Sheet จำกัด 50,000 ตัวอักษร/เซลล์)
+async function shrinkImageBase64(dataURL, maxDim, maxChars) {
+  maxDim = maxDim || 512; maxChars = maxChars || 45000;
+  try {
+    if (!dataURL || typeof dataURL !== 'string' || dataURL.indexOf('data:image') !== 0) return dataURL;
+    if (dataURL.length <= maxChars) return dataURL;
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataURL; });
+    let dim = maxDim;
+    for (let pass = 0; pass < 9; pass++) {
+      const scale = Math.min(1, dim / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d'); ctx.clearRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
+      let out = c.toDataURL('image/png');                              // คงความโปร่งใสก่อน
+      if (out.length > maxChars) out = c.toDataURL('image/jpeg', 0.82); // ถ้ายังใหญ่ใช้ JPEG
+      if (out.length <= maxChars) return out;
+      dim = Math.round(dim * 0.8);
+    }
+    const c = document.createElement('canvas');
+    const s = Math.min(1, 256 / Math.max(img.width, img.height));
+    c.width = Math.max(1, Math.round(img.width * s)); c.height = Math.max(1, Math.round(img.height * s));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.6);
+  } catch (e) { console.warn('shrink image failed:', e.message); return dataURL; }
+}
+
 async function uploadCompanyImage(file, name) {
   // Google Sheets version: บันทึกแค่ Base64 (จัดการใน saveCompanySettings)
   return fileToBase64(file);
@@ -163,6 +189,9 @@ async function saveCompanySettings() {
       companySettings.SignatureURL = companySettings.SignatureBase64;
       pendingSignatureFile=null;
     }
+    // ย่อรูปให้ < 45,000 ตัวอักษร ก่อนเก็บลงเซลล์ (กันลิมิต 50k ของ Google Sheet)
+    if (companySettings.LogoBase64)      companySettings.LogoBase64      = await shrinkImageBase64(companySettings.LogoBase64, 512, 45000);
+    if (companySettings.SignatureBase64) companySettings.SignatureBase64 = await shrinkImageBase64(companySettings.SignatureBase64, 600, 45000);
     const fields = { Title:'main', CompanyName:document.getElementById('co-name').value, TaxID:document.getElementById('co-taxid').value, Phone:document.getElementById('co-phone').value, Email:document.getElementById('co-email').value, Address:document.getElementById('co-address').value, PrimaryColor:companySettings.PrimaryColor, FooterText:document.getElementById('co-footer').value, LogoURL:companySettings.LogoBase64||companySettings.LogoURL||'', SignatureURL:companySettings.SignatureBase64||companySettings.SignatureURL||'' };
     if (companySettingsId) { await updateListItem(CONFIG.lists.company, companySettingsId, fields); }
     else { const c=await createListItem(CONFIG.lists.company, fields); companySettingsId=c.id; }
@@ -175,6 +204,7 @@ async function saveCompanySettings() {
     // ภาพชื่อบริษัท (หัวเอกสาร) + ขนาด กว้าง/สูง (HeaderNameImage ถูกเก็บตอน preview แล้ว)
     companySettings.HeaderNameW = +(document.getElementById('coname-w')?.value) || 0;
     companySettings.HeaderNameH = +(document.getElementById('coname-h')?.value) || 0;
+    if (companySettings.HeaderNameImage) companySettings.HeaderNameImage = await shrinkImageBase64(companySettings.HeaderNameImage, 700, 45000);
     try { await saveCompanyExtra(); } catch(e2) { console.warn('save company extra', e2.message); }
     // ขนาดฟอนต์หัวบริษัท — เก็บแยกใน Settings list (เลี่ยงปัญหา column ใน Company list)
     const headerFs = +(document.getElementById('co-headerfs')?.value) || 10;
