@@ -1238,11 +1238,13 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const DOC_CLIENT = ((typeof customerThaiNameByAny === 'function' && customerThaiNameByAny(q.ClientName, q.CustomerTaxID)) || q.ClientName || '');
   const DOC_ADDR   = (q.CustomerAddress || '');   // ADDRESS = ภาษาไทยเสมอ
   // ── หัวบริษัท Fix ตายตัว (ยกเว้นโลโก้ดึงจาก Company Settings) ──
-  const CO_NAME_TH = 'บริษัท ไอที เซอร์วิสเซส จำกัด';
-  const CO_NAME_EN = 'IT SERVICES CO.,LTD.';
-  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = '168/8 ถนนพัฒนาชนบท 3 แขวงคลองสองต้นนุ่น เขตลาดกระบัง กรุงเทพมหานคร 10520';
-  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = '168/8 Patthana Chonabot 3 Rd, Khlong Song Ton Nun Sub District, Lat Krabang District, Bangkok 10520';
-  const CO_TEL = '02-108-6113', CO_FAX = '02-108-6113', CO_TAXID = '0105559006113';
+  // หัวบริษัท — ดึงจากหน้า "ตั้งค่าบริษัท" (แก้ในแอปได้เลย) ถ้าเว้นว่างใช้ค่าเริ่มต้น
+  const _cs = (typeof companySettings !== 'undefined' && companySettings) ? companySettings : {};
+  const CO_NAME_TH = _cs.CompanyName   || 'บริษัท ไอที เซอร์วิสเซส จำกัด';
+  const CO_NAME_EN = _cs.CompanyNameEn || 'IT SERVICES CO.,LTD.';
+  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = _cs.Address   || '168/8 ถนนพัฒนาชนบท 3 แขวงคลองสองต้นนุ่น เขตลาดกระบัง กรุงเทพมหานคร 10520';
+  const CO_ADDR_EN_L = 'HEAD OFFICE',  CO_ADDR_EN_V = _cs.AddressEn || '168/8 Patthana Chonabot 3 Rd, Khlong Song Ton Nun Sub District, Lat Krabang District, Bangkok 10520';
+  const CO_TEL = _cs.Phone || '02-108-6113', CO_FAX = _cs.Fax || _cs.Phone || '02-108-6113', CO_TAXID = _cs.TaxID || '0105559006113';
   const F_TH = "'Sarabun','Segoe UI',sans-serif";                        // ฟอนต์เดิมทั้งเอกสาร (Sarabun)
   const F_EN = "'Sarabun','Segoe UI',sans-serif";
   const F_NUM = "'Sarabun','Segoe UI',sans-serif";
