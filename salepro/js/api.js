@@ -38,9 +38,11 @@ async function _call(payload, _attempt) {
 }
 
 // แปลงชนิดข้อมูลตัวเลข/บูลีน ให้เก็บใน Sheet เป็นค่าที่ถูกต้อง
+// หมายเหตุ: ห้ามใส่ฟิลด์ที่เป็น "id อ้างอิง" (เช่น QuoteID) เพราะ Google version ใช้ UUID
+// ถ้าแปลงเป็นตัวเลข Number(uuid)=NaN → เก็บเป็น 0 → ความสัมพันธ์ขาด
 const _NUMERIC_FIELDS = new Set([
-  'SubTotal','DiscountPct','TotalAmount','PaidAmount','LastNotifiedApprovalID','DealClosedValue',
-  'QuoteID','Quantity','UnitPrice','LineTotal','SortOrder','AmountPaid','Price'
+  'SubTotal','DiscountPct','TotalAmount','PaidAmount','DealClosedValue',
+  'Quantity','UnitPrice','LineTotal','SortOrder','AmountPaid','Price'
 ]);
 const _BOOLEAN_FIELDS = new Set(['DealClosed','CancelNotified','IsActive']);
 function _coerceFields(fields) {
