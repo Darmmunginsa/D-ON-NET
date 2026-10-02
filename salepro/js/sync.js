@@ -33,14 +33,12 @@ function filterQuotesForUser(allQuotes) {
 async function syncAll() {
   toast('กำลังซิงค์ข้อมูล...', 'info');
   try {
-    // โหลดทุกอย่างพร้อมกัน (parallel) เพื่อความเร็ว
-    const [catData, allQuotes, settingsData, procData, companyData] = await Promise.all([
-      getListItems(CONFIG.lists.catalog),
-      getListItems(CONFIG.lists.quotations),
-      getListItems(CONFIG.lists.settings),
-      getListItems(CONFIG.lists.procurement).catch(()=>[]),   // ข้อมูลจัดซื้อ (ลิสต์แยก)
-      getListItems(CONFIG.lists.company)
-    ]);
+    // โหลดทีละตัว (sequential) — ลดโอกาส CORS/redirect ของ Apps Script หลุดตอนยิงพร้อมกัน
+    const catData     = await getListItems(CONFIG.lists.catalog);
+    const allQuotes   = await getListItems(CONFIG.lists.quotations);
+    const settingsData= await getListItems(CONFIG.lists.settings);
+    const procData    = await getListItems(CONFIG.lists.procurement).catch(()=>[]);   // ข้อมูลจัดซื้อ (ลิสต์แยก)
+    const companyData = await getListItems(CONFIG.lists.company);
     catalogData = catData;
     // รวม Settings (ฝั่งขาย) + ProcurementData (ฝั่งจัดซื้อ) เป็น cache เดียว โดยลิสต์จัดซื้อ "ชนะ" ถ้า Title ซ้ำ
     _settingsCache = (settingsData||[]).map(i=>({...i,_srcList:CONFIG.lists.settings}));
