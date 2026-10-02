@@ -18,7 +18,7 @@ function fmtDate(v) {
 
 const CONFIG = {
   // ⬇⬇ กรอก 2 ค่านี้หลังตั้งค่า Google ⬇⬇
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzO2wWtX6x6TBvfrS6VUDlYUICNMW7l1BV2eNtXbD-rIIUwAU3TPbdg2_mByxuuvd2K/exec',
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbKyaHSpdQueWDHSI0SRu3W9f1HRZECtVUs4vPFiPtwfg8h16mFxoJb_GTHrBFVwreQ/exec',
   googleClientId: '1000323548149-1j89kljart0tkdio1atkoov69lfjmk3m.apps.googleusercontent.com',
 
   // แต่ละ list = ชื่อแท็บ (sheet) ใน Google Sheet (สร้างอัตโนมัติเมื่อมีข้อมูลครั้งแรก)
