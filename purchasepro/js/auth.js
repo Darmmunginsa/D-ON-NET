@@ -54,3 +54,34 @@ async function logout() {
   try { if (typeof google !== 'undefined' && google.accounts) google.accounts.id.disableAutoSelect(); } catch(e) {}
   location.reload();
 }
+
+// ── Gmail API OAuth (ส่งอีเมลในนามผู้ที่ล็อกอินจริง ๆ) ──
+let _gmailTokenClient = null, _gmailTok = '', _gmailTokExp = 0, _gmailResolve = null, _gmailReject = null;
+function _ensureTokenClient() {
+  if (_gmailTokenClient) return _gmailTokenClient;
+  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return null;
+  _gmailTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.googleClientId,
+    scope: 'https://www.googleapis.com/auth/gmail.send',
+    callback: function(resp) {
+      if (resp && resp.access_token) {
+        _gmailTok = resp.access_token;
+        _gmailTokExp = Date.now() + ((resp.expires_in || 3600) * 1000) - 60000;
+        if (_gmailResolve) { _gmailResolve(_gmailTok); _gmailResolve = null; _gmailReject = null; }
+      } else if (_gmailReject) {
+        _gmailReject(new Error('ไม่ได้รับสิทธิ์ส่งอีเมล (gmail.send)')); _gmailReject = null; _gmailResolve = null;
+      }
+    }
+  });
+  return _gmailTokenClient;
+}
+// คืน access token ที่ใช้ได้ (ขอ consent ครั้งแรก, เงียบหลังจากนั้น)
+function getGmailToken() {
+  if (_gmailTok && Date.now() < _gmailTokExp) return Promise.resolve(_gmailTok);
+  return new Promise(function(res, rej) {
+    const tc = _ensureTokenClient();
+    if (!tc) { rej(new Error('Google OAuth ยังไม่พร้อม — ลองใหม่อีกครั้ง')); return; }
+    _gmailResolve = res; _gmailReject = rej;
+    try { tc.requestAccessToken({ prompt: '' }); } catch (e) { rej(e); }
+  });
+}

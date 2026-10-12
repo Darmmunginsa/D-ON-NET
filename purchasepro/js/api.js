@@ -81,11 +81,45 @@ async function deleteWhere(list, field, value) {
 }
 
 // ── Email / Upload ──
+// สร้าง MIME (RFC822) แล้ว base64url สำหรับ Gmail API
+function _mimeB64(str){ return btoa(unescape(encodeURIComponent(str))); }
+function _mimeWrap(b64){ return b64.replace(/(.{76})/g, '$1\r\n'); }
+function _encHeader(s){ return '=?UTF-8?B?' + _mimeB64(String(s||'')) + '?='; }
+function _buildRawEmail(from, fromName, to, subject, body, attachments){
+  const isHtml = /<[a-z][\s\S]*>/i.test(body||'');
+  const nl='\r\n';
+  const atts=(attachments||[]).filter(a=>a&&(a.contentBytes||a.base64));
+  const fromHdr = fromName ? (_encHeader(fromName)+' <'+from+'>') : from;
+  let h='From: '+fromHdr+nl+'To: '+to+nl+'Subject: '+_encHeader(subject)+nl+'MIME-Version: 1.0'+nl;
+  const bodyB64=_mimeWrap(_mimeB64(body||''));
+  const bodyPart='Content-Type: text/'+(isHtml?'html':'plain')+'; charset="UTF-8"'+nl+'Content-Transfer-Encoding: base64'+nl+nl+bodyB64;
+  let mime;
+  if(!atts.length){ mime=h+bodyPart; }
+  else {
+    const bd='b_'+Math.random().toString(36).slice(2);
+    mime=h+'Content-Type: multipart/mixed; boundary="'+bd+'"'+nl+nl+'--'+bd+nl+bodyPart+nl;
+    atts.forEach(a=>{ const data=_mimeWrap(a.contentBytes||a.base64);
+      mime+='--'+bd+nl
+        +'Content-Type: '+(a.contentType||'application/octet-stream')+'; name="'+(a.name||'file')+'"'+nl
+        +'Content-Transfer-Encoding: base64'+nl
+        +'Content-Disposition: attachment; filename="'+(a.name||'file')+'"'+nl+nl+data+nl;
+    });
+    mime+='--'+bd+'--';
+  }
+  return _mimeB64(mime).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+// ส่งอีเมล "ในนามผู้ที่ล็อกอินจริง ๆ" ผ่าน Gmail API (ไม่ผ่าน Apps Script)
 async function _sendMail(to, subject, body, attachments) {
-  // ส่งในนามผู้ที่ล็อกอิน: ตั้ง replyTo + ชื่อผู้ส่ง = ผู้ใช้ปัจจุบัน (Vendor ตอบกลับมาหาคนนี้โดยตรง)
-  var _u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
-  return _call({ action: 'sendEmail', to, subject, body, attachments: attachments || [],
-                 replyTo: _u ? (_u.email || '') : '', fromName: _u ? (_u.displayName || _u.email || '') : '' });
+  const _u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
+  if (!_u || !_u.email) throw new Error('ยังไม่ได้เข้าสู่ระบบ');
+  const token = await getGmailToken();   // ขอสิทธิ์ gmail.send (consent ครั้งแรก)
+  const raw = _buildRawEmail(_u.email, _u.displayName || _u.email, to, subject, body, attachments);
+  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw: raw })
+  });
+  if (!r.ok) throw new Error('ส่งอีเมลไม่สำเร็จ (Gmail ' + r.status + '): ' + await r.text());
+  return r.json();
 }
 async function _uploadFile(folder, fileName, mimeType, base64Data) {
   const d = await _call({ action: 'uploadFile', folder, fileName, mimeType, base64: base64Data });
