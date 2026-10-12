@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>PurchasePro — ระบบจัดซื้อ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="assets/style.css?v=g1" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="logo">P</div>
+    <h1>PurchasePro</h1>
+    <p>ระบบจัดซื้อ — iT Services<br>เชื่อมต่อ SharePoint เดียวกับ SalePro</p>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="msalLogin()">เข้าสู่ระบบด้วย Google</button>
+    <div id="gbtn" style="margin-top:10px;display:flex;justify-content:center"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app-screen" style="display:none">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">P</div>
+      <div><h2>PurchasePro</h2><div class="sub">● SharePoint Connected</div></div>
+    </div>
+    <div class="nav-group">จัดซื้อ</div>
+    <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard',this)">📊 ภาพรวม</div>
+    <div class="nav-item" data-page="purchases" onclick="showPage('purchases',this)">📦 งานจัดซื้อ</div>
+    <div class="nav-group">ข้อมูลหลัก</div>
+    <div class="nav-item" data-page="catalog" onclick="showPage('catalog',this)">🛒 Catalog สินค้า</div>
+    <div class="nav-item" data-page="vendors" onclick="showPage('vendors',this)">🏢 Vendor</div>
+    <div class="nav-item" data-page="settings" onclick="showPage('settings',this)">⚙️ ตั้งค่าบริษัท</div>
+    <div class="sidebar-foot">
+      <div class="avatar" id="user-avatar">U</div>
+      <div style="flex:1;min-width:0"><div id="user-name" style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">User</div><div id="user-email" style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div></div>
+      <button class="btn btn-sm" onclick="logout()" title="ออกจากระบบ">⎋</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 id="page-title">ภาพรวม</h1>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm" onclick="openThemePicker()" title="เปลี่ยนสีธีม">🎨 ธีม</button>
+        <button class="btn btn-sm" onclick="syncAll()">↻ Sync</button>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div id="pp-reminders"></div>
+        <div class="stat-grid" id="stat-grid"></div>
+        <div class="card">
+          <div class="card-head">🔥 งานที่ต้องดำเนินการ</div>
+          <table><thead><tr><th>อ้างอิงใบเสนอราคา</th><th>ลูกค้า</th><th>Vendor</th><th>มูลค่า</th><th>สถานะ</th></tr></thead>
+          <tbody id="dash-body"></tbody></table>
+        </div>
+      </div>
+
+      <!-- PURCHASES -->
+      <div class="page" id="page-purchases">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input id="po-search" placeholder="ค้นหา ใบเสนอราคา / ลูกค้า / Vendor..." oninput="renderPurchases()" style="max-width:300px">
+          <select id="po-filter" onchange="renderPurchases()" style="max-width:170px">
+            <option value="">ทุกสถานะ</option>
+          </select>
+          <select id="po-vfilter" onchange="renderPurchases()" style="max-width:150px"><option value="">ทุก Vendor</option></select>
+          <select id="po-tfilter" onchange="renderPurchases()" style="max-width:150px"><option value="">ทุกประเภท</option><option value="sale">เพื่อขาย</option><option value="asset">ทรัพย์สินบริษัท</option></select>
+          <button class="btn btn-primary" style="margin-left:auto" onclick="openNewPurchase()">+ สร้างงานจัดซื้อเอง</button>
+        </div>
+        <div id="po-basket-bar" style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:14px"></div>
+        <div class="card">
+          <table><thead><tr><th>อ้างอิง</th><th>ลูกค้า</th><th>Vendor</th><th>รายการ</th><th>มูลค่า</th><th>สถานะ</th><th></th></tr></thead>
+          <tbody id="purchases-body"></tbody></table>
+        </div>
+      </div>
+
+      <!-- CATALOG -->
+      <div class="page" id="page-catalog">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input id="cat-search" placeholder="ค้นหาสินค้า / Part No...." oninput="renderCatalog()" style="max-width:300px">
+          <button class="btn btn-primary" onclick="openAddProduct()" style="margin-left:auto">+ เพิ่มสินค้า</button>
+        </div>
+        <div class="card">
+          <table><thead><tr><th>Part No.</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ทุน</th><th>ขาย</th><th>กำไร</th><th>Vendor</th><th></th></tr></thead>
+          <tbody id="catalog-body"></tbody></table>
+        </div>
+      </div>
+
+      <!-- VENDORS -->
+      <div class="page" id="page-vendors">
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input id="ven-search" placeholder="ค้นหา Vendor..." oninput="renderVendors()" style="max-width:300px">
+          <button class="btn btn-primary" onclick="openAddVendor()" style="margin-left:auto">+ เพิ่ม Vendor</button>
+        </div>
+        <div class="card">
+          <table><thead><tr><th>ชื่อ</th><th>ผู้ติดต่อ</th><th>โทร</th><th>อีเมล</th><th>สถิติจัดซื้อ</th><th>สัญญา</th><th></th></tr></thead>
+          <tbody id="vendors-body"></tbody></table>
+        </div>
+      </div>
+
+      <div class="page" id="page-settings">
+        <div style="max-width:720px">
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-header"><h3>รูปภาพสำหรับเอกสาร (หัว/ลงนามใบสั่งซื้อ)</h3></div>
+            <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+              <div>
+                <div style="font-size:12px;font-weight:600;margin-bottom:6px">โลโก้บริษัท (หัวเอกสาร)</div>
+                <div id="co-logo-preview" onclick="document.getElementById('co-logo-file').click()" style="width:100%;height:90px;border:1.5px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;cursor:pointer;overflow:hidden;background:#fff"><span style="font-size:12px;color:var(--muted)">คลิกเพื่ออัปโหลดโลโก้</span></div>
+                <input type="file" id="co-logo-file" accept="image/*" style="display:none" onchange="previewPOImage(this,'logo')">
+                <div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="document.getElementById('co-logo-file').click()">เปลี่ยน</button><button class="btn btn-sm" onclick="clearPOImage('logo')" style="border:1px solid var(--border2)">ลบ</button></div>
+              </div>
+              <div>
+                <div style="font-size:12px;font-weight:600;margin-bottom:6px">ตราประทับบริษัท</div>
+                <div id="co-stamp-preview" onclick="document.getElementById('co-stamp-file').click()" style="width:100%;height:90px;border:1.5px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;cursor:pointer;overflow:hidden;background:#fff"><span style="font-size:12px;color:var(--muted)">คลิกเพื่ออัปโหลดตราประทับ</span></div>
+                <input type="file" id="co-stamp-file" accept="image/*" style="display:none" onchange="previewPOImage(this,'stamp')">
+                <div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="document.getElementById('co-stamp-file').click()">เปลี่ยน</button><button class="btn btn-sm" onclick="clearPOImage('stamp')" style="border:1px solid var(--border2)">ลบ</button></div>
+              </div>
+              <div>
+                <div style="font-size:12px;font-weight:600;margin-bottom:6px">ลายเซนผู้มีอำนาจอนุมัติ</div>
+                <div id="co-sign-preview" onclick="document.getElementById('co-sign-file').click()" style="width:100%;height:90px;border:1.5px dashed var(--border2);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:8px;cursor:pointer;overflow:hidden;background:#fff"><span style="font-size:12px;color:var(--muted)">คลิกเพื่ออัปโหลดลายเซน</span></div>
+                <input type="file" id="co-sign-file" accept="image/*" style="display:none" onchange="previewPOImage(this,'sign')">
+                <div style="display:flex;gap:6px"><button class="btn btn-sm" onclick="document.getElementById('co-sign-file').click()">เปลี่ยน</button><button class="btn btn-sm" onclick="clearPOImage('sign')" style="border:1px solid var(--border2)">ลบ</button></div>
+              </div>
+              <div style="grid-column:1/-1;font-size:11px;color:var(--muted)">แนะนำ PNG พื้นหลังโปร่งใส — ตราประทับ/ลายเซนจะแสดงเหนือช่อง "ผู้มีอำนาจอนุมัติ" บนใบสั่งซื้อ</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>ข้อมูลบริษัท</h3></div>
+            <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-group" style="grid-column:1/-1"><label>ชื่อบริษัท (ไทย)</label><input id="co-name"></div>
+              <div class="form-group" style="grid-column:1/-1"><label>ชื่อบริษัท (อังกฤษ)</label><input id="co-nameen"></div>
+              <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่</label><textarea id="co-address" style="min-height:60px"></textarea></div>
+              <div class="form-group"><label>โทรศัพท์</label><input id="co-phone"></div>
+              <div class="form-group"><label>แฟกซ์</label><input id="co-fax"></div>
+              <div class="form-group" style="grid-column:1/-1"><label>เลขประจำตัวผู้เสียภาษี</label><input id="co-taxid"></div>
+              <div style="grid-column:1/-1;display:flex;justify-content:flex-end;margin-top:4px"><button class="btn btn-primary" onclick="saveCompanySettings()">💾 บันทึกตั้งค่าบริษัท</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- PURCHASE DETAIL MODAL -->
+<div class="overlay" id="po-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="pom-title">งานจัดซื้อ</h3>
+      <button class="btn btn-sm" onclick="closeModal('po-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="stepper" id="pom-stepper"></div>
+      <div id="pom-stagebody"></div>
+      <div id="pom-footer" style="display:flex;justify-content:space-between;gap:8px;margin-top:18px;border-top:1px solid var(--border);padding-top:14px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCT MODAL -->
+<div class="overlay" id="product-modal">
+  <div class="modal" style="width:560px">
+    <div class="modal-header"><h3 id="pm-title">เพิ่มสินค้าใหม่</h3><button class="btn btn-sm" onclick="closeModal('product-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1"><label>ชื่อสินค้า</label><input id="np-name"></div>
+        <div class="form-group"><label>SKU</label><input id="np-sku"></div>
+        <div class="form-group"><label>Part No.</label><input id="np-pn"></div>
+        <div class="form-group"><label>ราคาทุน</label><input id="np-cost" type="number" oninput="updateProductMargin()"></div>
+        <div class="form-group"><label>ราคาขาย</label><input id="np-price" type="number" oninput="updateProductMargin()"></div>
+        <div class="form-group" style="grid-column:1/-1"><div id="np-margin" style="font-size:12px"></div></div>
+        <div class="form-group"><label>หน่วย</label><input id="np-unit" placeholder="ชิ้น"></div>
+        <div class="form-group"><label>หมวดหมู่</label><select id="np-cat"><option>Hardware</option><option>Software</option><option>Service</option><option>Consumable</option></select></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Vendor</label><select id="np-vendor"></select></div>
+        <div class="form-group" style="grid-column:1/-1"><label>รายละเอียด</label><textarea id="np-desc" style="min-height:56px"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1"><label>เอกสารการซื้อ <span id="np-pdoc-status" style="color:var(--muted)"></span></label>
+          <label class="btn btn-sm" style="cursor:pointer;display:inline-block;margin-bottom:6px">+ แนบเอกสาร<input type="file" onchange="uploadProductDoc(this)" style="display:none"></label>
+          <div id="np-pdoc"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">
+      <button class="btn" onclick="closeModal('product-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveProduct()">บันทึกสินค้า</button>
+    </div>
+  </div>
+</div>
+
+<!-- VENDOR MODAL -->
+<div class="overlay" id="vendor-modal">
+  <div class="modal" style="width:520px">
+    <div class="modal-header"><h3 id="vm-title">เพิ่ม Vendor</h3><button class="btn btn-sm" onclick="closeModal('vendor-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1"><label>ชื่อ Vendor</label><input id="vd-name"></div>
+        <div class="form-group"><label>ผู้ติดต่อ</label><input id="vd-contact"></div>
+        <div class="form-group"><label>เบอร์โทร</label><input id="vd-phone"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>อีเมล</label><input id="vd-email"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่</label><textarea id="vd-address" style="min-height:48px"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="vd-note" style="min-height:48px"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1"><label>เอกสารสัญญา <span id="vd-file-status" style="color:var(--muted)"></span></label>
+          <label class="btn btn-sm" style="cursor:pointer;display:inline-block;margin-bottom:6px">+ แนบสัญญา<input type="file" onchange="uploadVendorContract(this)" style="display:none"></label>
+          <div id="vd-contracts"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">
+      <button class="btn" onclick="closeModal('vendor-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveVendor()">บันทึก Vendor</button>
+    </div>
+  </div>
+</div>
+
+<!-- เอกสารทั้งงาน MODAL -->
+<div class="overlay" id="alldocs-modal">
+  <div class="modal" style="width:600px">
+    <div class="modal-header"><h3>📂 เอกสารทั้งงาน</h3><button class="btn btn-sm" onclick="closeModal('alldocs-modal')">✕</button></div>
+    <div class="modal-body" id="alldocs-body" style="max-height:70vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- เพิ่มเข้า Catalog — เลือกรายการ MODAL -->
+<div class="overlay" id="catimport-modal">
+  <div class="modal" style="width:640px">
+    <div class="modal-header"><h3>เพิ่มเข้า Catalog — เลือกรายการ</h3><button class="btn btn-sm" onclick="closeModal('catimport-modal')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">ติ๊กเฉพาะรายการที่ต้องการเพิ่ม + ปรับราคาทุนได้ (ราคาขายตั้ง 0 ไว้ปรับที่หน้า Catalog)</div>
+      <div class="card"><table><thead><tr>
+        <th style="width:30px"><input type="checkbox" id="cat-all" onchange="catToggleAll(this.checked)"></th>
+        <th>รายการ</th><th style="width:70px">หน่วย</th><th style="width:120px">ทุน/หน่วย</th></tr></thead>
+        <tbody id="catimport-rows"></tbody></table></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">
+      <span id="cat-count" style="font-size:12px;color:var(--muted)"></span>
+      <div style="display:flex;gap:8px"><button class="btn" onclick="closeModal('catimport-modal')">ยกเลิก</button><button class="btn btn-primary" onclick="confirmCatalogImport()">➕ เพิ่มที่เลือกเข้า Catalog</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- NEW PURCHASE (สร้างเอง) MODAL -->
+<div class="overlay" id="newpo-modal">
+  <div class="modal" style="width:680px">
+    <div class="modal-header"><h3>สร้างงานจัดซื้อเอง (ซื้อใช้เอง)</h3><button class="btn btn-sm" onclick="closeModal('newpo-modal')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>ชื่องาน / อ้างอิง</label><input id="np-title" placeholder="เช่น จัดซื้ออุปกรณ์ออฟฟิศ"></div>
+        <div class="form-group"><label>แผนก/ผู้ขอ</label><input id="np-client" placeholder="เช่น ฝ่าย IT"></div>
+        <div class="form-group"><label>ประเภทการซื้อ</label><select id="np-assettype"><option value="asset">ทรัพย์สินบริษัท (เข้า Asset)</option><option value="sale">ใช้งานทั่วไป</option></select></div>
+        <div class="form-group"><label>ต้องการของภายใน</label><input id="np-reqdate" type="date"></div>
+      </div>
+      <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:12px;color:var(--muted)">รายการที่จะซื้อ</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" onclick="openNpCatalog()">📚 เลือกจาก Catalog</button>
+          <button class="btn btn-sm" onclick="npAddRow()">+ เพิ่มรายการ</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:8px"><table><thead><tr><th>รายการ</th><th style="width:70px">จำนวน</th><th style="width:70px">หน่วย</th><th style="width:110px">ทุน/หน่วย</th><th style="width:30px"></th></tr></thead><tbody id="np-rows"></tbody></table></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">
+      <button class="btn" onclick="closeModal('newpo-modal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveNewPurchase()">💾 สร้างงานจัดซื้อ</button>
+    </div>
+  </div>
+</div>
+
+<!-- CATALOG PICKER (สำหรับสร้างงานจัดซื้อเอง) -->
+<div class="overlay" id="npcat-modal">
+  <div class="modal" style="width:640px">
+    <div class="modal-header"><h3>📚 เลือกสินค้าจาก Catalog</h3><button class="btn btn-sm" onclick="closeModal('npcat-modal')">✕</button></div>
+    <div class="modal-body">
+      <input id="npcat-search" placeholder="ค้นหาชื่อ / Part No. / หมวด..." oninput="renderNpCatalog()" style="margin-bottom:10px">
+      <div class="card"><table>
+        <thead><tr><th style="width:34px"></th><th>รายการ</th><th>หมวด</th><th style="width:110px;text-align:right">ทุน/หน่วย</th></tr></thead>
+        <tbody id="npcat-body"></tbody>
+      </table></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">
+      <span id="npcat-count" style="font-size:12px;color:var(--muted)">เลือก 0 รายการ</span>
+      <div style="display:flex;gap:8px"><button class="btn" onclick="closeModal('npcat-modal')">ยกเลิก</button><button class="btn btn-primary" onclick="confirmNpCatalog()">➕ เพิ่มที่เลือก</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- TEMPLATE EDITOR MODAL -->
+<div class="overlay" id="tpl-modal">
+  <div class="modal" style="width:600px">
+    <div class="modal-header"><h3 id="tpl-title">ปรับข้อความอีเมล</h3><button class="btn btn-sm" onclick="closeModal('tpl-modal')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px">ใช้ตัวแปรเหล่านี้ได้ (ระบบจะแทนค่าให้): <code>{contact}</code> ผู้ติดต่อ · <code>{vendor}</code> ชื่อ Vendor · <code>{items}</code> ตารางรายการ · <code>{date}</code> กำหนดส่ง · <code>{total}</code> ยอดรวม · <code>{note}</code> หมายเหตุ · <code>{sender}</code> ชื่อผู้ส่ง · <code>{senderEmail}</code></div>
+      <textarea id="tpl-text" style="min-height:280px;font-family:var(--mono);font-size:13px;line-height:1.6"></textarea>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">
+      <button class="btn btn-sm" onclick="resetTpl()">↺ คืนค่าเริ่มต้น</button>
+      <div style="display:flex;gap:8px"><button class="btn" onclick="closeModal('tpl-modal')">ยกเลิก</button><button class="btn btn-primary" onclick="saveTpl()">💾 บันทึกข้อความ</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="theme-modal">
+  <div class="modal" style="width:420px">
+    <div class="modal-header"><h3>🎨 สีธีม</h3><button class="btn btn-sm" onclick="closeModal('theme-modal')">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">ปรับหน้าตาระบบ — บันทึกเฉพาะเครื่องนี้ (ต่อผู้ใช้)</div>
+      <label>พื้นหลัง</label>
+      <div id="theme-modes" style="display:flex;gap:8px;margin:6px 0 18px"></div>
+      <label>สีสำเร็จรูป</label>
+      <div id="theme-swatches" style="display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 18px"></div>
+      <label>เลือกสีเอง</label>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <input type="color" id="theme-custom" style="width:54px;height:40px;padding:2px;cursor:pointer" oninput="setAccent(this.value)">
+        <span id="theme-custom-hex" style="font-family:var(--mono);font-size:13px;color:var(--muted)"></span>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">
+      <button class="btn btn-sm" onclick="resetAccent()">↺ คืนค่าเริ่มต้น</button>
+      <button class="btn btn-primary" onclick="closeModal('theme-modal')">เสร็จสิ้น</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="po-basket-assign-modal">
+  <div class="modal" style="width:420px">
+    <div class="modal-header"><h3>🗂 จัดงานนี้เข้าตะกร้า</h3><button class="btn btn-sm" onclick="closeModal('po-basket-assign-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="pba-quote" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
+      <div id="pba-list" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+      <div style="display:flex;gap:6px;margin-top:12px">
+        <input id="pba-new" placeholder="สร้างตะกร้าใหม่..." style="flex:1">
+        <button class="btn btn-sm btn-primary" onclick="poBasketCreateInline()">+ สร้าง</button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border)"><button class="btn btn-primary" onclick="closeModal('po-basket-assign-modal')">เสร็จสิ้น</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="po-basket-manage-modal">
+  <div class="modal" style="width:480px">
+    <div class="modal-header"><h3>⚙ จัดการตะกร้า</h3><button class="btn btn-sm" onclick="closeModal('po-basket-manage-modal')">✕</button></div>
+    <div class="modal-body">
+      <div id="pbm-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div style="display:flex;gap:6px;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+        <input id="pbm-new" placeholder="ชื่อตะกร้าใหม่ เช่น รอของ, ด่วน...">
+        <button class="btn btn-sm btn-primary" onclick="poBasketCreateInline(true)">+ เพิ่มตะกร้า</button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--border)"><button class="btn" onclick="closeModal('po-basket-manage-modal')">ปิด</button></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="js/config.js?v=g1"></script>
+<script src="js/api.js?v=g1"></script>
+<script src="js/auth.js?v=g1"></script>
+<script src="js/app.js?v=g1"></script>
+<script src="js/manage.js?v=g1"></script>
+<script src="js/tour.js?v=g1"></script>
+</body>
+</html>
