@@ -10,7 +10,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="stylesheet" href="assets/style.css?v=g6">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="assets/style.css?v=g7">
 </head>
 <body>
 
@@ -985,7 +987,13 @@
             <div class="form-group"><label>ผู้ติดต่อหน้างาน</label><input id="tech-contact-name" placeholder="ชื่อผู้ติดต่อ"></div>
             <div class="form-group"><label>เบอร์โทรหน้างาน</label><input id="tech-contact-phone" placeholder="08x-xxx-xxxx"></div>
             <div class="form-group"><label>วันเวลาเข้างาน</label><input id="tech-scheduled-at" type="datetime-local"></div>
-            <div class="form-group"><label>แผนที่ (URL)</label><input id="tech-map-url" placeholder="https://maps.google.com/..."></div>
+            <div class="form-group"><label>แผนที่ (URL)</label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input id="tech-map-url" placeholder="https://maps.google.com/..." style="flex:1">
+                <button type="button" class="btn btn-sm" onclick="openMapPicker()" style="white-space:nowrap">📍 ปักหมุด</button>
+              </div>
+              <div style="font-size:10px;color:var(--muted);margin-top:3px">💡 กด <b>ปักหมุด</b> เพื่อเลือกตำแหน่งบนแผนที่ในหน้านี้ (ค้นหาที่อยู่ / ใช้ตำแหน่งปัจจุบัน / คลิกปักเอง) แล้วระบบจะกรอกลิงก์ให้อัตโนมัติ</div>
+            </div>
             <div class="form-group" style="grid-column:1/-1"><label>วัสดุ/อุปกรณ์ที่ต้องนำไป</label><textarea id="tech-materials" placeholder="เช่น&#10;1. แบตเตอรี่ 12V x2&#10;2. สายไฟ AWG10 10m" style="min-height:72px"></textarea></div>
             <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุเพิ่มเติม</label><textarea id="tech-note" placeholder="ข้อมูลเพิ่มเติมสำหรับช่าง..." style="min-height:52px"></textarea></div>
           </div>
@@ -1369,29 +1377,29 @@
 
 <div class="toast-wrap" id="toasts"></div>
 
-<script src="js/config.js?v=g6"></script>
-<script src="js/auth.js?v=g6"></script>
-<script src="js/api.js?v=g6"></script>
-<script src="js/sync.js?v=g6"></script>
-<script src="js/pages/ui.js?v=g6"></script>
-<script src="js/pages/dashboard.js?v=g6"></script>
-<script src="js/pages/quotes.js?v=g6"></script>
-<script src="js/pages/approve.js?v=g6"></script>
-<script src="js/pages/payment.js?v=g6"></script>
-<script src="js/pages/catalog.js?v=g6"></script>
-<script src="js/pages/settings.js?v=g6"></script>
-<script src="js/pages/customers.js?v=g6"></script>
-<script src="js/pages/signature.js?v=g6"></script>
-<script src="js/pages/company.js?v=g6"></script>
-<script src="js/pages/pdf.js?v=g6"></script>
-<script src="js/pages/saletracker.js?v=g6"></script>
-<script src="js/pages/forecast.js?v=g6"></script>
-<script src="js/pages/vendor.js?v=g6"></script>
-<script src="js/pages/belowcost.js?v=g6"></script>
-<script src="js/pages/procurement.js?v=g6"></script>
-<script src="js/pages/contracts.js?v=g6"></script>
-<script src="js/app.js?v=g6"></script>
-<script src="js/tour.js?v=g6"></script>
+<script src="js/config.js?v=g7"></script>
+<script src="js/auth.js?v=g7"></script>
+<script src="js/api.js?v=g7"></script>
+<script src="js/sync.js?v=g7"></script>
+<script src="js/pages/ui.js?v=g7"></script>
+<script src="js/pages/dashboard.js?v=g7"></script>
+<script src="js/pages/quotes.js?v=g7"></script>
+<script src="js/pages/approve.js?v=g7"></script>
+<script src="js/pages/payment.js?v=g7"></script>
+<script src="js/pages/catalog.js?v=g7"></script>
+<script src="js/pages/settings.js?v=g7"></script>
+<script src="js/pages/customers.js?v=g7"></script>
+<script src="js/pages/signature.js?v=g7"></script>
+<script src="js/pages/company.js?v=g7"></script>
+<script src="js/pages/pdf.js?v=g7"></script>
+<script src="js/pages/saletracker.js?v=g7"></script>
+<script src="js/pages/forecast.js?v=g7"></script>
+<script src="js/pages/vendor.js?v=g7"></script>
+<script src="js/pages/belowcost.js?v=g7"></script>
+<script src="js/pages/procurement.js?v=g7"></script>
+<script src="js/pages/contracts.js?v=g7"></script>
+<script src="js/app.js?v=g7"></script>
+<script src="js/tour.js?v=g7"></script>
 <datalist id="doc-type-list">
   <option value="สัญญา">
   <option value="PO">

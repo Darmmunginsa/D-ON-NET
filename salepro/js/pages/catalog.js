@@ -39,7 +39,7 @@ function renderCatalog() {
       <div class="price">${fmt(p.Price||0)} <span style="font-size:11px;color:var(--muted);font-weight:400">/${p.Unit||''}</span></div>
       ${cost>0?`<div style="font-size:11px;color:var(--muted);margin-top:2px">ทุน ${fmt(cost)} · กำไร <span style="color:${margin>=0?'var(--green)':'var(--red)'}">${fmt(margin)}</span></div>`:''}
       ${vd?`<div style="font-size:11px;color:var(--accent2);margin-top:2px">🏢 ${escHtml(vd.name)}</div>`:''}
-      ${ex.pdoc?`<div style="font-size:11px;margin-top:2px"><a href="${ex.pdoc.url}" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none">📄 เอกสารซื้อ</a></div>`:''}
+      ${ex.pdoc?`<div style="margin-top:4px">${docThumb(ex.pdoc.url, ex.pdoc.name||'เอกสารซื้อ', {small:true})}</div>`:''}
       <div style="display:flex;align-items:center;margin-top:8px;gap:6px">
         <span class="cat-tag">${p.Category||''}</span>
       </div>
@@ -85,7 +85,7 @@ function renderProductDoc() {
   if (!wrap) return;
   wrap.innerHTML = _npPDoc
     ? `<div style="display:flex;align-items:center;gap:6px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px">
-        <a href="${_npPDoc.url}" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📄 ${escHtml(_npPDoc.name)}</a>
+        <span style="flex:1;min-width:0">${docThumb(_npPDoc.url, _npPDoc.name, {small:true})}</span>
         <button class="action-btn" onclick="_npPDoc=null;renderProductDoc()" style="color:var(--red)" title="ลบ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>` : '<div style="font-size:11px;color:var(--muted)">ยังไม่มีเอกสารแนบ</div>';
 }

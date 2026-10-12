@@ -207,7 +207,7 @@ function renderProcDocs() {
   if (!wrap) return;
   wrap.innerHTML = procDocs.length ? procDocs.map(d => `
     <div style="display:flex;align-items:center;gap:6px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;margin-bottom:4px">
-      <a href="${d.url}" target="_blank" rel="noopener" style="color:var(--accent2);text-decoration:none;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📄 ${escHtml(d.name)}</a>
+      <span style="flex:1;min-width:0">${docThumb(d.url,d.name,{small:true})}</span>
       <button class="action-btn" onclick="removeProcDoc(${d.id})" style="color:var(--red)" title="ลบเอกสาร"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>`).join('') : '<div style="font-size:11px;color:var(--muted)">ยังไม่มีเอกสารแนบ</div>';
 }
@@ -280,7 +280,7 @@ function renderSavedPOs() {
         <button class="action-btn" onclick="editProcurementPO(${p.id})" title="แก้ไข"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         <button class="action-btn" onclick="deleteProcurementPO(${p.id})" style="color:var(--red)" title="ลบ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
       </div>
-      ${(p.docs && p.docs.length) ? '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">' + p.docs.map(d => `<a href="${d.url}" target="_blank" rel="noopener" style="font-size:10px;color:var(--accent2);text-decoration:none;background:rgba(79,142,247,0.1);border:1px solid rgba(79,142,247,0.2);border-radius:5px;padding:2px 7px">📄 ${escHtml(d.name)}</a>`).join('') + '</div>' : ''}
+      ${(p.docs && p.docs.length) ? '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">' + p.docs.map(d => docThumb(d.url,d.name,{small:true})).join('') + '</div>' : ''}
     </div>`).join('');
 }
 

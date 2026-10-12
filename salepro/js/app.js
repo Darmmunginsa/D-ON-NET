@@ -149,7 +149,7 @@ function renderTechJobList(){
         +'<span style="background:rgba(79,142,247,0.1);color:var(--accent2);border-radius:4px;padding:1px 5px;font-size:10px;white-space:nowrap">'+escHtml(e.category)+'</span>'
         +'<span style="color:var(--text);flex:1">'+escHtml(e.description||'')+'</span>'
         +'<span style="font-family:var(--mono);color:var(--amber);font-weight:600">'+fmt(e.amount||0)+'</span>'
-        +(e.receiptUrl?'<a href="'+escHtml(e.receiptUrl)+'" target="_blank" style="color:var(--accent2);font-size:10px">🧾↗</a>':'')
+        +(e.receiptUrl?docThumb(e.receiptUrl,'ใบเสร็จ',{small:true}):'')
         +(!isRO&&!techLocked?'<button onclick="deleteTechExpense('+j.id+','+e.id+')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:0 2px">✕</button>':'')
         +'</div>';
     }).join('');
@@ -180,7 +180,7 @@ function renderTechJobList(){
         var photos=j.completionPhotos||(j.completionPhotoUrl?[j.completionPhotoUrl]:[]);
         if(photos.length){
           actionHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
-            +photos.map(function(u,i){return '<a href="'+escHtml(u)+'" target="_blank" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--green);color:var(--green);text-decoration:none">🖼 รูปงาน'+(photos.length>1?' '+(i+1):'')+'↗</a>';}).join('')
+            +photos.map(function(u,i){return docThumb(u,'รูปงาน'+(photos.length>1?' '+(i+1):''),{small:true});}).join('')
             +'</div>';
         }
       }
@@ -195,7 +195,7 @@ function renderTechJobList(){
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11px;color:var(--muted);margin-bottom:8px">'
       +'<div>👤 <span style="color:var(--text)">'+escHtml(j.contactName||'-')+'</span> '+escHtml(j.contactPhone||'')+'</div>'
       +'<div>📅 <span style="color:var(--text)">'+escHtml(sched)+'</span></div>'
-      +(j.mapUrl?'<div style="grid-column:1/-1">📍 <a href="'+escHtml(j.mapUrl)+'" target="_blank" style="color:var(--accent2)">เปิดแผนที่ ↗</a></div>':'')
+      +(j.mapUrl?mapCardHtml(j.mapUrl):'')
       +(j.materials?'<div style="grid-column:1/-1;white-space:pre-wrap">🔩 '+escHtml(j.materials)+'</div>':'')
       +(j.note?'<div style="grid-column:1/-1">📝 '+escHtml(j.note)+'</div>':'')
       +'</div>'
@@ -343,3 +343,120 @@ async function loadTheme() {
   } catch(e) { /* keep default */ }
 }
 
+
+// ============================================================
+// Thumbnail + Preview (Google Drive native — ไม่ต้องใช้ token)
+// ============================================================
+function _driveId(url){ const s=String(url||''); let m=s.match(/\/d\/([-\w]{10,})/)||s.match(/[?&]id=([-\w]{10,})/); return m?m[1]:''; }
+function docExt(name,url){ const s=String(name||url||'').split('?')[0]; const m=s.match(/\.([a-z0-9]+)$/i); return m?m[1].toLowerCase():''; }
+function docIsImg(name,url){ return ['png','jpg','jpeg','gif','webp','bmp','svg'].includes(docExt(name,url)); }
+function docIsPdf(name,url){ return docExt(name,url)==='pdf'; }
+function docIcon(name,url){ const e=docExt(name,url); if(docIsPdf(name,url))return'📄'; if(['doc','docx'].includes(e))return'📝'; if(['xls','xlsx','csv'].includes(e))return'📊'; if(['zip','rar','7z'].includes(e))return'🗜️'; return'📎'; }
+function docThumb(url,name,opt){ opt=opt||{}; const sz=opt.small?44:92; const label=escHtml(name||'ไฟล์');
+  const payload=`'${encodeURIComponent(url)}','${encodeURIComponent(name||'')}'`;
+  const did=_driveId(url);
+  const imgSrc = did ? ('https://drive.google.com/thumbnail?id='+did+'&sz=w'+(sz*2)) : url;
+  const isImg = docIsImg(name,url) || !!did;   // Drive: ลองโหลด thumbnail เสมอ (ถ้าไม่ใช่รูปจะ fallback เป็นไอคอน)
+  const inner = isImg
+    ? `<img class="doc-thumb-lazy" src="${imgSrc}" alt="${label}" loading="lazy" style="width:${sz}px;height:${sz}px;object-fit:cover;display:block;background:var(--surface2,#f1f5f9)" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div style="display:none;width:${sz}px;height:${sz}px;align-items:center;justify-content:center;font-size:${opt.small?20:30}px;background:var(--surface2,#f1f5f9)">${docIcon(name,url)}</div>`
+    : `<div style="width:${sz}px;height:${sz}px;display:flex;align-items:center;justify-content:center;font-size:${opt.small?22:34}px;background:var(--surface2,#f1f5f9)">${docIcon(name,url)}</div>`;
+  if(opt.small) return `<span onclick="openDocPreview(${payload})" title="${label}" style="display:inline-flex;align-items:center;gap:7px;cursor:pointer;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--card);max-width:230px;vertical-align:middle">${inner}<span style="font-size:11px;padding:0 9px 0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</span></span>`;
+  return `<div onclick="openDocPreview(${payload})" title="${label}" style="cursor:pointer;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);width:${sz}px"><div style="overflow:hidden;border-bottom:1px solid var(--border)">${inner}</div><div style="font-size:11px;padding:5px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div></div>`;
+}
+function openDocPreview(encUrl,encName){ const url=decodeURIComponent(encUrl), name=decodeURIComponent(encName||'');
+  let o=document.getElementById('doc-preview-ov');
+  if(!o){ o=document.createElement('div'); o.id='doc-preview-ov'; o.onclick=function(e){ if(e.target===o) closeDocPreview(); }; document.body.appendChild(o); }
+  o.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:28px';
+  const header=`<div style="display:flex;align-items:center;gap:12px;color:#fff;font-size:13px;max-width:90vw"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(name||'ไฟล์แนบ')}</span><a href="${url}" target="_blank" rel="noopener" style="color:#9ec1ff;flex-shrink:0">↗ เปิดแท็บใหม่</a><span onclick="closeDocPreview()" style="cursor:pointer;flex-shrink:0;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.18);font-size:16px">✕</span></div>`;
+  const wrap=v=>`<div onclick="event.stopPropagation()" style="position:relative;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;align-items:center;gap:10px">${header}${v}</div>`;
+  const did=_driveId(url);
+  let viewer;
+  if(did){ viewer=`<iframe src="https://drive.google.com/file/d/${did}/preview" style="width:min(92vw,900px);height:84vh;border:none;border-radius:8px;background:#fff" allow="autoplay"></iframe>`; }
+  else if(docIsImg(name,url)){ viewer=`<img src="${url}" style="max-width:90vw;max-height:84vh;object-fit:contain;border-radius:8px;background:#fff">`; }
+  else if(docIsPdf(name,url)){ viewer=`<iframe src="${url}" style="width:min(92vw,900px);height:84vh;border:none;border-radius:8px;background:#fff"></iframe>`; }
+  else { viewer=`<div style="background:var(--card);border-radius:12px;padding:30px 34px;text-align:center;max-width:360px"><div style="font-size:52px;margin-bottom:10px">${docIcon(name,url)}</div><div style="font-size:13px;margin-bottom:16px;word-break:break-word">${escHtml(name||'ไฟล์')}</div><a href="${url}" target="_blank" rel="noopener" class="btn btn-primary" style="text-decoration:none">เปิด / ดาวน์โหลด</a></div>`; }
+  o.innerHTML=wrap(viewer);
+  document.addEventListener('keydown',_docPreviewEsc);
+}
+function _docPreviewEsc(e){ if(e.key==='Escape') closeDocPreview(); }
+function closeDocPreview(){ const o=document.getElementById('doc-preview-ov'); if(o)o.remove(); document.removeEventListener('keydown',_docPreviewEsc); }
+
+// ============================================================
+// แผนที่: ฝังในหน้า + ปักหมุด (Leaflet + OSM, ไม่ต้องใช้ API key)
+// ============================================================
+function mapEmbedUrl(url){
+  if(!url) return null;
+  try{
+    const u=String(url).trim();
+    let m = u.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+         || u.match(/[?&](?:q|query|ll|center|destination)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/)
+         || u.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/)
+         || u.match(/[/=](-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+    if(m) return 'https://maps.google.com/maps?q='+m[1]+','+m[2]+'&z=16&output=embed';
+    let qm = u.match(/[?&](?:q|query|destination)=([^&]+)/);
+    if(qm) return 'https://maps.google.com/maps?q='+qm[1]+'&z=16&output=embed';
+    let pm = u.match(/\/maps\/place\/([^/@]+)/);
+    if(pm) return 'https://maps.google.com/maps?q='+encodeURIComponent(decodeURIComponent(pm[1]))+'&output=embed';
+    if(/google\.[^/]+\/maps/.test(u)) return u+(u.includes('?')?'&':'?')+'output=embed';
+    return null;
+  }catch(e){ return null; }
+}
+function mapCardHtml(url){
+  const emb=mapEmbedUrl(url);
+  const link='<a href="'+escHtml(url)+'" target="_blank" rel="noopener" style="color:var(--accent2)">เปิดใน Google Maps ↗</a>';
+  if(emb){
+    return '<div style="grid-column:1/-1;margin-top:2px">'
+      +'<div style="font-size:11px;margin-bottom:5px;color:var(--text)">📍 สถานที่ติดตั้ง <span style="color:var(--muted)">·</span> '+link+'</div>'
+      +'<iframe src="'+escHtml(emb)+'" loading="lazy" referrerpolicy="no-referrer-when-downgrade" style="width:100%;height:190px;border:1px solid var(--border);border-radius:8px;display:block" allowfullscreen></iframe>'
+      +'</div>';
+  }
+  return '<div style="grid-column:1/-1">📍 '+link+' <span style="font-size:10px;color:var(--muted)">(ลิงก์ย่อ — แสดงตัวอย่างในหน้าไม่ได้)</span></div>';
+}
+let _mapPicker={map:null,marker:null,target:'tech-map-url',ll:null};
+function _parseLL(url){ const m=String(url||'').match(/(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/); return m?{lat:+m[1],lng:+m[2]}:null; }
+function openMapPicker(targetId){
+  _mapPicker.target=targetId||'tech-map-url';
+  if(typeof L==='undefined'){ toast('แผนที่ยังโหลดไม่เสร็จ ลองใหม่อีกครั้ง','error'); return; }
+  let o=document.getElementById('map-picker-ov');
+  if(!o){ o=document.createElement('div'); o.id='map-picker-ov'; o.onclick=function(e){ if(e.target===o) closeMapPicker(); }; document.body.appendChild(o); }
+  o.style.cssText='position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px';
+  o.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--card);border-radius:12px;width:min(640px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.4)">'
+    +'<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)"><span style="font-size:14px;font-weight:600;color:var(--text)">📍 ปักหมุดตำแหน่งติดตั้ง</span><span onclick="closeMapPicker()" style="margin-left:auto;cursor:pointer;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--surface2);color:var(--muted);font-size:15px">✕</span></div>'
+    +'<div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;overflow:auto">'
+    +'<div style="display:flex;gap:6px"><input id="mp-search" placeholder="🔍 ค้นหาที่อยู่ / สถานที่ แล้วกด Enter" style="flex:1" onkeydown="if(event.key===\'Enter\'){event.preventDefault();mpSearch();}"><button type="button" class="btn btn-sm" onclick="mpSearch()">ค้นหา</button><button type="button" class="btn btn-sm" onclick="mpLocate()" title="ใช้ตำแหน่งปัจจุบัน">🎯</button></div>'
+    +'<div id="mp-map" style="width:100%;height:340px;border-radius:8px;border:1px solid var(--border)"></div>'
+    +'<div id="mp-coord" style="font-size:12px;color:var(--muted)">คลิกบนแผนที่เพื่อปักหมุด หรือค้นหาที่อยู่ด้านบน</div>'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border)"><button type="button" class="btn btn-sm" onclick="closeMapPicker()">ยกเลิก</button><button type="button" class="btn btn-primary btn-sm" id="mp-confirm" onclick="mpConfirm()" disabled style="opacity:.5">✓ ใช้ตำแหน่งนี้</button></div>'
+    +'</div>';
+  document.addEventListener('keydown',_mpEsc);
+  const start=_parseLL(document.getElementById(_mapPicker.target)?.value)||{lat:13.7563,lng:100.5018};
+  setTimeout(function(){
+    const map=L.map('mp-map').setView([start.lat,start.lng],_parseLL(document.getElementById(_mapPicker.target)?.value)?16:11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+    _mapPicker.map=map; _mapPicker.marker=null; _mapPicker.ll=null;
+    if(_parseLL(document.getElementById(_mapPicker.target)?.value)) _mpSet(start.lat,start.lng,false);
+    map.on('click',function(e){ _mpSet(e.latlng.lat,e.latlng.lng,false); });
+    map.invalidateSize();
+  },60);
+}
+function _mpSet(lat,lng,pan){ const m=_mapPicker.map; if(!m)return; lat=+(+lat).toFixed(6); lng=+(+lng).toFixed(6); _mapPicker.ll={lat,lng};
+  if(_mapPicker.marker) _mapPicker.marker.setLatLng([lat,lng]); else _mapPicker.marker=L.marker([lat,lng],{draggable:true}).addTo(m).on('dragend',function(ev){ const p=ev.target.getLatLng(); _mpSet(p.lat,p.lng,false); });
+  if(pan) m.setView([lat,lng],16);
+  const c=document.getElementById('mp-coord'); if(c)c.innerHTML='พิกัด: <b style="color:var(--text)">'+lat+', '+lng+'</b> <span style="color:var(--muted)">(ลากหมุดปรับตำแหน่งได้)</span>';
+  const b=document.getElementById('mp-confirm'); if(b){ b.disabled=false; b.style.opacity='1'; }
+}
+async function mpSearch(){ const q=(document.getElementById('mp-search')?.value||'').trim(); if(!q)return; const c=document.getElementById('mp-coord'); if(c)c.textContent='⏳ กำลังค้นหา...';
+  try{ const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q),{headers:{'Accept-Language':'th'}});
+    const j=await r.json(); if(j&&j.length){ _mpSet(+j[0].lat,+j[0].lon,true); } else if(c){ c.textContent='ไม่พบสถานที่ — ลองคำค้นอื่น หรือคลิกปักเอง'; }
+  }catch(e){ if(c)c.textContent='ค้นหาไม่สำเร็จ — คลิกปักเองบนแผนที่ได้'; }
+}
+function mpLocate(){ if(!navigator.geolocation){ toast('อุปกรณ์ไม่รองรับระบุตำแหน่ง','error'); return; } const c=document.getElementById('mp-coord'); if(c)c.textContent='⏳ กำลังหาตำแหน่งปัจจุบัน...';
+  navigator.geolocation.getCurrentPosition(function(p){ _mpSet(p.coords.latitude,p.coords.longitude,true); },function(){ if(c)c.textContent='เข้าถึงตำแหน่งไม่ได้ — คลิกปักเองบนแผนที่'; },{enableHighAccuracy:true,timeout:8000});
+}
+function mpConfirm(){ const ll=_mapPicker.ll; if(!ll)return; const inp=document.getElementById(_mapPicker.target);
+  if(inp){ inp.value='https://www.google.com/maps?q='+ll.lat+','+ll.lng; inp.dispatchEvent(new Event('input',{bubbles:true})); }
+  closeMapPicker(); toast('ปักหมุดแล้ว ✓','success');
+}
+function _mpEsc(e){ if(e.key==='Escape') closeMapPicker(); }
+function closeMapPicker(){ if(_mapPicker.map){ _mapPicker.map.remove(); _mapPicker.map=null; } const o=document.getElementById('map-picker-ov'); if(o)o.remove(); document.removeEventListener('keydown',_mpEsc); }

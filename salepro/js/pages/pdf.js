@@ -236,14 +236,14 @@ function renderPDFHTML(d) {
   const thPad = `padding:8px 7px;${vline}`;
   const th2 = (th,en) => en+'<br><span style="font-weight:400;font-size:0.82em;opacity:0.9">'+th+'</span>';
   const tableHead = `<thead><tr style="background:${primaryColor};color:#fff">
-        <th style="${thPad}text-align:center;width:52px">${th2('ลำดับ','Item')}</th>
-        ${c.pn ? '<th style="'+thPad+'text-align:center;width:112px">'+th2('รหัสสินค้า','Part No.')+'</th>' : ''}
+        <th style="${thPad}text-align:center;width:40px">${th2('ลำดับ','Item')}</th>
+        ${c.pn ? '<th style="'+thPad+'text-align:center;width:90px">'+th2('รหัสสินค้า','Part No.')+'</th>' : ''}
         <th style="${thPad}text-align:center">${th2('รายการ','Description')}</th>
-        ${c.qty   ? '<th style="'+thPad+'text-align:center;width:60px;white-space:nowrap">'+th2('จำนวน','Qty')+'</th>' : ''}
-        ${c.unit  ? '<th style="'+thPad+'text-align:center;width:54px">'+th2('หน่วย','Unit')+'</th>' : ''}
-        ${c.price ? '<th style="'+thPad+'text-align:center;width:112px;white-space:nowrap">'+th2(d.pricePeriod==='month'?'ราคา/เดือน':(d.pricePeriod==='year'?'ราคา/ปี':'ราคาต่อหน่วย'), d.pricePeriod==='month'?'Price/Month':(d.pricePeriod==='year'?'Price/Year':'Unit Price'))+'</th>' : ''}
-        ${c.disc  ? '<th style="'+thPad+'text-align:center;width:56px">'+th2('ส่วนลด','Discount')+'</th>' : ''}
-        ${c.total ? '<th style="'+thPad+'text-align:center;width:100px">'+th2('จำนวนเงิน','Amount')+'</th>' : ''}
+        ${c.qty   ? '<th style="'+thPad+'text-align:center;width:48px;white-space:nowrap">'+th2('จำนวน','Qty')+'</th>' : ''}
+        ${c.unit  ? '<th style="'+thPad+'text-align:center;width:46px">'+th2('หน่วย','Unit')+'</th>' : ''}
+        ${c.price ? '<th style="'+thPad+'text-align:center;width:96px;white-space:nowrap">'+th2(d.pricePeriod==='month'?'ราคา/เดือน':(d.pricePeriod==='year'?'ราคา/ปี':'ราคาต่อหน่วย'), d.pricePeriod==='month'?'Price/Month':(d.pricePeriod==='year'?'Price/Year':'Unit Price'))+'</th>' : ''}
+        ${c.disc  ? '<th style="'+thPad+'text-align:center;width:50px">'+th2('ส่วนลด','Discount')+'</th>' : ''}
+        ${c.total ? '<th style="'+thPad+'text-align:center;width:92px">'+th2('จำนวนเงิน','Amount')+'</th>' : ''}
       </tr></thead>`;
   // render rows for one page; numbering continues via counter object
   const renderRows = (arr, ctr) => arr.map(it => {
@@ -264,7 +264,7 @@ function renderPDFHTML(d) {
       return `<tr style="${rh}">${cells.join('')}</tr>`;
     }
     if (it.__blank) return `<tr style="${rh}"><td colspan="${colspan}" style="${cellPad}border-bottom:0.5px solid #e5e7eb">&nbsp;</td></tr>`;
-    if (it.__note) return `<tr><td colspan="${colspan}" style="padding:${rpT}px 10px ${rpB}px;border-bottom:0.5px solid #e5e7eb;color:#555;font-style:italic;white-space:pre-line;line-height:${lh}">${escHtml(it.noteText||'')}</td></tr>`;
+    if (it.__note) return `<tr><td colspan="${colspan}" style="padding:${rpT}px 10px ${rpB}px;border-bottom:0.5px solid #e5e7eb;color:#1a1a2e;white-space:pre-line;line-height:${lh}">${escHtml(it.noteText||'')}</td></tr>`;
     ctr.n++;
     return `<tr style="${rh}background:${ctr.n%2===0?'#fff':'#f8fafc'};color:#1a1a2e">
       <td style="${cellBase}text-align:center;color:#666;background:inherit;white-space:nowrap;word-wrap:normal">${escHtml(String(it.No||it.no||ctr.n))}</td>

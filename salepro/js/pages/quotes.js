@@ -4,9 +4,10 @@
 function renderTrackerBtn(q) {
   const id = q.id;
   const histBtn = '<button class="btn btn-xs" style="background:rgba(123,130,153,0.12);border-color:rgba(123,130,153,0.25);color:var(--muted)" onclick="openSaleTrackerModal(' + "'" + id + "'" + ')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> ประวัติ</button>';
+  if (q.Status === 'Pending') return '—';   // กำลังรออนุมัติ — ยังไม่ให้ติดตาม
   if (q.Status === 'Cancelled') return histBtn;
   if (q.Status === 'Closed') return histBtn;
-  if (q.Status !== 'Approved' && q.Status !== 'Pending' && q.Status !== 'Draft' && q.Status !== 'PO Received') return '—';
+  if (q.Status !== 'Approved' && q.Status !== 'Draft' && q.Status !== 'PO Received') return '—';
   const ds = parseDealStatus(q.DealStatus);
   if (ds.closed) {
     return '<button class="btn btn-xs" style="background:rgba(52,211,153,0.12);border-color:rgba(52,211,153,0.3);color:var(--green)" onclick="openSaleTrackerModal(' + "'" + id + "'" + ')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ปิดแล้ว</button>';
@@ -35,31 +36,37 @@ function renderQuotes() {
     return matchStatus && matchSearch && passBasketFilter(q);
   });
 
-  // ถ้ามีการ filter → แสดงตรงๆ ไม่จัด group
-  // ถ้าไม่มี filter → จัด parent/child
-  const useGrouping = !sf && !sq && !_activeBasket;
+  // จัด tree (แขน ↳) เมื่อไม่ได้ค้นหา/กรองสถานะ — ยังเคารพตัวกรองตะกร้า (จัดกลุ่มภายในชุดที่กรองแล้ว)
+  const useGrouping = !sf && !sq;
 
   let rows = '';
 
   if (useGrouping) {
-    // จัด group: parent คือใบที่ไม่มี -RV หรือเป็น root
-    const parents = quotesData.filter(q => !/-RV\d+$/.test(q.Title||''));
-    const revisions = quotesData.filter(q => /-RV\d+$/.test(q.Title||''));
-
-    parents.forEach(q => {
-      rows += buildQuoteRow(q, false);
-      // หา revisions ของ parent นี้
-      const base = (q.Title||'').replace(/-RV\d+$/, '');
-      const children = revisions
-        .filter(r => (r.Title||'').replace(/-RV\d+$/, '') === base)
-        .sort((a,b) => (a.Title||'').localeCompare(b.Title||''));
-      children.forEach(r => { rows += buildQuoteRow(r, true); });
+    const pool = allFiltered;   // เคารพตัวกรองตะกร้า
+    // สร้างความสัมพันธ์: (1) revision ตาม -RV ในชื่อ (2) ใบที่สร้างจากใบเก่า (duplicate) ตามพาเรนต์ที่บันทึกไว้
+    const byId = {}; pool.forEach(q => byId[q.id] = q);
+    const parentOf = {};
+    pool.forEach(q => {
+      const t = q.Title || '';
+      if (/-RV\d+$/.test(t)) {
+        const base = t.replace(/-RV\d+$/, '');
+        const p = pool.find(x => (x.Title||'') === base);
+        if (p) { parentOf[q.id] = p.id; return; }
+      }
+      const pid = (typeof getQuoteParent === 'function') ? getQuoteParent(q.id) : '';
+      if (pid && byId[pid]) parentOf[q.id] = pid;
     });
-    // orphan revisions ที่ parent ถูกกรองออก
-    revisions.filter(r => {
-      const base = (r.Title||'').replace(/-RV\d+$/, '');
-      return !parents.find(p => p.Title === base);
-    }).forEach(r => { rows += buildQuoteRow(r, false); });
+    const childrenOf = {};
+    Object.keys(parentOf).forEach(cid => { const pid = parentOf[cid]; (childrenOf[pid] = childrenOf[pid] || []).push(cid); });
+    const seen = {};
+    const renderNode = (q, depth) => {
+      if (seen[q.id]) return; seen[q.id] = 1;
+      rows += buildQuoteRow(q, depth > 0, depth);
+      (childrenOf[q.id] || []).map(cid => byId[cid]).filter(Boolean)
+        .sort((a,b) => (a.Title||'').localeCompare(b.Title||''))
+        .forEach(c => renderNode(c, depth + 1));
+    };
+    pool.filter(q => !parentOf[q.id]).forEach(q => renderNode(q, 0));
   } else {
     allFiltered.forEach(q => { rows += buildQuoteRow(q, false); });
   }
@@ -68,13 +75,14 @@ function renderQuotes() {
     '<tr><td colspan=10 style="text-align:center;padding:32px;color:var(--muted)">ยังไม่มีข้อมูล</td></tr>';
 }
 
-function buildQuoteRow(q, isChild) {
-  const indent = isChild ? 'padding-left:24px' : '';
-  const prefix = isChild ? '<span style="color:var(--muted);margin-right:6px;font-size:11px">↳</span>' : '';
-  const childBg = isChild ? 'background:rgba(255,255,255,0.015);' : '';
+function buildQuoteRow(q, isChild, depth) {
+  depth = depth || (isChild ? 1 : 0);
+  const indent = depth > 0 ? `padding-left:${depth*24}px` : '';
+  const prefix = depth > 0 ? '<span style="color:var(--muted);margin-right:6px;font-size:11px">↳</span>' : '';
+  const childBg = depth > 0 ? 'background:rgba(255,255,255,0.015);' : '';
 
   return `
-    <tr style="${childBg}">
+    <tr style="${childBg}" draggable="true" ondragstart="quoteRowDragStart(event,'${q.id}')" title="ลากไปวางที่ตะกร้าเพื่อจัดกลุ่ม">
       <td style="font-family:var(--mono);font-size:12px;font-weight:500;${indent}">${prefix}${q.Title||''}${basketDots(q.id)}</td>
       <td style="font-size:13px${isChild?';color:var(--muted)':''}">${isChild ? '' : (q.ClientName||'')}</td>
       <td style="font-size:12px">${q.Tag ? `<span style="display:inline-block;color:var(--accent2);background:rgba(79,142,247,0.1);border:1px solid rgba(79,142,247,0.2);border-radius:5px;padding:2px 8px;white-space:nowrap"># ${escHtml(q.Tag)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
@@ -87,7 +95,7 @@ function buildQuoteRow(q, isChild) {
         <button class="action-btn" onclick="openApproveModal('${q.id}')" title="ดูรายละเอียด">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
-        ${q.Status !== 'Approved' && q.Status !== 'Cancelled' && q.Status !== 'Closed' && q.Status !== 'PO Received' && canEditQuote(q) ? `<button class="action-btn" style="color:var(--accent2)" onclick="editQuote('${q.id}')" title="แก้ไข">
+        ${q.Status !== 'Approved' && q.Status !== 'Pending' && q.Status !== 'Cancelled' && q.Status !== 'Closed' && q.Status !== 'PO Received' && canEditQuote(q) ? `<button class="action-btn" style="color:var(--accent2)" onclick="editQuote('${q.id}')" title="แก้ไข">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>` : ''}
         <button class="action-btn" onclick="showPDFForQuote('${q.id}')" title="PDF">
@@ -129,6 +137,7 @@ async function saveQuoteDefaults(note, terms) {
   catch(e) { console.warn('save quote defaults', e.message); }
 }
 function initNewQuote() {
+  _dupSourceId = null;   // ใบใหม่เปล่า ไม่ผูกความสัมพันธ์
   document.getElementById('q-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('q-client').value = '';
   document.getElementById('q-contact').value = '';
@@ -252,8 +261,21 @@ function priceCell(it) { return isNumeric(it.price) ? fmt(priceNum(it)) : (it.pr
 // ข้อความที่แสดงในช่อง "จำนวนเงิน" — ถ้าราคาเป็นข้อความ ให้แสดงข้อความเดียวกัน (เหมารวม)
 function totalCell(it) { return isNumeric(it.price) ? fmt(lineTotal(it)) : (it.price || ''); }
 
+function setGroupAlign(id, a) {
+  const it = quoteItems.find(x => x.id === id);
+  if (!it) return;
+  it.align = a;
+  const body = document.getElementById('items-body');
+  if (body) body.innerHTML = '';   // บังคับ render ใหม่ (align เปลี่ยนแต่ลำดับแถวเท่าเดิม)
+  renderItems();
+}
+function groupAlignBtns(id, cur) {
+  cur = cur || 'left';
+  const b = (a, label, tip) => `<button class="action-btn" onclick="setGroupAlign(${id},'${a}')" title="${tip}" style="font-size:10px;font-weight:700;padding:2px 6px;${cur===a?'color:var(--accent2);background:rgba(79,142,247,0.15)':'color:var(--muted)'}">${label}</button>`;
+  return `<span style="display:inline-flex;gap:2px;flex-shrink:0">${b('left','L','ชิดซ้าย')}${b('center','C','กึ่งกลาง')}${b('right','R','ชิดขวา')}</span>`;
+}
 function addGroupRow() {
-  quoteItems.push({ id: Date.now(), type:'group', title:'หัวข้อกลุ่ม' });
+  quoteItems.push({ id: Date.now(), type:'group', title:'หัวข้อกลุ่ม', align:'left' });
   renderItems();
   // focus the new group input
   setTimeout(() => {
@@ -331,7 +353,10 @@ function renderItems() {
           <td style="width:66px"></td>
           <td class="col-pn" style="width:84px"></td>
           <td style="padding:0">
-            <input value="${escHtml(it.title||'')}" onchange="updateGroupTitle(${it.id},this.value)" placeholder="ชื่อหัวข้อกลุ่ม..." style="width:100%;font-weight:600;color:var(--accent2);letter-spacing:0.02em;text-align:center">
+            <div style="display:flex;align-items:center;gap:4px">
+              <input value="${escHtml(it.title||'')}" onchange="updateGroupTitle(${it.id},this.value)" placeholder="ชื่อหัวข้อกลุ่ม..." style="flex:1;min-width:0;font-weight:600;color:var(--accent2);letter-spacing:0.02em;text-align:${it.align||'left'}">
+              ${groupAlignBtns(it.id, it.align||'left')}
+            </div>
           </td>
           <td class="col-qty" style="width:70px"></td>
           <td class="col-unit" style="width:70px"></td>
@@ -797,6 +822,27 @@ async function saveQuoteItemExtra(quoteId, arr) {
   } catch(e) { console.warn('Save item extra failed:', e.message); }
 }
 
+// ── ความสัมพันธ์ "สร้างใหม่จากใบเก่า" (duplicate) — เก็บพาเรนต์ไว้ใน Settings ───
+let _dupSourceId = null;   // id ใบต้นทางตอนกด "สร้างใหม่จากใบนี้" (ใช้ตอนบันทึกใบใหม่)
+function getQuoteParent(quoteId) {
+  try {
+    const it = (_settingsCache || []).find(i => i.Title === 'QuoteParent_' + quoteId);
+    return it && it.Value ? it.Value : '';
+  } catch(e) { return ''; }
+}
+async function saveQuoteParent(quoteId, parentId) {
+  const value = String(parentId || '');
+  try {
+    const items = _settingsCache || await getListItems(CONFIG.lists.settings);
+    const ex = items.find(i => i.Title === 'QuoteParent_' + quoteId);
+    if (ex) { await updateListItem(CONFIG.lists.settings, ex.id, { Value: value }); ex.Value = value; }
+    else {
+      const c = await createListItem(CONFIG.lists.settings, { Title: 'QuoteParent_' + quoteId, Value: value });
+      if (_settingsCache) _settingsCache.push({ id: c.id, Title: 'QuoteParent_' + quoteId, Value: value });
+    }
+  } catch(e) { console.warn('Save quote parent failed:', e.message); }
+}
+
 // ── Column toggle ──────────────────────────────────────────
 function toggleColPanel(e) {
   e.stopPropagation();
@@ -810,8 +856,8 @@ document.addEventListener('click', () => {
   if (sp) sp.classList.remove('open');
 });
 // สถานะการแสดง/ซ่อน คอลัมน์ (รายใบ)
-let colVisible = { pn:true, qty:true, unit:true, price:true, disc:true, total:true };
-let colLines = false;   // #7 เส้นแบ่งคอลัมน์แนวตั้งใน PDF (รายใบ)
+let colVisible = { pn:false, qty:true, unit:true, price:true, disc:false, total:true };   // ค่าเริ่มต้นคอลัมน์
+let colLines = true;   // #7 เส้นแบ่งคอลัมน์แนวตั้งใน PDF (รายใบ) — เปิดเป็นค่าเริ่มต้น
 let pricePeriod = '';   // '' | 'month' | 'year' — งวดของราคาต่อหน่วย (หัวคอลัมน์ราคา)
 function setPricePeriod(v) { pricePeriod = v || ''; }
 function toggleColLines(on) { colLines = !!on; }
@@ -833,10 +879,12 @@ function applyColVisibility() {
 }
 function setColVisible(state) {
   const st = state || {};
-  colLines = !!st.__lines;
+  // ค่าเริ่มต้น (ใบใหม่): เส้นแบ่งคอลัมน์เปิด — ถ้าใบเดิมเคยบันทึก __lines ไว้ใช้ค่านั้น
+  colLines = (st.__lines !== undefined) ? !!st.__lines : true;
   pricePeriod = st.__pricePeriod || '';
   const { __lines, __pricePeriod, ...cols } = st;
-  colVisible = { pn:true, qty:true, unit:true, price:true, disc:true, total:true, ...cols };
+  // default: จำนวน/หน่วย/ราคาต่อหน่วย/รวม เปิด · Part No./ส่วนลด% ปิด (ใบเดิมที่บันทึกค่าไว้จะ override)
+  colVisible = { pn:false, qty:true, unit:true, price:true, disc:false, total:true, ...cols };
   applyColVisibility();
 }
 // per-quote persistence (Settings list)
@@ -932,6 +980,7 @@ document.getElementById('g-disc')?.addEventListener('input', calcTotals);
 // ============================================================
 async function editQuote(id) {
   const q = quotesData.find(x => x.id === id);
+  if (q && q.Status === 'Pending') { toast('ใบนี้กำลังรออนุมัติ — แก้ไข/ส่งซ้ำไม่ได้ (ดูตัวอย่าง PDF ได้)', 'error'); return; }
   if (!q) return;
   if (q.Status === 'Cancelled') { toast('ใบเสนอราคานี้ถูกยกเลิกแล้ว — เก็บเป็นประวัติเท่านั้น', 'error'); return; }
   if (!canEditQuote(q)) { toast('คุณไม่มีสิทธิ์แก้ไขใบเสนอราคานี้', 'error'); return; }
@@ -948,7 +997,7 @@ async function editQuote(id) {
       const rh = +rowHs[idx] || 0;
       const ex = extra[idx] || {};
       if ((it.Title||'').startsWith('__GROUP__:')) {
-        return { id: Date.now() + idx, type:'group', title: it.Title.slice(10), spId: it.id, rowH: rh };
+        return { id: Date.now() + idx, type:'group', title: it.Title.slice(10), align: ex.align||'left', spId: it.id, rowH: rh };
       }
       if (it.Title === '__BLANK__') {
         return { id: Date.now() + idx, type:'blank', spId: it.id, rowH: rh };
@@ -1086,11 +1135,13 @@ function renderBasketBar() {
   const bar = document.getElementById('basket-bar'); if (!bar) return;
   const map = getBasketMap();
   const uncat = quotesData.filter(q => !(map[String(q.id)]||[]).length).length;
-  const chipBtn = (onclick, label, color, on) =>
-    `<button onclick="${onclick}" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:16px;border:1px solid ${on?(color||'var(--accent)'):'var(--border2)'};background:${on?(color?color+'22':'rgba(79,142,247,0.12)'):'var(--surface2)'};color:${on?(color||'var(--accent2)'):'var(--muted)'};font-size:12px;font-family:var(--font);cursor:pointer;font-weight:${on?600:400}">${label}</button>`;
+  const chipBtn = (onclick, label, color, on, extra) =>
+    `<button onclick="${onclick}" ${extra||''} style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:16px;border:1px solid ${on?(color||'var(--accent)'):'var(--border2)'};background:${on?(color?color+'22':'rgba(79,142,247,0.12)'):'var(--surface2)'};color:${on?(color||'var(--accent2)'):'var(--muted)'};font-size:12px;font-family:var(--font);cursor:pointer;font-weight:${on?600:400}">${label}</button>`;
+  // โฟลเดอร์ตะกร้า = เป้ารับการลากใบมาวาง (drop)
   const folderChip = b => chipBtn(`openBasket('${b.id}')`,
     `<span style="width:9px;height:9px;border-radius:50%;background:${b.color};display:inline-block"></span> ${escHtml(b.name)} <span style="opacity:.6">${basketRollupCount(b.id)}</span>${basketHasChildren(b.id)?' <span style="opacity:.5">▸</span>':''}`,
-    b.color, _activeBasket === b.id);
+    b.color, _activeBasket === b.id,
+    `ondragover="allowBasketDrop(event,this)" ondragleave="clearBasketDrop(this)" ondrop="dropQuoteToBasket(event,'${b.id}',this)"`);
   // breadcrumb (โฟลเดอร์ที่กำลังอยู่)
   let crumbs = `<span onclick="gotoBasketView('')" style="cursor:pointer;color:${_basketView?'var(--accent2)':'var(--text)'}">🏠 หน้าหลัก</span>`;
   basketAncestors(_basketView).concat(_basketView?[basketById(_basketView)]:[]).filter(Boolean).forEach((b,i,arr) => {
@@ -1111,6 +1162,34 @@ function renderBasketBar() {
   }
   chips += `<button onclick="openBasketManage()" style="padding:5px 12px;border-radius:16px;border:1px dashed var(--border2);background:none;color:var(--muted);font-size:12px;font-family:var(--font);cursor:pointer">⚙ จัดการตะกร้า</button>`;
   bar.innerHTML = `<div style="font-size:12px;margin-bottom:8px">${crumbs}</div><div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center">${chips}</div>`;
+}
+
+// ── ลากใบเสนอราคาจากตารางไปวางที่ตะกร้า ──
+let _dragQuoteId = null;
+function quoteRowDragStart(e, qid) {
+  _dragQuoteId = qid;
+  try { e.dataTransfer.setData('text/plain', qid); e.dataTransfer.effectAllowed = 'copy'; } catch(_) {}
+}
+function allowBasketDrop(e, el) {
+  e.preventDefault();
+  try { e.dataTransfer.dropEffect = 'copy'; } catch(_) {}
+  if (el) el.style.outline = '2px dashed var(--accent)';
+}
+function clearBasketDrop(el) { if (el) el.style.outline = ''; }
+async function dropQuoteToBasket(e, bid, el) {
+  e.preventDefault();
+  clearBasketDrop(el);
+  const qid = _dragQuoteId || (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+  _dragQuoteId = null;
+  if (!qid) return;
+  const map = getBasketMap();
+  const arr = map[String(qid)] || (map[String(qid)] = []);
+  if (arr.includes(bid)) { const b0 = basketById(bid); toast('ใบนี้อยู่ตะกร้า "' + (b0?b0.name:'') + '" แล้ว', 'info'); return; }
+  arr.push(bid);
+  try { await saveBasketMap(); } catch(err) { console.warn('save basket map', err.message); }
+  renderBasketBar(); renderQuotes();
+  const b = basketById(bid);
+  toast('จัดเข้าตะกร้า "' + (b?b.name:'') + '" แล้ว', 'success');
 }
 function openBasket(bid) { _basketView = bid; _activeBasket = bid; renderBasketBar(); renderQuotes(); }        // เข้าโฟลเดอร์ + กรองซับทรี
 function gotoBasketView(id) { _basketView = id; _activeBasket = id === '' ? '__none__' : id; renderBasketBar(); renderQuotes(); }
@@ -1249,6 +1328,7 @@ async function duplicateQuote(id) {
   if (!confirm('สร้างใบเสนอราคาใหม่ ' + newNo + '\nจากเนื้อหาของ ' + (q.Title||'') + ' (ลูกค้า: ' + (q.ClientName||'-') + ')?\n\nเลขที่จะเป็นใบใหม่ทั้งหมด แก้ไขได้ก่อนบันทึก')) return;
 
   toast('กำลังคัดลอกข้อมูล...', 'info');
+  _dupSourceId = id;   // ★ จำใบต้นทางไว้ผูกความสัมพันธ์ตอนบันทึกใบใหม่
   // โหลดรายการจากใบเดิม (เหมือน editQuote แต่ไม่ผูก spId เพราะจะสร้างใหม่)
   try {
     const allItems = await getListItems(CONFIG.lists.quoteItems);
@@ -1258,7 +1338,7 @@ async function duplicateQuote(id) {
     quoteItems = items.map((it, idx) => {
       const rh = +rowHs[idx] || 0;
       const ex = extra[idx] || {};
-      if ((it.Title||'').startsWith('__GROUP__:')) return { id: Date.now()+idx, type:'group', title: it.Title.slice(10), rowH: rh };
+      if ((it.Title||'').startsWith('__GROUP__:')) return { id: Date.now()+idx, type:'group', title: it.Title.slice(10), align: ex.align||'left', rowH: rh };
       if (it.Title === '__BLANK__')     return { id: Date.now()+idx, type:'blank', rowH: rh };
       if (it.Title === '__PAGEBREAK__') return { id: Date.now()+idx, type:'pagebreak' };
       if (it.Title === '__NOTE__')      return { id: Date.now()+idx, type:'note', text: it.Description || '' };
@@ -1409,6 +1489,8 @@ async function saveQuote(status) {
       // CREATE new quote
       const created = await createListItem(CONFIG.lists.quotations, fields);
       quoteId = created.id;
+      // ผูกความสัมพันธ์ถ้าใบนี้มาจาก "สร้างใหม่จากใบเก่า"
+      if (_dupSourceId) { try { await saveQuoteParent(quoteId, _dupSourceId); } catch(e) {} _dupSourceId = null; }
     }
     // Save line items — build itemExtra (pn + ราคาดิบ) ขนานกับแถวที่ถูกบันทึกจริง เพื่อ index ตรงกันตอนโหลด
     const itemExtra = [];
@@ -1418,7 +1500,7 @@ async function saveQuote(status) {
           Title: '__GROUP__:' + (it.title||''), QuoteID: quoteId,
           Quantity: 0, Unit: '', UnitPrice: 0, DiscountPct: 0, LineTotal: 0, Description: '__GROUP__'
         });
-        itemExtra.push({});
+        itemExtra.push({ align: it.align||'left' });
       } else if (it.type === 'blank') {
         await createListItem(CONFIG.lists.quoteItems, {
           Title: '__BLANK__', QuoteID: quoteId,

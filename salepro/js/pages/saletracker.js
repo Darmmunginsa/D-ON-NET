@@ -326,7 +326,7 @@ function renderExpenseTab() {
       <tr>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);white-space:nowrap">${fmtDate(e.date)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border)"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;background:${(EXP_CAT_COLORS[e.cat]||'#9ca3b5')}22;color:${EXP_CAT_COLORS[e.cat]||'#9ca3b5'}">${escHtml(e.cat||'อื่นๆ')}</span>${e._src==='tech'?'<div style="font-size:9px;color:var(--amber);margin-top:2px">จากงานช่าง</div>':''}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text)">${escHtml(e.detail||'-')}${e.by?`<div style="font-size:10px;color:var(--muted)">โดย ${escHtml(e.by)}</div>`:''}${e.receiptUrl?`<div style="margin-top:3px"><a href="${e.receiptUrl}" target="_blank" rel="noopener" style="font-size:10px;color:var(--accent2);text-decoration:none;display:inline-flex;align-items:center;gap:3px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>🧾 ดูใบเสร็จ</a></div>`:(e._src==='sale'?(e.receiptError?`<div style="margin-top:3px;font-size:10px;color:var(--red)">⚠ แนบรูปไม่สำเร็จ: ${escHtml(e.receiptError)}</div>`:`<div style="margin-top:3px;font-size:10px;color:var(--amber)">⚠ ไม่มีรูปแนบ</div>`):'')}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text)">${escHtml(e.detail||'-')}${e.by?`<div style="font-size:10px;color:var(--muted)">โดย ${escHtml(e.by)}</div>`:''}${e.receiptUrl?`<div style="margin-top:3px">${docThumb(e.receiptUrl,'ใบเสร็จ',{small:true})}</div>`:(e._src==='sale'?(e.receiptError?`<div style="margin-top:3px;font-size:10px;color:var(--red)">⚠ แนบรูปไม่สำเร็จ: ${escHtml(e.receiptError)}</div>`:`<div style="margin-top:3px;font-size:10px;color:var(--amber)">⚠ ไม่มีรูปแนบ</div>`):'')}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono);color:var(--red)">${fmt(e.amount)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:center">${e._src==='tech'?'<span style="font-size:9px;color:var(--muted)" title="บันทึกโดยช่าง — แก้ไขในแท็บช่าง">🔧</span>':'<span style="font-size:11px;color:var(--muted)" title="ค่าใช้จ่ายถูกบันทึกเป็นหลักฐาน ลบไม่ได้">🔒</span>'}</td>
       </tr>`).join('')}
@@ -506,7 +506,7 @@ async function renderSTPayHistory(q) {
         <span class="badge badge-draft" style="font-size:10px">${p.PaymentMethod||''}</span>
         ${(+p.WHTAmount>0)?`<span style="color:var(--amber);font-size:11px" title="ลูกค้าหัก ณ ที่จ่าย ${p.WHTPercent||''}%">หัก ${fmt(p.WHTAmount)}</span>`:''}
         ${p.Reference?`<span style="color:var(--muted);font-size:11px">${escHtml(p.Reference)}</span>`:''}
-        ${p.SlipURL && p.SlipURL.startsWith('http')?`<a href="${p.SlipURL}" target="_blank" rel="noopener" style="color:var(--accent2);font-size:11px;margin-left:auto;padding:2px 6px;border:1px solid rgba(79,142,247,0.2);border-radius:4px">📎 สลิป ↗</a>`:''}
+        ${p.SlipURL && p.SlipURL.startsWith('http')?`<span style="margin-left:auto">${docThumb(p.SlipURL,'สลิปโอนเงิน',{small:true})}</span>`:''}
       </div>`).join('');
   } catch(e){el.innerHTML='';}
 }
@@ -969,7 +969,7 @@ function renderCustPOTab() {
     const fileHtml = p.fileName
       ? '<div style="margin-top:6px">' + (
           p.fileUrl
-            ? '<a href="' + p.fileUrl + '" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent2);text-decoration:none;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:rgba(79,142,247,0.1);border-radius:5px;border:1px solid rgba(79,142,247,0.2)"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> ' + escHtml(p.fileName) + '</a>'
+            ? docThumb(p.fileUrl, p.fileName, {small:true})
             : '<span style="font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:4px">📎 ' + escHtml(p.fileName) + '</span>'
         ) + '</div>'
       : '';
@@ -1238,13 +1238,11 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const DOC_CLIENT = ((typeof customerThaiNameByAny === 'function' && customerThaiNameByAny(q.ClientName, q.CustomerTaxID)) || q.ClientName || '');
   const DOC_ADDR   = (q.CustomerAddress || '');   // ADDRESS = ภาษาไทยเสมอ
   // ── หัวบริษัท Fix ตายตัว (ยกเว้นโลโก้ดึงจาก Company Settings) ──
-  // หัวบริษัท — ดึงจากหน้า "ตั้งค่าบริษัท" (แก้ในแอปได้เลย) ถ้าเว้นว่างใช้ค่าเริ่มต้น
-  const _cs = (typeof companySettings !== 'undefined' && companySettings) ? companySettings : {};
-  const CO_NAME_TH = _cs.CompanyName   || 'บริษัท ไอที เซอร์วิสเซส จำกัด';
-  const CO_NAME_EN = _cs.CompanyNameEn || 'IT SERVICES CO.,LTD.';
-  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = _cs.Address   || '168/8 ถนนพัฒนาชนบท 3 แขวงคลองสองต้นนุ่น เขตลาดกระบัง กรุงเทพมหานคร 10520';
-  const CO_ADDR_EN_L = 'HEAD OFFICE',  CO_ADDR_EN_V = _cs.AddressEn || '168/8 Patthana Chonabot 3 Rd, Khlong Song Ton Nun Sub District, Lat Krabang District, Bangkok 10520';
-  const CO_TEL = _cs.Phone || '02-108-6113', CO_FAX = _cs.Fax || _cs.Phone || '02-108-6113', CO_TAXID = _cs.TaxID || '0105559006113';
+  const CO_NAME_TH = 'บริษัท ไอที เซอร์วิสเซส จำกัด';
+  const CO_NAME_EN = 'IT SERVICES CO.,LTD.';
+  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = '168/8 ถนนพัฒนาชนบท 3 แขวงคลองสองต้นนุ่น เขตลาดกระบัง กรุงเทพมหานคร 10520';
+  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = '168/8 Patthana Chonabot 3 Rd, Khlong Song Ton Nun Sub District, Lat Krabang District, Bangkok 10520';
+  const CO_TEL = '02-108-6113', CO_FAX = '02-108-6113', CO_TAXID = '0105559006113';
   const F_TH = "'Sarabun','Segoe UI',sans-serif";                        // ฟอนต์เดิมทั้งเอกสาร (Sarabun)
   const F_EN = "'Sarabun','Segoe UI',sans-serif";
   const F_NUM = "'Sarabun','Segoe UI',sans-serif";
@@ -1870,16 +1868,30 @@ async function sendPaymentCompleteEmail(q, totalPaid) {
   await apiPost('sendEmail', '_', null, { to, subject, body });
 }
 
+// หัวเรื่องอีเมลอนุมัติ (ใช้ร่วมทั้งคำขอและผล เพื่อให้ร้อยเธรดกันได้): [ใบเสนอราคา] เลขที่ — ลูกค้า — โปรเจกต์
+function _approvalSubject(q) {
+  const tag = (q.Tag || '').trim();
+  return '[ใบเสนอราคา] ' + (q.Title||'') + ' — ' + (q.ClientName||'') + (tag ? ' — ' + tag : '');
+}
 async function sendApprovalRequestEmail(q, attachment) {
   const to = q.ApproverEmail || '';
   if (!to || !to.includes('@')) return;
-  const subject = '[ใบเสนอราคา] ' + (q.Title||'') + ' — ' + (q.ClientName||'');
+  const subject = _approvalSubject(q);
+  const tag = (q.Tag || '').trim();
   const body = '🔔 มีใบเสนอราคารออนุมัติ (แนบไฟล์ PDF ใบเสนอราคาไว้ด้านล่าง)\n\n'
     + 'ใบเสนอราคา : ' + (q.Title||'') + '\n'
     + 'ลูกค้า      : ' + (q.ClientName||'') + '\n'
+    + (tag ? 'โปรเจกต์   : ' + tag + '\n' : '')
     + 'มูลค่ารวม   : ' + fmt(q.TotalAmount||0) + '\n'
     + 'ผู้จัดทำ    : ' + (q.SaleName||q.SaleEmail||'') + '\n\n'
     + 'กรุณาเข้าสู่ระบบ SalePro เพื่ออนุมัติหรือปฏิเสธใบเสนอราคา';
+  // ถ้าใบนี้เคยส่งอนุมัติแล้ว (มีอีเมลคำขอเดิม) → ส่งรอบใหม่เป็น reply เพื่อให้อยู่เธรดเดียวกัน
+  try {
+    if (typeof _findMessageIdBySubject === 'function' && typeof _sendReplyNew === 'function') {
+      const mid = await _findMessageIdBySubject(subject);
+      if (mid) { await _sendReplyNew(mid, to, body, attachment); return; }
+    }
+  } catch(e) { console.warn('reply-new-round failed, fallback to new email:', e.message); }
   await apiPost('sendEmail', '_', null, { to, subject, body, attachments: attachment ? [attachment] : [] });
 }
 
@@ -1887,15 +1899,24 @@ async function sendApprovalResultEmail(q, status, comment) {
   const to = q.SaleEmail || '';
   if (!to || !to.includes('@')) return;
   const isApproved = status === 'Approved';
-  // ใช้หัวเรื่องฐานเดียวกับอีเมลขออนุมัติ + RE: เพื่อให้ร้อยอยู่เธรดเดียวกัน
-  const subject = 'RE: [ใบเสนอราคา] ' + (q.Title||'') + ' — ' + (q.ClientName||'');
+  const reqSubject = _approvalSubject(q);   // หัวเรื่องเดียวกับอีเมลคำขอ (ใช้จับเธรด)
+  const tag = (q.Tag || '').trim();
   const body = (isApproved ? '✅ ใบเสนอราคาของคุณได้รับการอนุมัติแล้ว' : '❌ ใบเสนอราคาของคุณถูกปฏิเสธ') + '\n\n'
     + 'ใบเสนอราคา : ' + (q.Title||'') + '\n'
     + 'ลูกค้า      : ' + (q.ClientName||'') + '\n'
+    + (tag ? 'โปรเจกต์   : ' + tag + '\n' : '')
     + 'มูลค่ารวม   : ' + fmt(q.TotalAmount||0) + '\n'
     + 'อนุมัติโดย  : ' + (q.ApproverName||q.ApproverEmail||'') + '\n'
     + (comment ? '\nความคิดเห็น:\n' + comment : '');
-  await apiPost('sendEmail', '_', null, { to, subject, body });
+  // พยายาม reply อีเมลคำขอเดิมในกล่องผู้อนุมัติ → อยู่เธรดเดียวกันทั้งสองฝั่ง
+  try {
+    if (typeof _findMessageIdBySubject === 'function') {
+      const mid = await _findMessageIdBySubject(reqSubject);
+      if (mid) { await _replyMail(mid, body); return; }
+    }
+  } catch(e) { console.warn('reply-in-thread failed, fallback to new email:', e.message); }
+  // fallback: อีเมลใหม่ (RE:) ถ้าหาอีเมลคำขอไม่เจอ
+  await apiPost('sendEmail', '_', null, { to, subject: 'RE: ' + reqSubject, body });
 }
 
 
