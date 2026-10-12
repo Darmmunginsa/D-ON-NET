@@ -143,7 +143,8 @@ function deleteWhere(name, field, value) {
 
 function sendEmail(req) {
   var isHtml = /<[a-z][\s\S]*>/i.test(req.body || '');
-  var opts = { name: 'SalePro' };
+  var opts = { name: req.fromName || 'SalePro' };        // ชื่อผู้ส่ง = ผู้ที่ล็อกอิน (ถ้าส่งมา)
+  if (req.replyTo) opts.replyTo = req.replyTo;            // ตอบกลับไปหาผู้ที่ล็อกอินโดยตรง
   if (isHtml) opts.htmlBody = req.body;
   var atts = (req.attachments || []).filter(function (a) { return a && a.base64; });
   if (atts.length) {

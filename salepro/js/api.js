@@ -82,7 +82,10 @@ async function deleteWhere(list, field, value) {
 
 // ── Email / Upload ──
 async function _sendMail(to, subject, body, attachments) {
-  return _call({ action: 'sendEmail', to, subject, body, attachments: attachments || [] });
+  // ส่งในนามผู้ที่ล็อกอิน: ตั้ง replyTo + ชื่อผู้ส่ง = ผู้ใช้ปัจจุบัน (Vendor ตอบกลับมาหาคนนี้โดยตรง)
+  var _u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
+  return _call({ action: 'sendEmail', to, subject, body, attachments: attachments || [],
+                 replyTo: _u ? (_u.email || '') : '', fromName: _u ? (_u.displayName || _u.email || '') : '' });
 }
 async function _uploadFile(folder, fileName, mimeType, base64Data) {
   const d = await _call({ action: 'uploadFile', folder, fileName, mimeType, base64: base64Data });
