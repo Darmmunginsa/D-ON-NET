@@ -6,7 +6,7 @@
 <title>Finance — iT Services</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="stylesheet" href="assets/style.css?v=f2">
+<link rel="stylesheet" href="assets/style.css?v=f3">
 </head>
 <body>
 
@@ -24,11 +24,11 @@
   <aside class="sidebar">
     <div class="brand"><span class="brand-ico">💵</span> Finance</div>
     <nav>
-      <div class="nav-item active" data-v="dash" onclick="go('dash')">📊 ภาพรวม</div>
-      <div class="nav-item" data-v="ledger" onclick="go('ledger')">📒 รายการรับ-จ่าย</div>
-      <div class="nav-item" data-v="req" onclick="go('req')">🧾 ใบขอเบิก</div>
-      <div class="nav-item" data-v="report" onclick="go('report')">📈 รายงาน</div>
-      <div class="nav-item" data-v="cat" onclick="go('cat')">🏷️ หมวดหมู่</div>
+      <div class="nav-item active" data-v="dash" onclick="go('dash')"><span class="ni-ico">📊</span><span class="ni-lb">ภาพรวม</span></div>
+      <div class="nav-item" data-v="ledger" onclick="go('ledger')"><span class="ni-ico">📒</span><span class="ni-lb">รายการ</span></div>
+      <div class="nav-item" data-v="req" onclick="go('req')"><span class="ni-ico">🧾</span><span class="ni-lb">ใบเบิก</span></div>
+      <div class="nav-item" data-v="report" onclick="go('report')"><span class="ni-ico">📈</span><span class="ni-lb">รายงาน</span></div>
+      <div class="nav-item" data-v="cat" onclick="go('cat')"><span class="ni-ico">🏷️</span><span class="ni-lb">หมวดหมู่</span></div>
     </nav>
     <div class="side-foot">
       <a href="../" class="back-portal">← กลับ Portal</a>
@@ -45,13 +45,14 @@
     </header>
     <main id="view" class="view"></main>
   </div>
+  <button id="fab" class="fab" onclick="openTx('expense')" title="บันทึกรายจ่าย">＋</button>
 </div>
 
 <div id="toasts"></div>
 
-<script src="js/config.js?v=f2"></script>
-<script src="js/api.js?v=f2"></script>
-<script src="js/auth.js?v=f2"></script>
-<script src="js/app.js?v=f2"></script>
+<script src="js/config.js?v=f3"></script>
+<script src="js/api.js?v=f3"></script>
+<script src="js/auth.js?v=f3"></script>
+<script src="js/app.js?v=f3"></script>
 </body>
 </html>
