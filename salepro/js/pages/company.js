@@ -121,6 +121,13 @@ function fileToBase64(file) {
   });
 }
 
+// เติมพื้นหลังสีขาวไว้ "ด้านหลัง" ภาพที่วาดไว้แล้ว (ไม่ทับตัวภาพ) — สำหรับ export เป็น JPEG ที่ไม่มี alpha
+function _fillWhiteBehind(ctx, w, h) {
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = 'source-over';
+}
 // ย่อรูป base64 ให้สั้นกว่า maxChars (Google Sheet จำกัด 50,000 ตัวอักษร/เซลล์)
 async function shrinkImageBase64(dataURL, maxDim, maxChars) {
   maxDim = maxDim || 512; maxChars = maxChars || 45000;
@@ -135,14 +142,18 @@ async function shrinkImageBase64(dataURL, maxDim, maxChars) {
       const c = document.createElement('canvas'); c.width = w; c.height = h;
       const ctx = c.getContext('2d'); ctx.clearRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h);
       let out = c.toDataURL('image/png');                              // คงความโปร่งใสก่อน
-      if (out.length > maxChars) out = c.toDataURL('image/jpeg', 0.82); // ถ้ายังใหญ่ใช้ JPEG
+      if (out.length > maxChars) {                                     // ถ้ายังใหญ่ใช้ JPEG
+        _fillWhiteBehind(ctx, w, h);                                   // JPEG ไม่มี alpha → เติมขาวหลังรูป กันโปร่งใสกลายเป็นดำ
+        out = c.toDataURL('image/jpeg', 0.82);
+      }
       if (out.length <= maxChars) return out;
       dim = Math.round(dim * 0.8);
     }
     const c = document.createElement('canvas');
     const s = Math.min(1, 256 / Math.max(img.width, img.height));
     c.width = Math.max(1, Math.round(img.width * s)); c.height = Math.max(1, Math.round(img.height * s));
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const fctx = c.getContext('2d'); fctx.drawImage(img, 0, 0, c.width, c.height);
+    _fillWhiteBehind(fctx, c.width, c.height);
     return c.toDataURL('image/jpeg', 0.6);
   } catch (e) { console.warn('shrink image failed:', e.message); return dataURL; }
 }
