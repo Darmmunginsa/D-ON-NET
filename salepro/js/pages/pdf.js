@@ -63,7 +63,7 @@ function buildCurrentQuoteData() {
     ContractStartDate: document.getElementById('q-start').value||'',
     ContractEndDate: document.getElementById('q-end').value||''
   };
-  const d = buildPDFData(fakeQ, quoteItems.map(i=> i.type==='group' ? {__group:true, groupTitle:i.title, rowH:i.rowH} : i.type==='blank' ? {__blank:true, rowH:i.rowH} : i.type==='pagebreak' ? {__pagebreak:true} : i.type==='note' ? {__note:true, noteText:i.text} : i.asHeader ? {__group:true, groupTitle:i.name, rowH:i.rowH} : {No:i.no||'', PartNumber:i.pn||'', Title:i.name, Quantity:i.qty, Unit:i.unit, PriceRaw:i.price, UnitPrice:priceNum(i), DiscountPct:i.disc, Description:i.desc||'', rowH:i.rowH}));
+  const d = buildPDFData(fakeQ, quoteItems.map(i=> i.type==='group' ? {__group:true, groupTitle:i.title, align:i.align||'left', rowH:i.rowH} : i.type==='blank' ? {__blank:true, rowH:i.rowH} : i.type==='pagebreak' ? {__pagebreak:true} : i.type==='note' ? {__note:true, noteText:i.text} : i.asHeader ? {__group:true, groupTitle:i.name, rowH:i.rowH} : {No:i.no||'', PartNumber:i.pn||'', Title:i.name, Quantity:i.qty, Unit:i.unit, PriceRaw:i.price, UnitPrice:priceNum(i), DiscountPct:i.disc, Description:i.desc||'', rowH:i.rowH}));
   d.zoneFonts = { ...zoneFont };   // ใช้ค่าฟอนต์ที่กำลังตั้งอยู่ในฟอร์ม
   d.cols = { pn:true, ...colVisible };       // คอลัมน์ที่กำลังแสดงอยู่ในฟอร์ม
   d.colLines = (typeof colLines !== 'undefined') ? !!colLines : false;
@@ -94,12 +94,12 @@ async function showPDFForQuote(id) {
     items = all.filter(i => String(i.QuoteID) === String(id)).map((i, idx) => {
       const rh = +_rowHs[idx] || 0;
       const ex = _extra[idx] || {};
-      if ((i.Title||'').startsWith('__GROUP__:')) return { __group:true, groupTitle: i.Title.slice(10), rowH: rh };
+      if ((i.Title||'').startsWith('__GROUP__:')) return { __group:true, groupTitle: i.Title.slice(10), align: ex.align||'left', rowH: rh };
       if (i.Title === '__BLANK__') return { __blank:true, rowH: rh };
       if (i.Title === '__PAGEBREAK__') return { __pagebreak:true };
       if (i.Title === '__NOTE__') return { __note:true, noteText: i.Description || '' };
       if (ex.asHeader) return { __group:true, groupTitle: i.Title || '', rowH: rh };   // รายการที่ตั้งเป็นหัวข้อกลุ่ม
-      return { ...i, rowH: rh, No: ex.no || '', PartNumber: ex.pn || '', PriceRaw: (ex.price !== undefined && ex.price !== '') ? ex.price : i.UnitPrice };
+      return { ...i, rowH: rh, No: ex.no || '', PartNumber: ex.pn || '', PriceRaw: (ex.price !== undefined && ex.price !== '') ? ex.price : i.UnitPrice, Quantity: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : i.Quantity };
     });
   } catch(e) {}
   const _qdEN = (typeof getQuoteDocEN === 'function') ? getQuoteDocEN(id) : {};
@@ -137,7 +137,8 @@ async function showPDFForQuote(id) {
 
 
 function buildPDFData(q, items) {
-  const sub = (items||[]).reduce((a,i)=>(i.__group||i.__blank||i.__pagebreak||i.__note)?a:a+((i.Quantity||1)*(i.UnitPrice||0)*(1-(i.DiscountPct||0)/100)),0);
+  const _qn = v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)) && isFinite(v);
+  const sub = (items||[]).reduce((a,i)=>(i.__group||i.__blank||i.__pagebreak||i.__note)?a:(_qn(i.Quantity)?a+(parseFloat(i.Quantity)*(i.UnitPrice||0)*(1-(i.DiscountPct||0)/100)):a),0);
   const disc = (q.DiscountPct||0)/100;
   const after = sub*(1-disc);
   const vat = after*0.07;
@@ -178,9 +179,10 @@ function renderPDFHTML(d) {
     <div style="display:flex;align-items:stretch;justify-content:space-between;margin-bottom:6px;padding-bottom:8px;border-bottom:2px solid ${primaryColor}">
       <div style="flex:1;max-width:50%;word-break:break-word">
         ${(s.LogoBase64||s.LogoURL) ? `<img src="${s.LogoBase64||s.LogoURL}" style="max-height:81px;max-width:225px;object-fit:contain;margin-bottom:5px;display:block">` : ''}
-        <div style="font-size:${hbName};font-weight:700;color:${primaryColor}">${s.CompanyName||'บริษัท ไอที เซอร์วิสเซส จำกัด'}</div>
+        <div style="font-size:${hbName};font-weight:700;color:${primaryColor};line-height:1.15">${s.CompanyNameEn||'IT SERVICES CO.,LTD.'}</div>
+        <div style="font-size:${hbLine};font-weight:700;color:${primaryColor};line-height:1.2;margin-top:1px">${s.CompanyName||'บริษัท ไอที เซอร์วิสเซส จำกัด'}</div>
         <div style="font-size:${hbLine};color:#666;line-height:1.5;margin-top:3px">
-          ${s.Address ? s.Address+'<br>' : ''}
+          ${(s.AddressEn||s.Address) ? (s.AddressEn||s.Address)+'<br>' : ''}
           ${s.Phone ? 'Tel: '+s.Phone : ''}${s.Phone&&s.Email?' &nbsp;|&nbsp; ':''}${s.Email ? 'Email: '+s.Email : ''}<br>
           ${s.TaxID ? 'Tax ID: '+s.TaxID : ''}
         </div>
@@ -206,15 +208,16 @@ function renderPDFHTML(d) {
   const _clientName = (q.ClientNameEN||'').trim() || (_qEN && _qEN.nameEN) || (q.ClientName || '');
   const _clientAddr = (q.CustomerAddressEN||'').trim() || (_qEN && _qEN.addrEN) || (q.CustomerAddress || '');
   const custBlock = `
-    <div style="background:#f8fafc;border-radius:8px;padding:7px 14px;margin-bottom:6px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:${Zi.m}">
+    <div style="background:#f8fafc;border-radius:8px;padding:7px 14px;margin-bottom:6px;display:grid;grid-template-columns:0.8fr 1.2fr;gap:12px;font-size:${Zi.m}">
       <div>
         <div style="font-size:${Zi.s};color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Attention</div>
-        <div style="font-size:${Zi.l};font-weight:700;color:${primaryColor};margin-bottom:3px">${_clientName}</div>
-        ${(q.ContactPerson||q.Email) ? `<div style="color:#555;word-break:break-all;overflow-wrap:anywhere">${q.ContactPerson?'Contact: '+q.ContactPerson:''}${q.ContactPerson&&q.Email?' &nbsp;·&nbsp; ':''}${q.Email?'Email: '+q.Email:''}</div>` : ''}
+        ${q.ContactPerson ? `<div style="color:#555;word-break:break-all;overflow-wrap:anywhere">Contact: ${q.ContactPerson}</div>` : ''}
+        ${q.Email ? `<div style="color:#555;word-break:break-all;overflow-wrap:anywhere">Email: ${q.Email}</div>` : ''}
         ${(q.CustomerTel||q.Phone||d.customerFax) ? `<div style="color:#555">${(q.CustomerTel||q.Phone)?'Tel: '+(q.CustomerTel||q.Phone||''):''}${(q.CustomerTel||q.Phone)&&d.customerFax?' &nbsp;&nbsp; ':''}${d.customerFax?'Fax: '+escHtml(d.customerFax):''}</div>` : ''}
       </div>
       <div>
         <div style="font-size:${Zi.s};color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">Address</div>
+        <div style="font-size:${Zi.l};font-weight:700;color:${primaryColor};margin-bottom:3px">${_clientName}</div>
         <div style="color:#555;line-height:1.5;white-space:pre-line">${_clientAddr}</div>
       </div>
     </div>`;
@@ -225,7 +228,7 @@ function renderPDFHTML(d) {
   // ราคา/ยอด รองรับข้อความ (Included): ใช้ PriceRaw ถ้าเป็นข้อความ
   const _isNum = v => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v)) && isFinite(v);
   const cellPrice = it => { const r = (it.PriceRaw !== undefined ? it.PriceRaw : (it.UnitPrice!==undefined?it.UnitPrice:it.price)); return _isNum(r) ? fmtP(parseFloat(r)) : escHtml(String(r||'')); };
-  const cellTotal = it => { const r = (it.PriceRaw !== undefined ? it.PriceRaw : (it.UnitPrice!==undefined?it.UnitPrice:it.price)); if (!_isNum(r)) return escHtml(String(r||'')); return fmtP((it.Quantity||it.qty||1)*parseFloat(r)*(1-(it.DiscountPct||it.disc||0)/100)); };
+  const cellTotal = it => { const r = (it.PriceRaw !== undefined ? it.PriceRaw : (it.UnitPrice!==undefined?it.UnitPrice:it.price)); if (!_isNum(r)) return escHtml(String(r||'')); const q = (it.Quantity!==undefined?it.Quantity:it.qty); if (!_isNum(q)) return ''; return fmtP(parseFloat(q)*parseFloat(r)*(1-(it.DiscountPct||it.disc||0)/100)); };
   const sp = d.rowSpacing || { pad:4, lineH:1.35 };
   const rpT = (+sp.pad || 0);
   const rpB = rpT;
@@ -255,7 +258,7 @@ function renderPDFHTML(d) {
       const cells = [];
       cells.push(gEmpty);                                         // Item
       if (c.pn) cells.push(gEmpty);                               // Part No.
-      cells.push(`<td style="${cellBase}${gBg}text-align:left;font-weight:700;color:${primaryColor};font-size:${Zt.l};letter-spacing:0.04em">${escHtml(it.groupTitle||'')}</td>`);  // Description
+      cells.push(`<td style="${cellBase}${gBg}text-align:${it.align||'left'};font-weight:700;color:${primaryColor};font-size:${Zt.l};letter-spacing:0.04em">${escHtml(it.groupTitle||'')}</td>`);  // Description
       if (c.qty) cells.push(gEmpty);
       if (c.unit) cells.push(gEmpty);
       if (c.price) cells.push(gEmpty);
@@ -273,7 +276,7 @@ function renderPDFHTML(d) {
         <div style="font-weight:600;color:#1a1a2e;line-height:${lh}">${escHtml(it.Title||it.name||'-')}</div>
         ${(it.Description||it.desc) ? `<div style="font-size:${Zt.s};color:#666;margin-top:0.2em;white-space:pre-line;line-height:${lh}">${escHtml(it.Description||it.desc||'')}</div>` : ''}
       </td>
-      ${c.qty   ? `<td style="${cellBase}text-align:center;color:#1a1a2e">${it.Quantity||it.qty||1}</td>` : ''}
+      ${c.qty   ? `<td style="${cellBase}text-align:center;color:#1a1a2e">${escHtml(String(it.Quantity ?? it.qty ?? ''))}</td>` : ''}
       ${c.unit  ? `<td style="${cellBase}text-align:center;color:#1a1a2e">${it.Unit||it.unit||''}</td>` : ''}
       ${c.price ? `<td style="${cellBase}text-align:right;font-family:'Tahoma','Segoe UI',sans-serif;color:#1a1a2e">${cellPrice(it)}</td>` : ''}
       ${c.disc  ? `<td style="${cellBase}text-align:center;color:#1a1a2e">${(it.DiscountPct||it.disc||0) ? (it.DiscountPct||it.disc)+'%' : '–'}</td>` : ''}
@@ -286,8 +289,11 @@ function renderPDFHTML(d) {
     .map(x => (x || '').trim()).filter(Boolean).join('\n');
   const summaryBlock = `
     <div class="pdf-summary-row" style="display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-bottom:0;margin-top:14px">
-      <div style="flex:1;text-align:center;font-weight:600;color:${primaryColor};font-size:${Zo.m}">
-        <div style="border-top:1.5px solid ${primaryColor};border-bottom:1.5px solid ${primaryColor};background:${primaryColor}0d;padding:8px 14px;border-radius:4px">${bahtText(d.grand)}</div>
+      <div style="flex:1;font-weight:600;color:${primaryColor};font-size:${Zo.m}">
+        <div style="border-top:1.5px solid ${primaryColor};border-bottom:1.5px solid ${primaryColor};background:${primaryColor}0d;padding:8px 14px;border-radius:4px;display:flex;align-items:center;gap:10px">
+          <span style="white-space:nowrap;letter-spacing:0.03em">AMOUNT BAHT</span>
+          <span style="flex:1;text-align:center">${bahtText(d.grand)}</span>
+        </div>
       </div>
       <table style="width:240px;flex-shrink:0;border-collapse:collapse;color:#1a1a2e;font-size:${Zo.m};table-layout:fixed">
         <tr><td style="padding:4px 16px 4px 0;color:#444">SUB TOTAL</td><td style="text-align:right;font-family:'Tahoma','Segoe UI',sans-serif;padding:4px 0;color:#1a1a2e;white-space:nowrap">${fmtP(d.sub)}</td></tr>
@@ -362,7 +368,7 @@ function renderPDFHTML(d) {
     const tail = (isLast ? summaryBlock : '') + pageLabel;
     // wrap ยืด (flex:1) เฉพาะหน้าสุดท้าย; หน้าอื่นเป็น block ปกติ (ไม่ยืด)
     const wrapStyle = isLast ? 'flex:1;display:flex;flex-direction:column;margin-bottom:12px' : 'flex:0 0 auto;margin-bottom:12px';
-    return `<div class="pdf-page">${headBlock}${pi===0 ? custBlock : ''}<div class="pdf-items-wrap" style="${wrapStyle}">${itemsTable}</div>${tail}</div>`;
+    return `<div class="pdf-page">${headBlock}${custBlock}<div class="pdf-items-wrap" style="${wrapStyle}">${itemsTable}</div>${tail}</div>`;
   }).join('');
 
   const _cleanFn = s => String(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,' ').trim();

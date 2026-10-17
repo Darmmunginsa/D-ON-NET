@@ -115,9 +115,9 @@ async function afterLogin() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-screen').style.display = 'flex';
     initNewQuote();
-    await syncAll();
-    // Load roles from Settings sheet
+    // โหลดสิทธิ์ก่อน sync — ให้การกรองใบเสนอราคา (Admin/Approver เห็นทุกใบ) ถูกต้องตั้งแต่เข้าโปรแกรม
     await loadUserRoles();
+    await syncAll();
     // Load saved theme (per-user)
     await loadTheme();
     // Load Sale profile (name/tel/signature) from SharePoint — durable across devices

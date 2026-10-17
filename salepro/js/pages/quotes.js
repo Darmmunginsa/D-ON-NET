@@ -238,8 +238,11 @@ function updateAutoDates() {
   }
 }
 
+// id ที่ไม่ซ้ำเสมอ (กัน Date.now() ชนกันเมื่อเพิ่มหลายแถวใน ms เดียว → รายการถูกเขียนทับ/หาย)
+let _itemSeq = 0;
+function _nextItemId() { return Date.now() * 1000 + (_itemSeq++ % 1000); }
 function addItem(p = null) {
-  quoteItems.push({ id: Date.now(), type:'item', no:'', pn: p ? (p.PartNumber||p.SKU||'') : '', name: p ? p.Title : '', desc: p ? (p.Description||'') : '', qty: 1, unit: p ? (p.Unit||'ชิ้น') : 'ชิ้น', price: p ? (p.Price||0) : 0, disc: 0, cost: p ? (+p.Cost||0) : 0, vendorId: p ? (p.VendorId||'') : '' });
+  quoteItems.push({ id: _nextItemId(), type:'item', no:'', pn: p ? (p.PartNumber||p.SKU||'') : '', name: p ? p.Title : '', desc: p ? (p.Description||'') : '', qty: p ? 1 : '', unit: p ? (p.Unit||'ชิ้น') : 'ชิ้น', price: p ? (p.Price ?? '') : '', disc: 0, cost: p ? (+p.Cost||0) : 0, vendorId: p ? (p.VendorId||'') : '' });
   renderItems();
 }
 
@@ -258,8 +261,8 @@ function unitOptionsHTML(cur) {
 function priceNum(it) { return isNumeric(it.price) ? parseFloat(it.price) : 0; }
 // ข้อความที่แสดงในช่อง "ราคา/หน่วย"
 function priceCell(it) { return isNumeric(it.price) ? fmt(priceNum(it)) : (it.price || ''); }
-// ข้อความที่แสดงในช่อง "จำนวนเงิน" — ถ้าราคาเป็นข้อความ ให้แสดงข้อความเดียวกัน (เหมารวม)
-function totalCell(it) { return isNumeric(it.price) ? fmt(lineTotal(it)) : (it.price || ''); }
+// ข้อความที่แสดงในช่อง "จำนวนเงิน" — ราคาเป็นข้อความ → แสดงข้อความ; จำนวนไม่ใช่ตัวเลข/ว่าง → ว่าง (ไม่คำนวณ)
+function totalCell(it) { if (!isNumeric(it.price)) return it.price || ''; if (!isNumeric(it.qty)) return ''; return fmt(lineTotal(it)); }
 
 function setGroupAlign(id, a) {
   const it = quoteItems.find(x => x.id === id);
@@ -275,7 +278,7 @@ function groupAlignBtns(id, cur) {
   return `<span style="display:inline-flex;gap:2px;flex-shrink:0">${b('left','L','ชิดซ้าย')}${b('center','C','กึ่งกลาง')}${b('right','R','ชิดขวา')}</span>`;
 }
 function addGroupRow() {
-  quoteItems.push({ id: Date.now(), type:'group', title:'หัวข้อกลุ่ม', align:'left' });
+  quoteItems.push({ id: _nextItemId(), type:'group', title:'หัวข้อกลุ่ม', align:'left' });
   renderItems();
   // focus the new group input
   setTimeout(() => {
@@ -285,17 +288,17 @@ function addGroupRow() {
 }
 
 function addBlankRow() {
-  quoteItems.push({ id: Date.now(), type:'blank' });
+  quoteItems.push({ id: _nextItemId(), type:'blank' });
   renderItems();
 }
 
 function addPageBreak() {
-  quoteItems.push({ id: Date.now(), type:'pagebreak' });
+  quoteItems.push({ id: _nextItemId(), type:'pagebreak' });
   renderItems();
 }
 
 function addNoteRow() {
-  quoteItems.push({ id: Date.now(), type:'note', text:'' });
+  quoteItems.push({ id: _nextItemId(), type:'note', text:'' });
   renderItems();
   setTimeout(() => {
     const tas = document.querySelectorAll('#items-body tr.note-row textarea');
@@ -325,7 +328,8 @@ function lineTotal(it) {
   if (it.type === 'group' || it.type === 'blank' || it.type === 'pagebreak' || it.type === 'note') return 0;
   if (it.asHeader) return 0;   // รายการที่ตั้งเป็นหัวข้อกลุ่ม → ไม่คิดเงิน
   if (!isNumeric(it.price)) return 0;   // ราคาเป็นข้อความ (Included) → ไม่นับเป็นเงิน
-  return it.qty * priceNum(it) * (1 - it.disc / 100);
+  if (!isNumeric(it.qty)) return 0;     // จำนวนเป็นข้อความ/ว่าง → ไม่นับเป็นเงิน
+  return parseFloat(it.qty) * priceNum(it) * (1 - (it.disc || 0) / 100);
 }
 
 function renderItems() {
@@ -443,15 +447,15 @@ function renderItems() {
         ondrop="itemDrop(event,${it.id})"
         ondragend="itemDragEnd(event)">
         ${dragTd}
-        <td style="width:66px;vertical-align:top"><input value="${escHtml(it.no||'')}" maxlength="9" onchange="updateItemText(${it.id},'no',this.value)" placeholder="${itemNum}" title="หมายเลขนำหน้า — เว้นว่าง = เลขอัตโนมัติ" style="text-align:center;font-size:11px;padding:0.2em 2px"></td>
-        <td class="col-pn" style="width:112px;vertical-align:top"><input value="${escHtml(it.pn||'')}" maxlength="15" onchange="updateItemText(${it.id},'pn',this.value)" placeholder="Part No." style="font-size:11px"></td>
+        <td style="width:66px;vertical-align:top;position:relative"><input value="${escHtml(it.no||'')}" maxlength="9" onchange="updateItemText(${it.id},'no',this.value)" placeholder="${itemNum}" title="หมายเลขนำหน้า — เว้นว่าง = เลขอัตโนมัติ" style="text-align:center;font-size:11px;padding:0.2em 18px 0.2em 2px">${_blankDot}</td>
+        <td class="col-pn" style="width:112px;vertical-align:top;position:relative"><input value="${escHtml(it.pn||'')}" maxlength="15" onchange="updateItemText(${it.id},'pn',this.value)" placeholder="Part No." style="font-size:11px;padding-right:18px">${_blankDot}</td>
         <td>
           <input value="${escHtml(it.name)}" onchange="updateItemText(${it.id},'name',this.value)" placeholder="ชื่อรายการ..." style="min-width:160px;margin-bottom:0.25em">
           <textarea class="autogrow" oninput="autoGrow(this)" onchange="updateItemText(${it.id},'desc',this.value)" placeholder="รายละเอียดเพิ่มเติม..." rows="1" style="width:100%;min-height:1.6em;resize:none;overflow:hidden;color:var(--muted);line-height:1.35">${escHtml(it.desc||'')}</textarea>
         </td>
-        <td class="col-qty" style="width:70px"><input type="number" value="${it.qty}" min="1" oninput="updateItemNum(${it.id},'qty',+this.value)"></td>
-        <td class="col-unit" style="width:70px"><input value="${escHtml(it.unit)}" onchange="updateItemText(${it.id},'unit',this.value)"></td>
-        <td class="col-price" style="width:110px"><input value="${escHtml(String(it.price))}" oninput="updateItemPrice(${it.id},this.value)" placeholder="0 หรือ Included" style="text-align:right" title="ใส่ตัวเลข หรือข้อความ เช่น Included (ราคาเหมา)">${(()=>{const _c=itemCost(it);const _p=catalogPriceFor(it);return `<div style="font-size:9px;text-align:right;margin-top:1px;line-height:1.3">${_p>0?`<span style="color:var(--accent2)" title="ราคาขายมาตรฐานจาก Catalog">ขาย ${fmt(_p)}</span>`:''}<span style="color:${_c>0?'var(--muted)':'var(--amber)'};margin-left:6px" title="ราคาต้นทุน (จากจัดซื้อ/Catalog)">ทุน ${fmt(_c)}</span></div>`;})()}</td>
+        <td class="col-qty" style="width:70px;position:relative"><input value="${escHtml(String(it.qty ?? ''))}" placeholder="จำนวน" oninput="updateItemQtyRaw(${it.id},this.value)" style="text-align:center;padding-right:18px" title="ใส่ตัวเลข หรือข้อความ (เว้นว่างได้) — ข้อความไม่นำไปคำนวณ">${_blankDot}</td>
+        <td class="col-unit" style="width:70px;position:relative"><input value="${escHtml(it.unit)}" onchange="updateItemText(${it.id},'unit',this.value)" style="padding-right:18px">${_blankDot}</td>
+        <td class="col-price" style="width:110px;position:relative"><input value="${escHtml(String(it.price))}" oninput="updateItemPrice(${it.id},this.value)" placeholder="0 หรือ Included" style="text-align:right;padding-right:18px" title="ใส่ตัวเลข หรือข้อความ เช่น Included (ราคาเหมา)">${_blankDot}${(()=>{const _c=itemCost(it);const _p=catalogPriceFor(it);return `<div style="font-size:9px;text-align:right;margin-top:1px;line-height:1.3">${_p>0?`<span style="color:var(--accent2)" title="ราคาขายมาตรฐานจาก Catalog">ขาย ${fmt(_p)}</span>`:''}<span style="color:${_c>0?'var(--muted)':'var(--amber)'};margin-left:6px" title="ราคาต้นทุน (จากจัดซื้อ/Catalog)">ทุน ${fmt(_c)}</span></div>`;})()}</td>
         <td class="col-disc" style="width:70px"><input type="number" value="${it.disc}" min="0" max="100" oninput="updateItemNum(${it.id},'disc',+this.value)" style="text-align:right${isBelowCost(it)?';border-color:var(--red);background:rgba(248,113,113,0.08)':''}" ${isBelowCost(it)?'title="ราคาขายหลังลด ต่ำกว่าทุน — ลดเพิ่มไม่ได้ ต้องขออนุมัติ"':''}></td>
         <td class="col-total" style="text-align:right;font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--accent2);padding-right:8px">${isBelowCost(it)?'<span title="ต่ำกว่าทุน" style="color:var(--red)">⚠ </span>':''}${totalCell(it)}</td>
         ${itemAction}
@@ -935,6 +939,25 @@ function toggleItemHeader(id) {
   updateApproverBox();
 }
 
+// ปุ่มกลมเล็ก ๆ ในแต่ละช่อง → ล้างให้ว่าง (ใส่ช่องว่าง 1 ตัว แทนการเคาะ space เอง)
+const _blankDot = '<button type="button" title="ล้างให้ว่าง" onclick="blankCell(this)" style="position:absolute;top:4px;right:3px;width:15px;height:15px;border-radius:50%;border:none;background:var(--surface2,#334155);color:var(--muted);font-size:10px;line-height:15px;text-align:center;cursor:pointer;opacity:.55;padding:0;z-index:2" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.55">×</button>';
+function blankCell(btn) {
+  const td = btn.closest('td'); if (!td) return;
+  const inp = td.querySelector('input,textarea,select'); if (!inp) return;
+  inp.value = ' ';                                   // ช่องว่าง = แสดงว่างในเอกสาร (เหมือนกด space)
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+}
+// จำนวน: เก็บค่าดิบ (ตัวเลข หรือข้อความ เช่น "-", "ตามจริง") แล้วอัปเดตยอด
+function updateItemQtyRaw(id, val) {
+  const it = quoteItems.find(i => i.id == id);
+  if (!it) return;
+  it.qty = val;
+  const row = document.querySelector(`#items-body tr[data-id="${id}"]`);
+  if (row) { const lt = row.querySelector('.col-total'); if (lt) lt.textContent = totalCell(it); }
+  calcTotals();
+  updateApproverBox();
+}
 // ราคา: เก็บค่าดิบ (ตัวเลข หรือข้อความ เช่น Included) แล้วอัปเดตยอด
 function updateItemPrice(id, val) {
   const it = quoteItems.find(i => i.id == id);
@@ -1012,7 +1035,7 @@ async function editQuote(id) {
         id: Date.now() + idx, type:'item', spId: it.id,
         no: ex.no || '', pn: ex.pn || '',
         name: it.Title || '', desc: it.Description || '',
-        qty: it.Quantity || 1, unit: it.Unit || 'ชิ้น',
+        qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
         // ราคา: ใช้ค่าดิบจาก extra ถ้ามี (รองรับข้อความ Included) ไม่งั้น fallback เป็นตัวเลขจาก column
         price: (ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0),
         disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader
@@ -1345,7 +1368,7 @@ async function duplicateQuote(id) {
       return {
         id: Date.now()+idx, type:'item',
         no: ex.no || '', pn: ex.pn || '', name: it.Title || '', desc: it.Description || '',
-        qty: it.Quantity || 1, unit: it.Unit || 'ชิ้น',
+        qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
         price: (ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0),
         disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader
       };
@@ -1522,12 +1545,12 @@ async function saveQuote(status) {
       } else {
         if (!it.name) continue;
         await createListItem(CONFIG.lists.quoteItems, {
-          Title: it.name, QuoteID: quoteId, Quantity: it.qty,
+          Title: it.name, QuoteID: quoteId, Quantity: isNumeric(it.qty) ? parseFloat(it.qty) : 0,
           Unit: it.unit, UnitPrice: priceNum(it), DiscountPct: it.disc, LineTotal: lineTotal(it),
           Description: it.desc||''
         });
-        // เก็บ No. + Part No. + ราคาดิบ + ต้นทุน/Vendor (สำหรับยาม "ลดต่ำกว่าทุน")
-        itemExtra.push({ no: it.no||'', pn: it.pn||'', price: String(it.price ?? ''), cost: +it.cost||0, vendorId: it.vendorId||'', asHeader: !!it.asHeader });
+        // เก็บ No. + Part No. + ราคาดิบ + จำนวนดิบ + ต้นทุน/Vendor (สำหรับยาม "ลดต่ำกว่าทุน")
+        itemExtra.push({ no: it.no||'', pn: it.pn||'', price: String(it.price ?? ''), qtyRaw: String(it.qty ?? ''), cost: +it.cost||0, vendorId: it.vendorId||'', asHeader: !!it.asHeader });
       }
     }
     await saveQuoteItemExtra(quoteId, itemExtra);

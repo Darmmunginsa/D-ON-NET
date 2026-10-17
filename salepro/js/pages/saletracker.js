@@ -1873,6 +1873,22 @@ function _approvalSubject(q) {
   const tag = (q.Tag || '').trim();
   return '[ใบเสนอราคา] ' + (q.Title||'') + ' — ' + (q.ClientName||'') + (tag ? ' — ' + tag : '');
 }
+// เก็บ conversationId ของเธรดอนุมัติไว้ต่อใบ → ทุกเมล (ขอ/อนุมัติ/ปฏิเสธ) อยู่เธรดเดียวกันเสมอ
+function _getApprovalCID(qid) {
+  try { const it = (_settingsCache || []).find(i => i.Title === 'ApprovalCID_' + qid); return it && it.Value ? it.Value : ''; }
+  catch(e) { return ''; }
+}
+// คืน message id ที่จะใช้ reply (ล่าสุดในเธรดเดิม) — ถ้ายังไม่มี cid ให้ค้นจาก subject แล้วจำ cid ไว้
+async function _approvalThreadMid(q) {
+  if (typeof _latestInConversation !== 'function' || typeof _findRequestMsg !== 'function') return null;
+  const cid = _getApprovalCID(q.id);
+  let mid = cid ? await _latestInConversation(cid).catch(() => null) : null;
+  if (!mid) {
+    const m = await _findRequestMsg(_approvalSubject(q)).catch(() => null);
+    if (m) { mid = m.id; if (m.conversationId) { try { await saveSettingItem('ApprovalCID_' + q.id, m.conversationId); } catch(e) {} } }
+  }
+  return mid;
+}
 async function sendApprovalRequestEmail(q, attachment) {
   const to = q.ApproverEmail || '';
   if (!to || !to.includes('@')) return;
@@ -1885,14 +1901,19 @@ async function sendApprovalRequestEmail(q, attachment) {
     + 'มูลค่ารวม   : ' + fmt(q.TotalAmount||0) + '\n'
     + 'ผู้จัดทำ    : ' + (q.SaleName||q.SaleEmail||'') + '\n\n'
     + 'กรุณาเข้าสู่ระบบ SalePro เพื่ออนุมัติหรือปฏิเสธใบเสนอราคา';
-  // ถ้าใบนี้เคยส่งอนุมัติแล้ว (มีอีเมลคำขอเดิม) → ส่งรอบใหม่เป็น reply เพื่อให้อยู่เธรดเดียวกัน
+  // ถ้าใบนี้เคยส่งอนุมัติแล้ว (มีเธรดเดิม) → ส่งรอบใหม่เป็น reply เพื่อให้อยู่เธรดเดียวกัน
   try {
-    if (typeof _findMessageIdBySubject === 'function' && typeof _sendReplyNew === 'function') {
-      const mid = await _findMessageIdBySubject(subject);
-      if (mid) { await _sendReplyNew(mid, to, body, attachment); return; }
-    }
+    const mid = await _approvalThreadMid(q);
+    if (mid && typeof _sendReplyNew === 'function') { await _sendReplyNew(mid, to, body, attachment); return; }
   } catch(e) { console.warn('reply-new-round failed, fallback to new email:', e.message); }
+  // ส่งอีเมลใหม่ แล้วจำ conversationId ของเธรดนี้ไว้ (เพื่อให้ผลอนุมัติ/ปฏิเสธรอบถัดไปตามเข้าเธรดเดิม)
   await apiPost('sendEmail', '_', null, { to, subject, body, attachments: attachment ? [attachment] : [] });
+  try {
+    if (typeof _findRequestMsg === 'function') {
+      const m = await _findRequestMsg(subject);
+      if (m && m.conversationId) await saveSettingItem('ApprovalCID_' + q.id, m.conversationId);
+    }
+  } catch(e) {}
 }
 
 async function sendApprovalResultEmail(q, status, comment) {
@@ -1908,14 +1929,12 @@ async function sendApprovalResultEmail(q, status, comment) {
     + 'มูลค่ารวม   : ' + fmt(q.TotalAmount||0) + '\n'
     + 'อนุมัติโดย  : ' + (q.ApproverName||q.ApproverEmail||'') + '\n'
     + (comment ? '\nความคิดเห็น:\n' + comment : '');
-  // พยายาม reply อีเมลคำขอเดิมในกล่องผู้อนุมัติ → อยู่เธรดเดียวกันทั้งสองฝั่ง
+  // reply เข้าเธรดเดิม (ใช้ conversationId ที่จำไว้) → อนุมัติ/ปฏิเสธ ของใบเดียวกันอยู่เธรดเดียวกันเสมอ
   try {
-    if (typeof _findMessageIdBySubject === 'function') {
-      const mid = await _findMessageIdBySubject(reqSubject);
-      if (mid) { await _replyMail(mid, body); return; }
-    }
+    const mid = await _approvalThreadMid(q);
+    if (mid && typeof _replyMail === 'function') { await _replyMail(mid, body); return; }
   } catch(e) { console.warn('reply-in-thread failed, fallback to new email:', e.message); }
-  // fallback: อีเมลใหม่ (RE:) ถ้าหาอีเมลคำขอไม่เจอ
+  // fallback: อีเมลใหม่ (RE:) ถ้าหาเธรดเดิมไม่เจอ
   await apiPost('sendEmail', '_', null, { to, subject: 'RE: ' + reqSubject, body });
 }
 
