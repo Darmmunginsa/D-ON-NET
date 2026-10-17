@@ -1515,43 +1515,32 @@ async function saveQuote(status) {
       // ผูกความสัมพันธ์ถ้าใบนี้มาจาก "สร้างใหม่จากใบเก่า"
       if (_dupSourceId) { try { await saveQuoteParent(quoteId, _dupSourceId); } catch(e) {} _dupSourceId = null; }
     }
-    // Save line items — build itemExtra (pn + ราคาดิบ) ขนานกับแถวที่ถูกบันทึกจริง เพื่อ index ตรงกันตอนโหลด
+    // Save line items — รวมเป็นชุดเดียวแล้วเขียนทีเดียว (batch) เพื่อลด round-trip (เร็วขึ้นมากบน Google Sheet)
     const itemExtra = [];
+    const _rows = [];
     for (const it of quoteItems) {
       if (it.type === 'group') {
-        await createListItem(CONFIG.lists.quoteItems, {
-          Title: '__GROUP__:' + (it.title||''), QuoteID: quoteId,
-          Quantity: 0, Unit: '', UnitPrice: 0, DiscountPct: 0, LineTotal: 0, Description: '__GROUP__'
-        });
+        _rows.push({ Title: '__GROUP__:' + (it.title||''), QuoteID: quoteId, Quantity: 0, Unit: '', UnitPrice: 0, DiscountPct: 0, LineTotal: 0, Description: '__GROUP__' });
         itemExtra.push({ align: it.align||'left' });
       } else if (it.type === 'blank') {
-        await createListItem(CONFIG.lists.quoteItems, {
-          Title: '__BLANK__', QuoteID: quoteId,
-          Quantity: 0, Unit: '', UnitPrice: 0, DiscountPct: 0, LineTotal: 0, Description: '__BLANK__'
-        });
+        _rows.push({ Title: '__BLANK__', QuoteID: quoteId, Quantity: 0, Unit: '', UnitPrice: 0, DiscountPct: 0, LineTotal: 0, Description: '__BLANK__' });
         itemExtra.push({});
       } else if (it.type === 'pagebreak') {
-        await createListItem(CONFIG.lists.quoteItems, {
-          Title: '__PAGEBREAK__', QuoteID: quoteId,
-          Quantity: 0, Unit: '', UnitPrice: 0, DiscountPct: 0, LineTotal: 0, Description: '__PAGEBREAK__'
-        });
+        _rows.push({ Title: '__PAGEBREAK__', QuoteID: quoteId, Quantity: 0, Unit: '', UnitPrice: 0, DiscountPct: 0, LineTotal: 0, Description: '__PAGEBREAK__' });
         itemExtra.push({});
       } else if (it.type === 'note') {
-        await createListItem(CONFIG.lists.quoteItems, {
-          Title: '__NOTE__', QuoteID: quoteId,
-          Quantity: 0, Unit: '', UnitPrice: 0, DiscountPct: 0, LineTotal: 0, Description: it.text||''
-        });
+        _rows.push({ Title: '__NOTE__', QuoteID: quoteId, Quantity: 0, Unit: '', UnitPrice: 0, DiscountPct: 0, LineTotal: 0, Description: it.text||'' });
         itemExtra.push({});
       } else {
         if (!it.name) continue;
-        await createListItem(CONFIG.lists.quoteItems, {
-          Title: it.name, QuoteID: quoteId, Quantity: isNumeric(it.qty) ? parseFloat(it.qty) : 0,
-          Unit: it.unit, UnitPrice: priceNum(it), DiscountPct: it.disc, LineTotal: lineTotal(it),
-          Description: it.desc||''
-        });
-        // เก็บ No. + Part No. + ราคาดิบ + จำนวนดิบ + ต้นทุน/Vendor (สำหรับยาม "ลดต่ำกว่าทุน")
+        _rows.push({ Title: it.name, QuoteID: quoteId, Quantity: isNumeric(it.qty) ? parseFloat(it.qty) : 0,
+          Unit: it.unit, UnitPrice: priceNum(it), DiscountPct: it.disc, LineTotal: lineTotal(it), Description: it.desc||'' });
         itemExtra.push({ no: it.no||'', pn: it.pn||'', price: String(it.price ?? ''), qtyRaw: String(it.qty ?? ''), cost: +it.cost||0, vendorId: it.vendorId||'', asHeader: !!it.asHeader });
       }
+    }
+    if (_rows.length) {
+      if (typeof createListItemsBulk === 'function') await createListItemsBulk(CONFIG.lists.quoteItems, _rows);
+      else { for (const r of _rows) await createListItem(CONFIG.lists.quoteItems, r); }   // fallback
     }
     await saveQuoteItemExtra(quoteId, itemExtra);
     // บันทึกขนาดฟอนต์ 4 zone + อายุใบเสนอราคา ของใบนี้ (รายใบ)

@@ -33,12 +33,21 @@ function filterQuotesForUser(allQuotes) {
 async function syncAll() {
   toast('กำลังซิงค์ข้อมูล...', 'info');
   try {
-    // โหลดทีละตัว (sequential) — ลดโอกาส CORS/redirect ของ Apps Script หลุดตอนยิงพร้อมกัน
-    const catData     = await getListItems(CONFIG.lists.catalog);
-    const allQuotes   = await getListItems(CONFIG.lists.quotations);
-    const settingsData= await getListItems(CONFIG.lists.settings);
-    const procData    = await getListItems(CONFIG.lists.procurement).catch(()=>[]);   // ข้อมูลจัดซื้อ (ลิสต์แยก)
-    const companyData = await getListItems(CONFIG.lists.company);
+    // โหลดทุกแท็บใน "ครั้งเดียว" (multiList) — ลด round-trip บน Apps Script ให้เร็วขึ้นมาก
+    let catData, allQuotes, settingsData, procData, companyData;
+    if (typeof getListItemsMulti === 'function') {
+      const L = CONFIG.lists;
+      const m = await getListItemsMulti([L.catalog, L.quotations, L.settings, L.procurement, L.company]);
+      catData = m[L.catalog] || []; allQuotes = m[L.quotations] || []; settingsData = m[L.settings] || [];
+      procData = m[L.procurement] || []; companyData = m[L.company] || [];
+    } else {
+      // fallback: โหลดทีละตัว
+      catData     = await getListItems(CONFIG.lists.catalog);
+      allQuotes   = await getListItems(CONFIG.lists.quotations);
+      settingsData= await getListItems(CONFIG.lists.settings);
+      procData    = await getListItems(CONFIG.lists.procurement).catch(()=>[]);
+      companyData = await getListItems(CONFIG.lists.company);
+    }
     catalogData = catData;
     // รวม Settings (ฝั่งขาย) + ProcurementData (ฝั่งจัดซื้อ) เป็น cache เดียว โดยลิสต์จัดซื้อ "ชนะ" ถ้า Title ซ้ำ
     _settingsCache = (settingsData||[]).map(i=>({...i,_srcList:CONFIG.lists.settings}));

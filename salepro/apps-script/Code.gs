@@ -90,6 +90,37 @@ function createRow(name, fields) {
     return item;
   } finally { lock.releaseLock(); }
 }
+// เขียนหลายแถวในครั้งเดียว (append ด้วย setValues ครั้งเดียว) — เร็วกว่าวน createRow มาก
+function batchCreate(name, rows) {
+  rows = rows || [];
+  var out = [];
+  if (!rows.length) return out;
+  var lock = LockService.getScriptLock(); lock.waitLock(30000);
+  try {
+    var sh = _sheet(name);
+    var keySet = {};
+    rows.forEach(function (f) { Object.keys(f || {}).forEach(function (k) { keySet[k] = 1; }); });
+    var hdr = _ensureCols(sh, [ID_COL].concat(Object.keys(keySet)));
+    var matrix = [];
+    rows.forEach(function (f) {
+      f = f || {};
+      var id = _uuid();
+      matrix.push(hdr.map(function (h) {
+        if (h === ID_COL) return id;
+        var v = f[h];
+        return (v === undefined || v === null) ? '' : String(v);
+      }));
+      var item = { id: id };
+      Object.keys(f).forEach(function (k) { item[k] = f[k]; });
+      out.push(item);
+    });
+    var start = sh.getLastRow() + 1;
+    var rng = sh.getRange(start, 1, matrix.length, hdr.length);
+    rng.setNumberFormat('@');                 // กันเลข 0 นำหน้าหาย
+    rng.setValues(matrix);
+    return out;
+  } finally { lock.releaseLock(); }
+}
 function _findRowIndex(sh, id) {
   var hdr = _headers(sh); var idIdx = hdr.indexOf(ID_COL);
   if (idIdx < 0) return -1;
@@ -174,6 +205,8 @@ function uploadFile(req) {
 function handle(req) {
   var a = req.action;
   if (a === 'list')        return { ok: true, items: listRows(req.list) };
+  if (a === 'multiList')   { var _o = {}; (req.lists || []).forEach(function (n) { _o[n] = listRows(n); }); return { ok: true, lists: _o }; }   // อ่านหลายแท็บในครั้งเดียว
+  if (a === 'batchCreate') return { ok: true, items: batchCreate(req.list, req.rows || []) };                                                   // เขียนหลายแถวในครั้งเดียว
   if (a === 'create' || a === 'add') return { ok: true, item: createRow(req.list, req.fields || req.data) };
   if (a === 'update')      return { ok: true, item: updateRow(req.list, req.id, req.fields || req.data) };
   if (a === 'delete')      return { ok: true, deleted: deleteRow(req.list, req.id).deleted };

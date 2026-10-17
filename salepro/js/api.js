@@ -50,7 +50,7 @@ function _saveEnd(ok) {
 function _sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 // wrapper: โชว์ progress overlay เฉพาะ action ที่ "เขียนข้อมูล" (ไม่ใช่ list)
 async function _call(payload) {
-  const write = payload && payload.action && payload.action !== 'list';
+  const write = payload && payload.action && payload.action !== 'list' && payload.action !== 'multiList';
   if (!write) return _callRaw(payload);
   _saveStart(); let ok = false;
   try { const d = await _callRaw(payload); ok = true; return d; }
@@ -113,9 +113,29 @@ async function getListItems(list) {
   const d = await _call({ action: 'list', list });
   return d.items || [];
 }
+// อ่านหลายแท็บในครั้งเดียว → { listName: items[] }  (ลด round-trip ตอน sync)
+// ถ้า Apps Script ยังไม่รองรับ (ยังไม่ redeploy) → fallback โหลดทีละตัว
+async function getListItemsMulti(lists) {
+  try { const d = await _call({ action: 'multiList', lists }); if (d && d.lists) return d.lists; }
+  catch (e) { console.warn('multiList ไม่รองรับ → fallback:', e.message); }
+  const out = {};
+  for (const l of lists) { out[l] = await getListItems(l).catch(() => []); }
+  return out;
+}
 async function createListItem(list, fields) {
   const d = await _call({ action: 'create', list, fields: _coerceFields(fields) });
   return d.item || { id: d.id, ...fields };
+}
+// เขียนหลายแถวในครั้งเดียว (เร็วกว่าวน createListItem มาก) — คืน array ของ item ที่สร้าง
+// ถ้า Apps Script ยังไม่รองรับ (ยังไม่ redeploy) → fallback วนสร้างทีละแถว
+async function createListItemsBulk(list, rowsArray) {
+  if (!rowsArray || !rowsArray.length) return [];
+  const rows = rowsArray.map(f => _coerceFields(f));
+  try { const d = await _call({ action: 'batchCreate', list, rows }); if (d && d.items) return d.items; }
+  catch (e) { console.warn('batchCreate ไม่รองรับ → fallback:', e.message); }
+  const out = [];
+  for (const r of rowsArray) { out.push(await createListItem(list, r)); }
+  return out;
 }
 async function updateListItem(list, itemId, fields) {
   return _call({ action: 'update', list, id: itemId, fields: _coerceFields(fields) });
