@@ -1238,11 +1238,11 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const DOC_CLIENT = ((typeof customerThaiNameByAny === 'function' && customerThaiNameByAny(q.ClientName, q.CustomerTaxID)) || q.ClientName || '');
   const DOC_ADDR   = (q.CustomerAddress || '');   // ADDRESS = ภาษาไทยเสมอ
   // ── หัวบริษัท Fix ตายตัว (ยกเว้นโลโก้ดึงจาก Company Settings) ──
-  const CO_NAME_TH = 'บริษัท ไอที เซอร์วิสเซส จำกัด';
-  const CO_NAME_EN = 'IT SERVICES CO.,LTD.';
-  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = '168/8 ถนนพัฒนาชนบท 3 แขวงคลองสองต้นนุ่น เขตลาดกระบัง กรุงเทพมหานคร 10520';
-  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = '168/8 Patthana Chonabot 3 Rd, Khlong Song Ton Nun Sub District, Lat Krabang District, Bangkok 10520';
-  const CO_TEL = '02-108-6113', CO_FAX = '02-108-6113', CO_TAXID = '0105559006113';
+  const CO_NAME_TH = 'บริษัท ดี ออน เน็ต จำกัด';
+  const CO_NAME_EN = 'D ON NET CO.,LTD.';
+  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = 'เลขที่ 78 หมู่ที่ 11 ตำบลผาเลือด อำเภอท่าปลา จังหวัดอุตรดิตถ์ 53190';
+  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = 'No. 78, Moo 11, Pha Lueat Subdistrict, Tha Pla District, Uttaradit Province';
+  const CO_TEL = '091-5192945', CO_FAX = '-', CO_TAXID = '535569001005';
   const F_TH = "'Sarabun','Segoe UI',sans-serif";                        // ฟอนต์เดิมทั้งเอกสาร (Sarabun)
   const F_EN = "'Sarabun','Segoe UI',sans-serif";
   const F_NUM = "'Sarabun','Segoe UI',sans-serif";
@@ -1976,7 +1976,7 @@ function buildCancelEmailHTML(q, reason) {
     + '<div style="background:#7c1d1d;padding:24px 28px;text-align:center">'
     + '<div style="font-size:32px;margin-bottom:8px">🚫</div>'
     + '<div style="color:#fff;font-size:18px;font-weight:600">ใบเสนอราคาถูกยกเลิก</div>'
-    + '<div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:4px">SalePro · iT Services Co., Ltd.</div>'
+    + '<div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:4px">SalePro · D On Net Co., Ltd.</div>'
     + '</div>'
     + '<div style="padding:24px 28px">'
     + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px">'
@@ -1990,10 +1990,10 @@ function buildCancelEmailHTML(q, reason) {
     + '<div style="padding:14px 16px;font-size:13px;color:#1a1a2e;line-height:1.7">' + reason + '</div>'
     + '</div>'
     + '<div style="text-align:center">'
-    + '<a href="https://itservices.co.th/salepro/index.html" style="display:inline-block;background:#1a3a5c;color:#fff;text-decoration:none;padding:11px 28px;border-radius:8px;font-size:13px;font-weight:600">เข้าระบบ SalePro →</a>'
+    + '<a href="https://darmmunginsa.github.io/D-ON-NET/salepro/index.html" style="display:inline-block;background:#1a3a5c;color:#fff;text-decoration:none;padding:11px 28px;border-radius:8px;font-size:13px;font-weight:600">เข้าระบบ SalePro →</a>'
     + '</div></div>'
     + '<div style="padding:14px 28px;text-align:center;border-top:1px solid #e5e7eb;background:#f9fafb">'
-    + '<div style="font-size:11px;color:#9ca3af">iT Services Co., Ltd. · อีเมลนี้ส่งอัตโนมัติจาก SalePro</div>'
+    + '<div style="font-size:11px;color:#9ca3af">D On Net Co., Ltd. · อีเมลนี้ส่งอัตโนมัติจาก SalePro</div>'
     + '</div></div>';
 }
 
@@ -2131,7 +2131,7 @@ function showPOConfirmation(poStatus, quoteId, cfg, comment) {
 // Override buildPOEmailHTML เพิ่ม status buttons
 function buildPOEmailHTML(q, payload) {
   const baseHTML = buildPOEmailHTMLBase(q, payload);
-  const baseUrl = 'https://itservices.co.th/salepro/index.html';
+  const baseUrl = 'https://darmmunginsa.github.io/D-ON-NET/salepro/index.html';
   const qid = q.id || stQuoteId || '';
 
   // Partial และ Unavailable ต้องมี comment ก่อน → ใช้ mailto-style form ใน HTML email
