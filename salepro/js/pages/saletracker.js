@@ -701,7 +701,7 @@ async function sendPORequest(){
 // ---- CLOSE DEAL ----
 
 
-async function saveSTDealData(){
+async function saveSTDealData(throwOnError){
   try{
     const toSave={...stDealData,
       docs:(stDealData.docs||[]).map(d=>({id:d.id,name:d.name,docType:d.docType,url:d.url,ts:d.ts})),
@@ -710,7 +710,7 @@ async function saveSTDealData(){
     const val=serializeDealStatus(toSave);
     await putStoredDealStatus(stQuoteId, val);   // เก็บใน Settings list — ไม่แตะ quotation item
     const q=quotesData.find(x=>x.id===stQuoteId);if(q)q.DealStatus=val;
-  }catch(e){toast('บันทึก DealStatus ไม่สำเร็จ: '+e.message,'error');}
+  }catch(e){toast('บันทึก DealStatus ไม่สำเร็จ: '+e.message,'error');if(throwOnError)throw e;}
 }
 
 // ============================================================
@@ -1055,9 +1055,10 @@ function _stTimeline(text, type) {
 async function requestPOWaiver() {
   const reason = (prompt('เหตุผลที่ต้องข้ามการรับ PO ลูกค้า (จะส่งให้ผู้อนุมัติพิจารณา):', '') || '').trim();
   if (!reason) { toast('กรุณาระบุเหตุผล', 'error'); return; }
+  const previous = JSON.parse(JSON.stringify(stDealData));
   stDealData.poWaiver = { status: 'pending', reason: reason, by: (currentUser && (currentUser.displayName || currentUser.email)) || 'User', at: new Date().toISOString() };
   _stTimeline('📝 ขอข้ามการรับ PO ลูกค้า — รออนุมัติ (เหตุผล: ' + reason + ')', 'custpo');
-  await saveSTDealData();
+  if (!await savePOWaiverChange(previous)) return;
   renderCustPOTab(); renderSTTimeline();
   toast('ส่งคำขอข้าม PO แล้ว — รอผู้อนุมัติพิจารณา', 'success');
   // แจ้งผู้อนุมัติ (ถ้ามีฟังก์ชันส่งเมล)
@@ -1067,11 +1068,12 @@ async function approvePOWaiver() {
   if (!(userRoles.isApprover || userRoles.isAdmin)) { toast('เฉพาะผู้อนุมัติเท่านั้น', 'error'); return; }
   const w = stDealData.poWaiver; if (!w || w.status !== 'pending') return;
   if (!confirm('อนุมัติให้ "ข้ามการรับ PO" สำหรับดีลนี้? ระบบจะเปลี่ยนสถานะเป็น PO Received และออกเอกสารได้')) return;
+  const previous = JSON.parse(JSON.stringify(stDealData));
   w.status = 'approved';
   w.approvedBy = (currentUser && (currentUser.displayName || currentUser.email)) || 'Approver';
   w.approvedAt = new Date().toISOString();
   _stTimeline('✅ อนุมัติให้ข้ามการรับ PO โดย ' + w.approvedBy, 'custpo');
-  await saveSTDealData();
+  if (!await savePOWaiverChange(previous)) return;
   try {
     await updateListItem(CONFIG.lists.quotations, stQuoteId, { Status: 'PO Received' });   // ให้ downstream ปฏิบัติเหมือนได้รับ PO
     const q = quotesData.find(x => x.id === stQuoteId);
@@ -1086,19 +1088,25 @@ async function rejectPOWaiver() {
   if (!(userRoles.isApprover || userRoles.isAdmin)) { toast('เฉพาะผู้อนุมัติเท่านั้น', 'error'); return; }
   const w = stDealData.poWaiver; if (!w || w.status !== 'pending') return;
   if (!confirm('ปฏิเสธคำขอข้าม PO นี้?')) return;
+  const previous = JSON.parse(JSON.stringify(stDealData));
   _stTimeline('✕ ปฏิเสธคำขอข้ามการรับ PO โดย ' + ((currentUser && (currentUser.displayName || currentUser.email)) || 'Approver'), 'custpo');
   delete stDealData.poWaiver;
-  await saveSTDealData();
+  if (!await savePOWaiverChange(previous)) return;
   renderCustPOTab(); renderSTTimeline();
   toast('ปฏิเสธคำขอแล้ว', 'success');
 }
 async function cancelPOWaiver() {
   const w = stDealData.poWaiver; if (!w || w.status !== 'pending') return;
   if (!confirm('ยกเลิกคำขอข้าม PO?')) return;
+  const previous = JSON.parse(JSON.stringify(stDealData));
   delete stDealData.poWaiver;
-  await saveSTDealData();
+  if (!await savePOWaiverChange(previous)) return;
   renderCustPOTab(); renderSTTimeline();
   toast('ยกเลิกคำขอแล้ว', 'success');
+}
+async function savePOWaiverChange(previous) {
+  try { await saveSTDealData(true); return true; }
+  catch(e) { stDealData = previous; renderCustPOTab(); renderSTTimeline(); return false; }
 }
 
 function renderPrintTab() {

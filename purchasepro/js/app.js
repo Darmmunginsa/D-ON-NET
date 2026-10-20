@@ -59,7 +59,11 @@ async function syncAll(){
     try{ oldSettings = await getListItems(CONFIG.lists.settings); }catch(e){ oldSettings=[]; }
     _settingsCache = procList.map(i=>({...i,_srcList:CONFIG.lists.procurement}));
     // นำ key เก่าจาก Settings ที่ยังไม่มีในลิสต์ใหม่มาเสริม (mark _srcList=settings → เซฟครั้งหน้าจะย้ายเข้าลิสต์ใหม่)
-    oldSettings.forEach(i=>{ if(!_settingsCache.some(x=>x.Title===i.Title)) _settingsCache.push({...i,_srcList:CONFIG.lists.settings}); });
+    oldSettings.forEach(i=>{
+      // SalePro owns DealStatus; an old migrated procurement copy must not shadow it.
+      if((i.Title||'').startsWith('DealStatus_')) _settingsCache=_settingsCache.filter(x=>x.Title!==i.Title);
+      if(!_settingsCache.some(x=>x.Title===i.Title)) _settingsCache.push({...i,_srcList:CONFIG.lists.settings});
+    });
     const procItem = _settingsCache.find(i=>i.Title==='Procurements');
     procurements = (procItem&&procItem.Value)?(JSON.parse(procItem.Value)||[]):[];
     const venItem = _settingsCache.find(i=>i.Title==='Vendors');
@@ -439,6 +443,7 @@ function _quoteHasCustPO(quoteId){
   try{ const it=(_settingsCache||[]).find(i=>i.Title==='DealStatus_'+quoteId); if(it){ const ds=JSON.parse(it.Value||'{}');
     if(ds.custPOs&&ds.custPOs.length) return true;
     if(ds.poWaiver && ds.poWaiver.status==='approved') return true;   // SalePro อนุมัติให้ข้ามการรับ PO
+    if(ds.poWaiver) return false; // A pending/rejected request is not an approval.
   } }catch(e){}
   // 2) เช็คสถานะใบเสนอราคา (PO Received / Closed = รับ PO แล้ว)
   const q=quotesById[String(quoteId)];
@@ -448,11 +453,45 @@ function poStagesLocked(){
   if(!editingPO || !editingPO.quoteId) return false;   // ซื้อใช้เอง (ไม่ผูกใบเสนอราคา) → ไม่ล็อก
   return !_quoteHasCustPO(editingPO.quoteId);
 }
+let _poGateRefreshing=false;
+async function refreshCustomerPOGate(){
+  const id=editingPO && editingPO.quoteId;
+  if(!id) return;
+  const [settings,quotes]=await Promise.all([getListItems(CONFIG.lists.settings),getListItems(CONFIG.lists.quotations)]);
+  if(!editingPO || String(editingPO.quoteId)!==String(id)) return;
+  const key='DealStatus_'+id;
+  _settingsCache=_settingsCache.filter(item=>item.Title!==key);
+  const current=settings.find(item=>item.Title===key);
+  if(current) _settingsCache.push({...current,_srcList:CONFIG.lists.settings});
+  const quote=quotes.find(item=>String(item.id)===String(id));
+  if(quote) quotesById[String(id)]=quote; else delete quotesById[String(id)];
+}
+async function refreshPOLock(){
+  if(_poGateRefreshing) return;
+  _poGateRefreshing=true;
+  try{await refreshCustomerPOGate();renderStepper();renderStageBody();renderFooter();toast(poStagesLocked()?'ยังรอรับ PO หรืออนุมัติคำขอข้าม PO':'สถานะล่าสุดพร้อมดำเนินการขั้น 5–8','info');}
+  catch(e){toast('ตรวจสถานะ PO ล่าสุดไม่ได้: '+e.message,'error');}
+  finally{_poGateRefreshing=false;}
+}
+async function canEnterPOStage(target){
+  if(!editingPO || _poReadonly || _poGateRefreshing) return false;
+  if(target<PO_LOCK_FROM_STAGE || !editingPO.quoteId) return true;
+  const purchaseId=String(editingPO.id),quoteId=String(editingPO.quoteId);
+  _poGateRefreshing=true;
+  try{
+    await refreshCustomerPOGate();
+    if(!editingPO || String(editingPO.id)!==purchaseId || String(editingPO.quoteId)!==quoteId) return false;
+    if(poStagesLocked()){renderStepper();toast('🔒 ต้องได้รับ PO ลูกค้า หรืออนุมัติคำขอข้าม PO ก่อน (ใส่เหตุผลอย่างเดียวยังรออนุมัติ)','error');return false;}
+    return true;
+  }catch(e){toast('ตรวจสถานะอนุมัติล่าสุดไม่ได้ — ยังไม่เปลี่ยนขั้นตอน: '+e.message,'error');return false;}
+  finally{_poGateRefreshing=false;}
+}
 function _lockedNotice(){
   return `<div class="card" style="border-color:var(--amber)"><div style="padding:22px;text-align:center">
     <div style="font-size:34px;margin-bottom:8px">🔒</div>
     <div style="font-size:14px;font-weight:600;margin-bottom:6px">ยังเปิดขั้นตอนนี้ไม่ได้</div>
-    <div style="font-size:12px;color:var(--muted);line-height:1.6">ขั้น 5-8 (ออก PO → จ่ายเงิน → ส่ง → รับของ) จะปลดล็อกเมื่อ<br><b>SalePro ได้รับ PO จากลูกค้า</b> หรือ <b>ได้รับอนุมัติให้ข้ามการรับ PO</b> แล้วเท่านั้น<br>ตอนนี้ทำได้ถึงขั้นเทียบราคา/ยืนยันสั่งซื้อ (ขั้น 1-4)</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6">ขั้น 5-8 (ออก PO → จ่ายเงิน → ส่ง → รับของ) จะปลดล็อกเมื่อ<br><b>SalePro ได้รับ PO จากลูกค้า</b> หรือ <b>ได้รับอนุมัติให้ข้ามการรับ PO</b> แล้วเท่านั้น<br>การใส่เหตุผลเป็นเพียงคำขอ ต้องให้ผู้อนุมัติกด “อนุมัติให้ข้าม PO” ใน SalePro ก่อน<br>ตอนนี้ทำได้ถึงขั้นเทียบราคา/ยืนยันสั่งซื้อ (ขั้น 1-4)</div>
+    <button class="btn btn-sm" style="margin-top:12px" onclick="refreshPOLock()">↻ ตรวจสถานะอนุมัติล่าสุด</button>
   </div></div>`;
 }
 function renderStepper(){
@@ -544,8 +583,8 @@ async function confirmCatalogImport(){
     toast('เพิ่ม '+n+' รายการเข้า Catalog แล้ว — ปรับราคาขายที่เมนู Catalog','success');
   }catch(e){ toast('เพิ่มไม่สำเร็จ: '+e.message,'error'); }
 }
-function gotoStage(n){ if(n>=PO_LOCK_FROM_STAGE && poStagesLocked()){ toast('🔒 ขั้น 5-8 ปลดล็อกเมื่อ SalePro รับ PO ลูกค้าแล้ว','error'); return; } editingPO.stage=n; renderStepper(); renderStageBody(); renderFooter(); }
-function moveStage(d){
+async function gotoStage(n){ if(!await canEnterPOStage(n)) return; editingPO.stage=n; renderStepper(); renderStageBody(); renderFooter(); }
+async function moveStage(d){
   // ตั้งแต่ขั้น 2 เป็นต้นไป ต้องระบุหัวข้ออีเมลก่อนถึงจะไปขั้นถัดไปได้
   if(d>0 && editingPO.stage>=2 && !hasMailSubject()){
     toast('กรุณาระบุหัวข้ออีเมลก่อนไปขั้นตอนถัดไป','error');
@@ -553,7 +592,7 @@ function moveStage(d){
     return;
   }
   const n=Math.max(1,Math.min(8,editingPO.stage+d));
-  if(d>0 && n>=PO_LOCK_FROM_STAGE && poStagesLocked()){ toast('🔒 ขั้น 5-8 ปลดล็อกเมื่อ SalePro รับ PO ลูกค้าแล้ว','error'); return; }
+  if(d>0 && !await canEnterPOStage(n)) return;
   editingPO.stage=n; renderStepper(); renderStageBody(); renderFooter(); if(d>0) savePurchase();
 }
 async function closePurchase(){
