@@ -18,7 +18,7 @@ function fmtDate(v) {
 
 const CONFIG = {
   // ⬇⬇ กรอก 2 ค่านี้หลังตั้งค่า Google ⬇⬇
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbxKyaHSpdQueWDHSI0SRu3W9flHRZECtVUs4vPFiPtwfg8h16mFxoJb_GTHrBFVwreQ/exec',
+  appsScriptUrl: 'https://d-on-net-gateway.darmmunginsa.workers.dev/',
   googleClientId: '1000323548149-1j89kljart0tkdio1atkoov69lfjmk3m.apps.googleusercontent.com',
 
   // แต่ละ list = ชื่อแท็บ (sheet) ใน Google Sheet (สร้างอัตโนมัติเมื่อมีข้อมูลครั้งแรก)
@@ -35,6 +35,6 @@ const CONFIG = {
     company:     'Company'
   },
   // สิทธิ์เริ่มต้น (bootstrap) — อีเมลในนี้จะได้สิทธิ์ทันทีโดยไม่ต้องตั้งในชีต
-  adminEmails:    ['darmmunginsa@gmail.com'],   // แอดมิน (เห็นทุกเมนู + ตั้งค่า)
+  adminEmails:    ['admin@dongroups.com'],   // แอดมิน (เห็นทุกเมนู + ตั้งค่า)
   approverEmails: []                            // ผู้อนุมัติ (เพิ่มอีเมลคั่นด้วย ,)
 };

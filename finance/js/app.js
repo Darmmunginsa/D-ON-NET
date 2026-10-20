@@ -10,7 +10,7 @@ function _today(){ return new Date().toISOString().slice(0,10); }
 
 // ── state ──
 let finTx = [], finReq = [], finCat = [], impIncome = [], impExpense = [];
-let _period = localStorage.getItem('fin_period') || 'month';
+let _period = AppStorage.getItem('fin_period') || 'month';
 let _view = 'dash';
 let _ledgerFilter = { type:'all', source:'all', q:'' };
 let _reqFilter = 'all';
@@ -132,7 +132,7 @@ function renderDash(){
       <div class="card"><div class="card-h">รายรับ-รายจ่าย รายเดือน</div><div id="bars"></div></div>
     </div>`;
 }
-function setPeriod(p){ _period=p; localStorage.setItem('fin_period',p); go('dash'); }
+function setPeriod(p){ _period=p; AppStorage.setItem('fin_period',p); go('dash'); }
 function drawCharts(){
   const ents=allEntries().filter(inPeriod);
   // donut: expense by category
@@ -327,7 +327,7 @@ function renderReport(){
     </div>
     <div class="card" style="margin-top:14px;text-align:center;padding:16px"><span style="color:var(--muted)">กำไร/ขาดทุนสุทธิ</span> <span style="font-size:22px;font-weight:700;color:${ti-te>=0?'var(--accent2)':'var(--red)'};margin-left:10px">${fmt(ti-te)}</span></div>`;
 }
-function setPeriodR(p){ _period=p; localStorage.setItem('fin_period',p); go('report'); }
+function setPeriodR(p){ _period=p; AppStorage.setItem('fin_period',p); go('report'); }
 function exportCSV(){
   const ents=allEntries().filter(inPeriod).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   const head=['วันที่','ประเภท','หมวดหมู่','รายละเอียด','จำนวนเงิน','วิธีชำระ','แหล่ง'];

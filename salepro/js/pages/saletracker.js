@@ -601,7 +601,7 @@ function initProcurementTab(){
   const req=new Date();req.setDate(req.getDate()+7);
   _v('po-required-date',req.toISOString().split('T')[0]);
   _v('po-budget',q.TotalAmount||'');_v('po-vendor','');_v('po-costcenter','');_v('po-note','');
-  try{const s=localStorage.getItem('po_recipients_'+(currentUser?.email||''));poRecipients=s?JSON.parse(s):[];}catch(e){poRecipients=[];}
+  try{const s=AppStorage.getItem('po_recipients_'+(currentUser?.email||''));poRecipients=s?JSON.parse(s):[];}catch(e){poRecipients=[];}
   if(!poRecipients.length)poRecipients=[{id:Date.now(),email:''}];
   renderPORecipients();
   renderPOItemsPreview();
@@ -663,7 +663,7 @@ async function sendPORequest(){
   if(!valid.length){toast('กรุณาระบุ Email ฝ่ายจัดซื้ออย่างน้อย 1 คน','error');return;}
   const reqDate=document.getElementById('po-required-date')?.value;
   if(!reqDate){toast('กรุณาระบุวันที่ต้องการของ','error');return;}
-  try{localStorage.setItem('po_recipients_'+(currentUser?.email||''),JSON.stringify(poRecipients));}catch(e){}
+  try{AppStorage.setItem('po_recipients_'+(currentUser?.email||''),JSON.stringify(poRecipients));}catch(e){}
   try{
     toast('กำลังส่ง Email...','info');
     const vendor=document.getElementById('po-vendor')?.value||'';

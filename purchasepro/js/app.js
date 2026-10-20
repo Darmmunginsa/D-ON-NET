@@ -1219,8 +1219,8 @@ function parsePOPaste(text){
 }
 // ── ดูดรายการจากไฟล์ใบเสนอราคา Vendor ด้วย AI (Claude Vision) ──
 var PO_AI_MODEL='claude-sonnet-5';
-function getAIKey(){ try{ return localStorage.getItem('po_ai_key')||''; }catch(e){ return ''; } }
-function setAIKey(k){ try{ localStorage.setItem('po_ai_key', k||''); }catch(e){} }
+function getAIKey(){ try{ return AppStorage.getItem('po_ai_key')||''; }catch(e){ return ''; } }
+function setAIKey(k){ try{ AppStorage.setItem('po_ai_key', k||''); }catch(e){} }
 function _fileToB64(file){ return new Promise(function(res,rej){ const r=new FileReader(); r.onload=function(e){ res(String(e.target.result).split(',')[1]||''); }; r.onerror=rej; r.readAsDataURL(file); }); }
 async function callClaudeExtract(b64, mediaType){
   const key=getAIKey(); if(!key) throw new Error('ยังไม่ได้ใส่ API key');
@@ -1824,7 +1824,7 @@ function applyAccent(color){
   const hex=String(color).replace('#','');
   if(hex.length===6){ const r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16); root.setProperty('--accent-soft',`rgba(${r},${g},${b},0.13)`); }
 }
-function setAccent(color){ applyAccent(color); try{ localStorage.setItem('pp_accent',color); }catch(e){}
+function setAccent(color){ applyAccent(color); try{ AppStorage.setItem('pp_accent',color); }catch(e){}
   const hx=document.getElementById('theme-custom-hex'); if(hx) hx.textContent=color.toUpperCase();
   const ci=document.getElementById('theme-custom'); if(ci) ci.value=color;
   _markActiveSwatch(color);
@@ -1842,8 +1842,8 @@ function applyMode(mode){
   const root=document.documentElement.style;
   Object.entries(m.vars).forEach(([k,v])=>root.setProperty(k,v));
 }
-function setMode(mode){ applyMode(mode); try{ localStorage.setItem('pp_mode',mode); }catch(e){} _markActiveMode(mode); }
-function _savedMode(){ try{ return localStorage.getItem('pp_mode')||MODE_DEFAULT; }catch(e){ return MODE_DEFAULT; } }
+function setMode(mode){ applyMode(mode); try{ AppStorage.setItem('pp_mode',mode); }catch(e){} _markActiveMode(mode); }
+function _savedMode(){ try{ return AppStorage.getItem('pp_mode')||MODE_DEFAULT; }catch(e){ return MODE_DEFAULT; } }
 function _markActiveMode(mode){
   document.querySelectorAll('#theme-modes .modebtn').forEach(el=>{
     const on=el.dataset.m===mode;
@@ -1852,7 +1852,7 @@ function _markActiveMode(mode){
     el.style.background=on?'var(--accent-soft)':'transparent';
   });
 }
-function _savedAccent(){ try{ return localStorage.getItem('pp_accent')||THEME_DEFAULT; }catch(e){ return THEME_DEFAULT; } }
+function _savedAccent(){ try{ return AppStorage.getItem('pp_accent')||THEME_DEFAULT; }catch(e){ return THEME_DEFAULT; } }
 function _markActiveSwatch(color){
   document.querySelectorAll('#theme-swatches .sw').forEach(el=>{
     el.style.outline = (el.dataset.c||'').toLowerCase()===String(color).toLowerCase() ? '2px solid var(--text)' : 'none';

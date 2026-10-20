@@ -12,8 +12,8 @@
  *  แต่ละ "List" = แท็บ (sheet) ที่ชื่อเดียวกับ CONFIG.lists ใน front-end
  ************************************************************/
 
-var SPREADSHEET_ID  = '1rQAVGAIuTGussD1GaOs7M6LCMu2x5FPXxpM_IdJgQLw';   // Google Sheet (SalePro DB)
-var UPLOAD_FOLDER_ID = '1AtzqOI4S4PBWmLyBFo3KxJ3sUd9E3Cr0';            // โฟลเดอร์ไฟล์แนบใน Drive
+var SPREADSHEET_ID  = '1HkB3y5gXPp2cLn4YmDAddMGfnqQtPmJJDZ_RKLS84DU';   // Google Sheet (SalePro DB)
+var UPLOAD_FOLDER_ID = '1Ra1XkkAbXpmo5uCbYOyxyvLSvjxaU1rw';            // โฟลเดอร์ไฟล์แนบใน Drive
 var ID_COL = '_id';
 
 function _ss() {
@@ -225,6 +225,7 @@ function _json(obj) {
 function doPost(e) {
   try {
     var req = JSON.parse(e.postData.contents || '{}');
+    _authorizeGateway(req);
     return _json(handle(req));
   } catch (err) {
     return _json({ ok: false, error: String(err && err.message || err) });
@@ -232,4 +233,57 @@ function doPost(e) {
 }
 function doGet(e) {
   return _json({ ok: true, msg: 'SalePro API พร้อมใช้งาน' });
+}
+
+// Run this manually as admin@dongroups.com before deploying the new project.
+// Creates schema/configuration only; never imports or deletes business records.
+function checkNewEnvironment() {
+  var email = String(Session.getEffectiveUser().getEmail() || '').toLowerCase();
+  if (email !== 'admin@dongroups.com') throw new Error('กรุณาเปิดและรันด้วยบัญชี admin@dongroups.com ขณะนี้เป็น: ' + email);
+  var database = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var folder = DriveApp.getFolderById(UPLOAD_FOLDER_ID);
+  Logger.log('บัญชี: ' + email);
+  Logger.log('ฐานข้อมูล: ' + database.getName());
+  Logger.log('โฟลเดอร์: ' + folder.getName());
+  Logger.log('โควตาผู้รับอีเมลที่เหลือ: ' + MailApp.getRemainingDailyQuota());
+  return true;
+}
+function initializeNewDatabase() {
+  checkNewEnvironment();
+  var names = ['Catalog','Quotations','QuoteItems','Approvals','Payments','Settings','Procurement','Contracts','Customers','Company','FinanceTx','FinanceReq','FinanceCat'];
+  var database = SpreadsheetApp.openById(SPREADSHEET_ID);
+  // Reject existing business rows before writing anything. Re-running is allowed only for setup metadata.
+  names.forEach(function(name) {
+    var sheet = database.getSheetByName(name);
+    if (!sheet || sheet.getLastRow() < 2) return;
+    if (name !== 'Settings') throw new Error('พบข้อมูลในแท็บ ' + name + ' หยุดเพื่อไม่แตะข้อมูลเดิม');
+    var rows = listRows(name);
+    if (rows.some(function(row) { return row.Title !== 'Role_admin@dongroups.com'; })) throw new Error('Settings มีข้อมูลอื่นอยู่แล้ว กรุณาตรวจสอบก่อน');
+  });
+  names.forEach(function(name) { _sheet(name); });
+  var settings = listRows('Settings');
+  if (!settings.some(function(row) { return row.Title === 'Role_admin@dongroups.com'; })) {
+    createRow('Settings', {Title:'Role_admin@dongroups.com',Value:'admin'});
+  }
+  Logger.log('เตรียม 13 แท็บแล้ว ไม่มีการนำเข้าข้อมูลธุรกิจเดิม และตั้งสิทธิ์ Admin สำหรับบัญชีบริษัท');
+}
+
+// This secret belongs in Apps Script Project Settings → Script properties.
+// The matching value belongs in the Cloudflare Worker secret GATEWAY_SECRET.
+// It must NEVER be placed in frontend files or sent to a browser.
+function _authorizeGateway(req) {
+  var expected = PropertiesService.getScriptProperties().getProperty('GATEWAY_SECRET') || '';
+  var received = String(req.gatewaySecret || '');
+  if (expected.length < 32 || received.length !== expected.length) throw new Error('Unauthorized gateway');
+  var mismatch = 0;
+  for (var i = 0; i < expected.length; i++) mismatch |= expected.charCodeAt(i) ^ received.charCodeAt(i);
+  if (mismatch) throw new Error('Unauthorized gateway');
+  var allowed = (PropertiesService.getScriptProperties().getProperty('ALLOWED_EMAILS') || 'admin@dongroups.com').split(',').map(function(email) { return email.trim().toLowerCase(); });
+  var actor = req._actor || {};
+  var email = String(actor.email || '').toLowerCase();
+  if (!actor.sub || allowed.indexOf(email) < 0) throw new Error('Account not allowed');
+  if (String(Session.getEffectiveUser().getEmail() || '').toLowerCase() !== 'admin@dongroups.com') throw new Error('Deploy must execute as admin@dongroups.com');
+  req.email = email;
+  req.replyTo = email;
+  delete req.gatewaySecret;
 }

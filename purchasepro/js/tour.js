@@ -33,8 +33,8 @@
   // ---------- engine ----------
   var idx=0, els={};
   function KEY(){ var em=((typeof currentUser!=='undefined'&&currentUser&&currentUser.email)||'').toLowerCase(); return 'TourSeen_'+APP+'_'+em+'_'+SEEN_VER; }
-  function seen(){ try{ if(localStorage.getItem(KEY()))return true; }catch(e){} return !!GET(KEY()); }
-  function markSeen(){ try{ localStorage.setItem(KEY(),'1'); }catch(e){} PUT(KEY(), new Date().toISOString()); }
+  function seen(){ try{ if(AppStorage.getItem(KEY()))return true; }catch(e){} return !!GET(KEY()); }
+  function markSeen(){ try{ AppStorage.setItem(KEY(),'1'); }catch(e){} PUT(KEY(), new Date().toISOString()); }
 
   function ensureDom(){
     if(els.blocker) return;

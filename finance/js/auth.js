@@ -34,10 +34,11 @@ function _initGIS() {
   _gisInited = true; return true;
 }
 function _onGoogleCredential(resp) {
+  if(!AuthSession.accept(resp && resp.credential,CONFIG.googleClientId)){toast("กรุณาใช้บัญชี Google Workspace ของ dongroups.com", "error");return;}
   const p = _decodeJwt(resp && resp.credential);
   if (!p || !p.email) { toast('เข้าสู่ระบบไม่สำเร็จ','error'); return; }
   currentUser = { email: p.email, displayName: p.name || p.email, picture: p.picture || '' };
-  try { localStorage.setItem('finuser', JSON.stringify(currentUser)); } catch(e){}
+  try { AppStorage.setItem('finuser', JSON.stringify(currentUser)); } catch(e){}
   afterLogin();
 }
 async function msalLogin() {
@@ -47,13 +48,14 @@ async function msalLogin() {
 }
 function googleLogin() { return msalLogin(); }
 async function tryRestoreSession() {
-  try { const s = localStorage.getItem('finuser'); if (s) { currentUser = JSON.parse(s); if (currentUser && currentUser.email) { await afterLogin(); return true; } } } catch(e){}
-  if (await _waitGoogle(8000)) _initGIS();
-  return false;
+  const p=AuthSession.profile(CONFIG.googleClientId);
+  if(p){currentUser={email:p.email,displayName:p.name||p.email,picture:p.picture||''};await afterLogin();return true;}
+  if(await _waitGoogle(8000))_initGIS();return false;
 }
 async function logout() {
+  AuthSession.clear();
   currentUser = null;
-  try { localStorage.removeItem('finuser'); } catch(e){}
+  try { AppStorage.removeItem('finuser'); } catch(e){}
   try { if (typeof google !== 'undefined' && google.accounts) google.accounts.id.disableAutoSelect(); } catch(e){}
   location.reload();
 }

@@ -3,8 +3,8 @@
 const BasketPersistence = (() => {
   const queues=new Map(),drafts=new Map();let pending=0;
   const prefix='donnet:basket-draft:';
-  function read(key){if(drafts.has(key))return drafts.get(key);try{const raw=localStorage.getItem(prefix+key);if(raw)return JSON.parse(raw);}catch(e){}return null;}
-  function store(key,record){drafts.set(key,record);try{localStorage.setItem(prefix+key,JSON.stringify(record));}catch(e){/* Remote save remains available if browser storage is full/disabled. */}}
+  function read(key){if(drafts.has(key))return drafts.get(key);try{const raw=AppStorage.getItem(prefix+key);if(raw)return JSON.parse(raw);}catch(e){}return null;}
+  function store(key,record){drafts.set(key,record);try{AppStorage.setItem(prefix+key,JSON.stringify(record));}catch(e){/* Remote save remains available if browser storage is full/disabled. */}}
   function save(key,value,write){
     const record={value,dirty:true,version:Date.now()+':'+Math.random()};store(key,record);pending++;
     const previous=queues.get(key)||Promise.resolve();

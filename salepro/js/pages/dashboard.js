@@ -40,10 +40,10 @@ function donutSVG(slices, size) {
     <div style="display:flex;flex-direction:column;gap:5px">${legend}</div></div>`;
 }
 
-let _salesPeriod = (function(){ try { return localStorage.getItem('sales_period') || '6m'; } catch(e) { return '6m'; } })();
+let _salesPeriod = (function(){ try { return AppStorage.getItem('sales_period') || '6m'; } catch(e) { return '6m'; } })();
 function setSalesPeriod(val) {
   _salesPeriod = val || '6m';
-  try { localStorage.setItem('sales_period', _salesPeriod); } catch(e) {}
+  try { AppStorage.setItem('sales_period', _salesPeriod); } catch(e) {}
   renderSalesReport();
 }
 // ช่วงเวลาตาม period → {start, end, label}

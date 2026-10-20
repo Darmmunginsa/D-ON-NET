@@ -46,7 +46,7 @@ async function initProcurementTab() {
   if (sel && typeof vendorOptionsHTML === 'function') sel.innerHTML = vendorOptionsHTML('');
 
   // ผู้รับ email (เดิม)
-  try { const s = localStorage.getItem('po_recipients_' + (currentUser?.email || '')); poRecipients = s ? JSON.parse(s) : []; } catch(e) { poRecipients = []; }
+  try { const s = AppStorage.getItem('po_recipients_' + (currentUser?.email || '')); poRecipients = s ? JSON.parse(s) : []; } catch(e) { poRecipients = []; }
   if (!poRecipients.length) poRecipients = [{ id: Date.now(), email: '' }];
   renderPORecipients();
 
@@ -351,7 +351,7 @@ async function sendPORequest() {
   if (!reqDate) { toast('กรุณาระบุวันที่ต้องการของ', 'error'); return; }
   const sel = _procSelectedItems();
   if (!sel.length) { toast('กรุณาเลือกอย่างน้อย 1 รายการ', 'error'); return; }
-  try { localStorage.setItem('po_recipients_' + (currentUser?.email || ''), JSON.stringify(poRecipients)); } catch(e) {}
+  try { AppStorage.setItem('po_recipients_' + (currentUser?.email || ''), JSON.stringify(poRecipients)); } catch(e) {}
   try {
     toast('กำลังเปิด Email...', 'info');
     const vendor = _procVendorName();

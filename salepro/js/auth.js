@@ -83,10 +83,11 @@ function _initGIS() {
   return true;
 }
 function _onGoogleCredential(resp) {
+  if(!AuthSession.accept(resp && resp.credential,CONFIG.googleClientId)){toast("กรุณาใช้บัญชี Google Workspace ของ dongroups.com", "error");return;}
   const p = _decodeJwt(resp && resp.credential);
   if (!p || !p.email) { toast('เข้าสู่ระบบไม่สำเร็จ', 'error'); return; }
   currentUser = { displayName: p.name || p.email, email: p.email, picture: p.picture || '' };
-  try { localStorage.setItem('guser', JSON.stringify(currentUser)); } catch(e) {}
+  try { AppStorage.setItem('guser', JSON.stringify(currentUser)); } catch(e) {}
   afterLogin();
 }
 // คงชื่อ msalLogin เดิมไว้ให้ปุ่มใน index.html ทำงาน → เรียก Google prompt
@@ -97,14 +98,11 @@ async function msalLogin() {
 }
 function googleLogin() { return msalLogin(); }
 
-// กู้เซสชันจาก localStorage ถ้ามี, ไม่งั้นเตรียมปุ่ม Google
+// กู้เซสชันจาก AppStorage ถ้ามี, ไม่งั้นเตรียมปุ่ม Google
 async function tryRestoreSession() {
-  try {
-    const s = localStorage.getItem('guser');
-    if (s) { currentUser = JSON.parse(s); if (currentUser && currentUser.email) { await afterLogin(); return true; } }
-  } catch(e) {}
-  if (await _waitGoogle(8000)) _initGIS();
-  return false;
+  const p=AuthSession.profile(CONFIG.googleClientId);
+  if(p){currentUser={email:p.email,displayName:p.name||p.email,picture:p.picture||''};await afterLogin();return true;}
+  if(await _waitGoogle(8000))_initGIS();return false;
 }
 
 async function afterLogin() {
@@ -151,8 +149,9 @@ async function afterLogin() {
 }
 
 async function logout() {
+  AuthSession.clear();
   currentUser = null;
-  try { localStorage.removeItem('guser'); } catch(e) {}
+  try { AppStorage.removeItem('guser'); } catch(e) {}
   try { if (typeof google !== 'undefined' && google.accounts) google.accounts.id.disableAutoSelect(); } catch(e) {}
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('app-screen').style.display = 'none';

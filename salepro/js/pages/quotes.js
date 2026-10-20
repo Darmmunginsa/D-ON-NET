@@ -152,18 +152,18 @@ function initNewQuote() {
   fillQuoteSourceOptions('');
   document.getElementById('q-validity').value = '30 วัน';
   updateAutoDates();   // Date = วันที่ใบ, Expire = วันที่ใบ + อายุใบเสนอราคา (อัตโนมัติ)
-  // โหลดข้อมูล Sale จาก localStorage (จำไว้จากครั้งที่แล้ว)
-  const _savedSale = (() => { try { return JSON.parse(localStorage.getItem('sale_info_' + (currentUser?.email||'')) || 'null'); } catch(e) { return null; } })();
-  // ลำดับความสำคัญ: SharePoint profile → localStorage → currentUser
+  // โหลดข้อมูล Sale จาก AppStorage (จำไว้จากครั้งที่แล้ว)
+  const _savedSale = (() => { try { return JSON.parse(AppStorage.getItem('sale_info_' + (currentUser?.email||'')) || 'null'); } catch(e) { return null; } })();
+  // ลำดับความสำคัญ: SharePoint profile → AppStorage → currentUser
   document.getElementById('q-sale-name').value  = _saleProfile.name || _savedSale?.name  || currentUser?.displayName || '';
   document.getElementById('q-sale-email').value = _savedSale?.email || currentUser?.email || '';
   document.getElementById('q-sale-tel').value   = _saleProfile.tel  || _savedSale?.tel   || '';
   // เลขที่ใบ: <ตัวย่อชื่อ-สกุล Sale><NN>-<MM>-<YYYY> เช่น CC01-07-2026 (สร้างหลังได้ชื่อ Sale)
   document.getElementById('q-no').value = _nextQuoteNo(document.getElementById('q-sale-name').value);
-  // ค่าเริ่มต้น หมายเหตุ/เงื่อนไข — เก็บถาวรใน SharePoint (Settings) ข้ามเครื่องได้ + fallback localStorage
+  // ค่าเริ่มต้น หมายเหตุ/เงื่อนไข — เก็บถาวรใน SharePoint (Settings) ข้ามเครื่องได้ + fallback AppStorage
   const _defs = getQuoteDefaults();
-  const _noteDef  = _defs.note  || localStorage.getItem('note_default_'  + (currentUser?.email||'')) || '';
-  const _termsDef = _defs.terms || localStorage.getItem('terms_default_' + (currentUser?.email||'')) || '';
+  const _noteDef  = _defs.note  || AppStorage.getItem('note_default_'  + (currentUser?.email||'')) || '';
+  const _termsDef = _defs.terms || AppStorage.getItem('terms_default_' + (currentUser?.email||'')) || '';
   document.getElementById('q-note').value = _noteDef;
   document.getElementById('q-terms').value = _termsDef || companySettings?.FooterText || 'ชำระภายใน 30 วันนับจากวันรับสินค้า';
   quoteItems = [];
@@ -591,11 +591,11 @@ function initNqFab() {
   if (!_nqFabInit && tools) {
     body.appendChild(tools);                 // ย้ายปุ่มทั้งหมดเข้าวิดเจ็ต (ครั้งเดียว)
     try {
-      const p = JSON.parse(localStorage.getItem('nqfab_pos') || 'null');
+      const p = JSON.parse(AppStorage.getItem('nqfab_pos') || 'null');
       if (p && p.left) { fab.style.left = p.left; fab.style.top = p.top; fab.style.right = 'auto'; }
       else { fab.style.left = Math.max(8, window.innerWidth - fab.offsetWidth - 24) + 'px'; fab.style.top = '130px'; fab.style.right = 'auto'; }
     } catch(e) {}
-    if (localStorage.getItem('nqfab_collapsed') === '1') {
+    if (AppStorage.getItem('nqfab_collapsed') === '1') {
       fab.classList.add('collapsed');
       const b = fab.querySelector('#nq-fab-head button'); if (b) b.textContent = '▸';
     }
@@ -608,7 +608,7 @@ function toggleNqFab(e) {
   fab.classList.toggle('collapsed');
   const b = fab.querySelector('#nq-fab-head button');
   if (b) b.textContent = fab.classList.contains('collapsed') ? '▸' : '▾';
-  try { localStorage.setItem('nqfab_collapsed', fab.classList.contains('collapsed') ? '1' : '0'); } catch(e) {}
+  try { AppStorage.setItem('nqfab_collapsed', fab.classList.contains('collapsed') ? '1' : '0'); } catch(e) {}
 }
 function nqFabDragStart(e) {
   if (e.target.closest('button')) return;     // กดปุ่มย่อ ไม่ใช่ลาก
@@ -632,7 +632,7 @@ function nqFabDragEnd() {
   if (!_nqFabDrag) return;
   const fab = document.getElementById('nq-fab');
   document.getElementById('nq-fab-head').style.cursor = 'grab';
-  try { localStorage.setItem('nqfab_pos', JSON.stringify({ left:fab.style.left, top:fab.style.top })); } catch(e) {}
+  try { AppStorage.setItem('nqfab_pos', JSON.stringify({ left:fab.style.left, top:fab.style.top })); } catch(e) {}
   window.removeEventListener('pointermove', nqFabDragMove);
   window.removeEventListener('pointerup', nqFabDragEnd);
   _nqFabDrag = null;
@@ -1470,19 +1470,19 @@ async function saveQuote(status) {
     ContractStartDate: document.getElementById('q-start').value||null,
     ContractEndDate: document.getElementById('q-end').value||null
   };
-  // บันทึกข้อมูล Sale ลง localStorage เพื่อใช้ครั้งต่อไป
-  try { localStorage.setItem('sale_info_' + (currentUser?.email||''), JSON.stringify({
+  // บันทึกข้อมูล Sale ลง AppStorage เพื่อใช้ครั้งต่อไป
+  try { AppStorage.setItem('sale_info_' + (currentUser?.email||''), JSON.stringify({
     name:  document.getElementById('q-sale-name').value||'',
     tel:   document.getElementById('q-sale-tel').value||'',
     email: document.getElementById('q-sale-email').value||''
   })); } catch(e) {}
-  // จำ หมายเหตุ/เงื่อนไข เป็นค่าเริ่มต้นของ user → ใบถัดไปดึงมาอัตโนมัติ (Settings = ถาวร/ข้ามเครื่อง + localStorage = cache)
+  // จำ หมายเหตุ/เงื่อนไข เป็นค่าเริ่มต้นของ user → ใบถัดไปดึงมาอัตโนมัติ (Settings = ถาวร/ข้ามเครื่อง + AppStorage = cache)
   try {
     const _em = currentUser?.email || '';
     const _n = document.getElementById('q-note').value || '';
     const _t = document.getElementById('q-terms').value || '';
-    localStorage.setItem('note_default_' + _em, _n);
-    localStorage.setItem('terms_default_' + _em, _t);
+    AppStorage.setItem('note_default_' + _em, _n);
+    AppStorage.setItem('terms_default_' + _em, _t);
     saveQuoteDefaults(_n, _t);   // เก็บถาวรใน SharePoint (async, ไม่บล็อก)
   } catch(e) {}
 

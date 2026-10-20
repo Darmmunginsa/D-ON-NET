@@ -10,7 +10,7 @@ function fmtDate(v) {
   return String(d).padStart(2, '0') + '/' + String(m).padStart(2, '0') + '/' + y;
 }
 const CONFIG = {
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbxKyaHSpdQueWDHSI0SRu3W9flHRZECtVUs4vPFiPtwfg8h16mFxoJb_GTHrBFVwreQ/exec',
+  appsScriptUrl: 'https://d-on-net-gateway.darmmunginsa.workers.dev/',
   googleClientId: '1000323548149-1j89kljart0tkdio1atkoov69lfjmk3m.apps.googleusercontent.com',
   lists: {
     // แท็บของ Finance (Apps Script สร้างให้อัตโนมัติเมื่อมีข้อมูลครั้งแรก)
@@ -23,7 +23,7 @@ const CONFIG = {
     settings:   'Settings',
     quotations: 'Quotations'
   },
-  adminEmails:    ['darmmunginsa@gmail.com'],   // ผู้มีสิทธิ์อนุมัติ/ตั้งค่า
+  adminEmails:    ['admin@dongroups.com'],   // ผู้มีสิทธิ์อนุมัติ/ตั้งค่า
   approverEmails: []
 };
 // หมวดหมู่เริ่มต้น (อิงจากไฟล์ Excel สรุปรายรับรายจ่ายของบริษัท — ถ้าแท็บ FinanceCat ว่าง)

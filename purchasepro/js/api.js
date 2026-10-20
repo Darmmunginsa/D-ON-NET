@@ -7,35 +7,7 @@
 // เรียก Apps Script web app — ใช้ content-type text/plain เพื่อเลี่ยง CORS preflight
 // มี auto-retry กัน CORS/redirect ของ Apps Script หลุดเป็นครั้งคราว
 function _sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-async function _call(payload, _attempt) {
-  if (!CONFIG.appsScriptUrl || CONFIG.appsScriptUrl.indexOf('PASTE') === 0) {
-    throw new Error('ยังไม่ได้ตั้งค่า appsScriptUrl ใน js/config.js');
-  }
-  _attempt = _attempt || 1;
-  const MAX = 4;
-  const body = JSON.stringify(Object.assign({ email: (typeof currentUser !== 'undefined' && currentUser) ? currentUser.email : '' }, payload));
-  try {
-    const r = await fetch(CONFIG.appsScriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body,
-      redirect: 'follow'
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const text = await r.text();
-    let data; try { data = text ? JSON.parse(text) : {}; } catch (e) { throw new Error('ตอบกลับไม่ใช่ JSON'); }
-    if (data.ok === false) throw new Error(data.error || 'API error');
-    return data;
-  } catch (e) {
-    // retry เฉพาะข้อผิดพลาดเครือข่าย/CORS/redirect (TypeError: Failed to fetch) หรือ HTTP ชั่วคราว
-    const retriable = (e instanceof TypeError) || /Failed to fetch|HTTP 5|HTTP 429|NetworkError|Load failed/i.test(e.message || '');
-    if (retriable && payload.action !== 'sendEmail' && _attempt < MAX) {
-      await _sleep(300 * _attempt);           // backoff: 300, 600, 900ms
-      return _call(payload, _attempt + 1);
-    }
-    throw e;
-  }
-}
+async function _call(payload) { return GatewayClient.call(CONFIG.appsScriptUrl,payload); }
 
 // แปลงชนิดข้อมูลตัวเลข/บูลีน ให้เก็บใน Sheet เป็นค่าที่ถูกต้อง
 // หมายเหตุ: ห้ามใส่ฟิลด์ที่เป็น "id อ้างอิง" (เช่น QuoteID) เพราะ Google version ใช้ UUID

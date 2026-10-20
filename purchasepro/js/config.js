@@ -18,7 +18,7 @@ function fmtDate(v) {
 }
 
 const CONFIG = {
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbxKyaHSpdQueWDHSI0SRu3W9flHRZECtVUs4vPFiPtwfg8h16mFxoJb_GTHrBFVwreQ/exec',
+  appsScriptUrl: 'https://d-on-net-gateway.darmmunginsa.workers.dev/',
   googleClientId: '1000323548149-1j89kljart0tkdio1atkoov69lfjmk3m.apps.googleusercontent.com',
 
   // ชื่อแท็บใน Google Sheet (ร่วมกับ SalePro)
@@ -34,6 +34,6 @@ const CONFIG = {
     customers:   'Customers',
     company:     'Company'
   },
-  adminEmails:    ['darmmunginsa@gmail.com'],
+  adminEmails:    ['admin@dongroups.com'],
   approverEmails: []
 };

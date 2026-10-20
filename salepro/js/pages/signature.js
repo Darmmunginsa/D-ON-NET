@@ -48,7 +48,7 @@ async function saveSaleProfile(partial) {
 
 async function saveSigToSharePoint(base64) {
   const key = sigKey();
-  try { localStorage.setItem(key, base64); sigCache[key] = base64; } catch(e) { /* ignore */ }
+  try { AppStorage.setItem(key, base64); sigCache[key] = base64; } catch(e) { /* ignore */ }
   await saveSaleProfile({ signature: base64 });  // durable across devices
 }
 
@@ -71,7 +71,7 @@ async function loadSigFromSharePoint(email) {
     } catch(e) { /* ignore */ }
   }
   try {
-    const val = localStorage.getItem(key);
+    const val = AppStorage.getItem(key);
     if (val) { sigCache[key] = val; return val; }
   } catch(e) { /* ignore */ }
   return null;
@@ -133,18 +133,18 @@ async function initQuoteSignature() {
 window.saveNoteTermsDefault = function() {
   try {
     const email = currentUser?.email || ''
-    localStorage.setItem('note_default_' + email, document.getElementById('q-note')?.value || '')
-    localStorage.setItem('terms_default_' + email, document.getElementById('q-terms')?.value || '')
+    AppStorage.setItem('note_default_' + email, document.getElementById('q-note')?.value || '')
+    AppStorage.setItem('terms_default_' + email, document.getElementById('q-terms')?.value || '')
     toast('บันทึกเป็นค่าเริ่มต้นแล้ว — ใบเสนอราคาใหม่จะใช้ค่านี้', 'success')
   } catch(e) { /* ignore */ }
 }
 
-// จำข้อมูล Sale ทันทีที่แก้ — เก็บทั้ง localStorage (เร็ว) + SharePoint (ทุกเครื่อง)
+// จำข้อมูล Sale ทันทีที่แก้ — เก็บทั้ง AppStorage (เร็ว) + SharePoint (ทุกเครื่อง)
 window.saveSaleInfo = function() {
   const name = document.getElementById('q-sale-name')?.value || ''
   const tel  = document.getElementById('q-sale-tel')?.value || ''
   const email = document.getElementById('q-sale-email')?.value || ''
-  try { localStorage.setItem('sale_info_' + (currentUser?.email || ''), JSON.stringify({ name, tel, email })) } catch(e) { /* ignore */ }
+  try { AppStorage.setItem('sale_info_' + (currentUser?.email || ''), JSON.stringify({ name, tel, email })) } catch(e) { /* ignore */ }
   saveSaleProfile({ name, tel })  // durable across devices
 }
 

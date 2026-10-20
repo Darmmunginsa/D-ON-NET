@@ -169,8 +169,8 @@
   // ---------- engine ----------
   var CUR=null, PAGEKEY='dashboard', idx=0, els={}, _page='dashboard';
   function KEY(pk){ var em=((typeof currentUser!=='undefined'&&currentUser&&currentUser.email)||'').toLowerCase(); return 'TourSeen_'+APP+'_'+pk+'_'+em+'_'+VER; }
-  function seen(pk){ try{ if(localStorage.getItem(KEY(pk)))return true; }catch(e){} return !!GET(KEY(pk)); }
-  function markSeen(pk){ try{ localStorage.setItem(KEY(pk),'1'); }catch(e){} PUT(KEY(pk), new Date().toISOString()); }
+  function seen(pk){ try{ if(AppStorage.getItem(KEY(pk)))return true; }catch(e){} return !!GET(KEY(pk)); }
+  function markSeen(pk){ try{ AppStorage.setItem(KEY(pk),'1'); }catch(e){} PUT(KEY(pk), new Date().toISOString()); }
 
   function ensureDom(){
     if(els.blocker) return;

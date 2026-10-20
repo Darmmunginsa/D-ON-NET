@@ -184,32 +184,18 @@ select.form-control option{background:var(--card)}
 
 <div id="toast"></div>
 
+<script src="../shared/gateway-client.js?v=admin1"></script>
 <script>
 // ── CONFIG — Google backend (Apps Script + Sheets/Drive) + Google Sign-In ──
 // ใช้ Apps Script / Spreadsheet / Client ID "ตัวเดียวกับ SalePro"
 const CONFIG = {
-  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbxKyaHSpdQueWDHSI0SRu3W9flHRZECtVUs4vPFiPtwfg8h16mFxoJb_GTHrBFVwreQ/exec',
+  appsScriptUrl: 'https://d-on-net-gateway.darmmunginsa.workers.dev/',
   googleClientId: '1000323548149-1j89kljart0tkdio1atkoov69lfjmk3m.apps.googleusercontent.com'
 };
 
 // เรียก Apps Script (text/plain เลี่ยง CORS preflight) + auto-retry
 function _sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-async function _call(payload, _attempt) {
-  _attempt = _attempt || 1; const MAX = 4;
-  const body = JSON.stringify(Object.assign({ email: (currentUser && currentUser.email) || '' }, payload));
-  try {
-    const r = await fetch(CONFIG.appsScriptUrl, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body, redirect:'follow' });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const text = await r.text();
-    let data; try { data = text ? JSON.parse(text) : {}; } catch(e) { throw new Error('ตอบกลับไม่ใช่ JSON'); }
-    if (data.ok === false) throw new Error(data.error || 'API error');
-    return data;
-  } catch(e) {
-    const retriable = (e instanceof TypeError) || /Failed to fetch|HTTP 5|HTTP 429|NetworkError|Load failed/i.test(e.message||'');
-    if (retriable && _attempt < MAX) { await _sleep(300*_attempt); return _call(payload, _attempt+1); }
-    throw e;
-  }
-}
+async function _call(payload) { return GatewayClient.call(CONFIG.appsScriptUrl,payload); }
 // แปลง Drive webUrl → ลิงก์ thumbnail/preview (ไฟล์แชร์ ANYONE_WITH_LINK)
 function _driveId(url){ const s=String(url||''); const m=s.match(/\/d\/([-\w]{10,})/)||s.match(/[?&]id=([-\w]{10,})/); return m?m[1]:''; }
 function _driveThumb(url){ const id=_driveId(url); return id ? ('https://drive.google.com/thumbnail?id='+id+'&sz=w400') : url; }
@@ -244,15 +230,17 @@ function _initGIS(){
   _gisInited=true; return true;
 }
 function _onGoogleCredential(resp){
+  if(!AuthSession.accept(resp&&resp.credential,CONFIG.googleClientId)){toast("กรุณาใช้บัญชี Google Workspace ของ dongroups.com","error");return;}
   const p=_decodeJwt(resp&&resp.credential);
   if(!p||!p.email){ toast('เข้าสู่ระบบไม่สำเร็จ','error'); return; }
   currentUser={ email:p.email, name:p.name||p.email, picture:p.picture||'' };
-  try{ localStorage.setItem('techuser',JSON.stringify(currentUser)); }catch(e){}
+  try{ AppStorage.setItem('techuser',JSON.stringify(currentUser)); }catch(e){}
   showApp(); loadJobs();
 }
 window.onload = async function(){
-  try{ const s=localStorage.getItem('techuser'); if(s){ currentUser=JSON.parse(s); if(currentUser&&currentUser.email){ showApp(); loadJobs(); } } }catch(e){}
-  if(await _waitGoogle(8000)) _initGIS();
+  const p=AuthSession.profile(CONFIG.googleClientId);
+  if(p){currentUser={email:p.email,name:p.name||p.email,picture:p.picture||''};showApp();loadJobs();}
+  if(await _waitGoogle(8000))_initGIS();
 };
 async function msalLogin(){
   if(!(await _waitGoogle(8000))){ toast('โหลด Google Sign-In ไม่สำเร็จ','error'); return; }
@@ -267,8 +255,9 @@ function showApp() {
   if (currentUser.picture && av) av.src = currentUser.picture;
 }
 async function signOut() {
+  AuthSession.clear();
   try{ if(typeof google!=='undefined'&&google.accounts) google.accounts.id.disableAutoSelect(); }catch(e){}
-  try{ localStorage.removeItem('techuser'); }catch(e){}
+  try{ AppStorage.removeItem('techuser'); }catch(e){}
   currentUser = null; allJobs = [];
   location.reload();
 }
