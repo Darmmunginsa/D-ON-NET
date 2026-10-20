@@ -336,10 +336,10 @@ function renderPDFHTML(d) {
           : '<div style="height:44px"></div>'
         }
         <div style="border-top:0.5px solid #ccc;padding-top:8px">
-          <div style="color:#333;font-weight:500">${d.approverName || '(Apichart Silarat)'}</div>
+          <div style="color:#333;font-weight:500">${d.approverName || '(Darm Munginsa)'}</div>
           <div style="font-size:${Zn.s};color:#888;margin-top:4px">Sale Director</div>
-          <div style="font-size:${Zn.s};color:#888">apichart.s@itservices.co.th</div>
-          <div style="font-size:${Zn.s};color:#888">(Mobile : 098-7959693)</div>
+          <div style="font-size:${Zn.s};color:#888">darm.m@dongroups.com</div>
+          <div style="font-size:${Zn.s};color:#888">(Mobile : 091-5192945)</div>
         </div>
       </div>
     </div></div>`;
