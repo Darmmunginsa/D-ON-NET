@@ -1130,19 +1130,19 @@ async function editQuote(id) {
 let _baskets = null, _basketMap = null, _activeBasket = '__none__', _basketView = '', _assignQuoteId = null;  // _basketView = โฟลเดอร์ที่กำลังเปิดดู (''=ราก)
 const BASKET_COLORS = ['#4f8ef7','#34d399','#fbbf24','#f87171','#a78bfa','#f472b6','#22d3ee','#fb923c'];
 // ตะกร้าเป็นของแต่ละคน (per-profile) — ผูก key กับอีเมลผู้ใช้
-function _bkUser() { return ((currentUser && currentUser.email) || 'anon').toLowerCase(); }
+function _bkUser() { return ((currentUser && currentUser.email) || 'anon').trim().toLowerCase(); }
 function _bkKey(base) { return base + '_' + _bkUser(); }
 function loadBaskets() {
   // อ่านของผู้ใช้ปัจจุบัน ถ้ายังไม่มี ลอง fallback ค่ารวมเดิม (ของเก่าก่อนแยก profile)
-  try { _baskets = JSON.parse(getSettingValue(_bkKey('QuoteBaskets')) || getSettingValue('QuoteBaskets') || '[]') || []; } catch(e) { _baskets = []; }
-  try { _basketMap = JSON.parse(getSettingValue(_bkKey('QuoteBasketMap')) || getSettingValue('QuoteBasketMap') || '{}') || {}; } catch(e) { _basketMap = {}; }
+  try { _baskets = JSON.parse(BasketPersistence.load(_bkKey('QuoteBaskets'),getSettingValue(_bkKey('QuoteBaskets')),getSettingValue('QuoteBaskets') || '[]')) || []; } catch(e) { _baskets = []; }
+  try { _basketMap = JSON.parse(BasketPersistence.load(_bkKey('QuoteBasketMap'),getSettingValue(_bkKey('QuoteBasketMap')),getSettingValue('QuoteBasketMap') || '{}')) || {}; } catch(e) { _basketMap = {}; }
 }
 function getBaskets()   { if (_baskets === null)   loadBaskets(); return _baskets; }
 function getBasketMap() { if (_basketMap === null) loadBaskets(); return _basketMap; }
 function quoteBaskets(qid) { return getBasketMap()[String(qid)] || []; }
 function basketById(bid) { return getBaskets().find(b => b.id === bid); }
-async function saveBaskets()   { await putSettingValue(_bkKey('QuoteBaskets'), JSON.stringify(getBaskets())); }
-async function saveBasketMap() { await putSettingValue(_bkKey('QuoteBasketMap'), JSON.stringify(getBasketMap())); }
+async function saveBaskets()   { await BasketPersistence.save(_bkKey('QuoteBaskets'), JSON.stringify(getBaskets()),saveSettingItem); }
+async function saveBasketMap() { await BasketPersistence.save(_bkKey('QuoteBasketMap'), JSON.stringify(getBasketMap()),saveSettingItem); }
 // ── tree helpers (sub-ตะกร้าไม่จำกัดชั้น) ──
 function basketChildren(pid) { return getBaskets().filter(b => (b.parentId||'') === (pid||'')); }
 function basketDescendants(bid) { const out = [bid]; basketChildren(bid).forEach(c => out.push(...basketDescendants(c.id))); return out; }
@@ -1209,7 +1209,7 @@ async function dropQuoteToBasket(e, bid, el) {
   const arr = map[String(qid)] || (map[String(qid)] = []);
   if (arr.includes(bid)) { const b0 = basketById(bid); toast('ใบนี้อยู่ตะกร้า "' + (b0?b0.name:'') + '" แล้ว', 'info'); return; }
   arr.push(bid);
-  try { await saveBasketMap(); } catch(err) { console.warn('save basket map', err.message); }
+  try { await saveBasketMap(); } catch(err) { toast('ยังบันทึกตะกร้าขึ้นระบบไม่ได้ เก็บรอส่งซ้ำบนเครื่องนี้แล้ว: '+err.message,'error');return; }
   renderBasketBar(); renderQuotes();
   const b = basketById(bid);
   toast('จัดเข้าตะกร้า "' + (b?b.name:'') + '" แล้ว', 'success');
@@ -1304,8 +1304,8 @@ function renderBasketManage() {
   const rows = _manageTreeRows('', 0);
   list.innerHTML = rows || '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">ยังไม่มีตะกร้า</div>';
 }
-async function basketRename(bid, name) { const b = basketById(bid); if (!b) return; b.name = (name||'').trim() || b.name; try { await saveBaskets(); } catch(e){} renderBasketBar(); }
-async function basketSetColor(bid, color) { const b = basketById(bid); if (!b) return; b.color = color; try { await saveBaskets(); } catch(e){} renderBasketBar(); renderBasketManage(); }
+async function basketRename(bid, name) { const b = basketById(bid); if (!b) return; b.name = (name||'').trim() || b.name; try { await saveBaskets(); } catch(e){toast('ยังบันทึกชื่อตะกร้าขึ้นระบบไม่ได้ เก็บรอส่งซ้ำบนเครื่องนี้แล้ว: '+e.message,'error');} renderBasketBar(); }
+async function basketSetColor(bid, color) { const b = basketById(bid); if (!b) return; b.color = color; try { await saveBaskets(); } catch(e){toast('ยังบันทึกสีตะกร้าขึ้นระบบไม่ได้ เก็บรอส่งซ้ำบนเครื่องนี้แล้ว: '+e.message,'error');} renderBasketBar(); renderBasketManage(); }
 async function basketDelete(bid) {
   const b = basketById(bid); if (!b) return;
   const hasKids = basketHasChildren(bid);

@@ -33,6 +33,7 @@ function filterQuotesForUser(allQuotes) {
 async function syncAll() {
   toast('กำลังซิงค์ข้อมูล...', 'info');
   try {
+    await BasketPersistence.idle();
     // โหลดทุกแท็บใน "ครั้งเดียว" (multiList) — ลด round-trip บน Apps Script ให้เร็วขึ้นมาก
     let catData, allQuotes, settingsData, procData, companyData;
     if (typeof getListItemsMulti === 'function') {
@@ -50,8 +51,8 @@ async function syncAll() {
     }
     catalogData = catData;
     // รวม Settings (ฝั่งขาย) + ProcurementData (ฝั่งจัดซื้อ) เป็น cache เดียว โดยลิสต์จัดซื้อ "ชนะ" ถ้า Title ซ้ำ
-    _settingsCache = (settingsData||[]).map(i=>({...i,_srcList:CONFIG.lists.settings}));
-    (procData||[]).forEach(p=>{ const pi={...p,_srcList:CONFIG.lists.procurement}; const idx=_settingsCache.findIndex(x=>x.Title===p.Title); if(idx>=0) _settingsCache[idx]=pi; else _settingsCache.push(pi); });
+    _settingsCache = [...new Map((settingsData||[]).map(i=>[i.Title,{...i,_srcList:CONFIG.lists.settings}])).values()];
+    (procData||[]).forEach(p=>{ const pi={...p,_srcList:CONFIG.lists.procurement}; const idx=_settingsCache.findIndex(x=>x.Title===p.Title); if(idx>=0){if(_listForSettingKey(p.Title)===CONFIG.lists.procurement)_settingsCache[idx]=pi;}else _settingsCache.push(pi); });
     // ขนาดฟอนต์หัวบริษัท (เก็บใน Settings list แบบ key/value)
     const _hfsItem = settingsData.find(i => i.Title === 'CompanyHeaderFontSize');
     const _headerFs = _hfsItem ? (+_hfsItem.Value || 10) : 10;
@@ -79,6 +80,8 @@ async function syncAll() {
     // overlay Tag / ชื่อ Project จาก Settings list (เก็บแยก ไม่อยู่บน quotation item)
     quotesData.forEach(qq => { const t = (typeof getQuoteTag === 'function') ? getQuoteTag(qq.id) : ''; if (t) qq.Tag = t; });
     try { await loadCatalogExtra(); } catch(e) {}   // ข้อมูลเสริมสินค้า (ต้นทุน/Vendor)
+    await BasketPersistence.retry([_bkKey('QuoteBaskets'),_bkKey('QuoteBasketMap')],saveSettingItem);
+    loadBaskets(); // Reload after settings arrive, even if first render created empty arrays.
     renderDash();
     renderQuotes();
     renderCatalog();

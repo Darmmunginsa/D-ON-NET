@@ -53,11 +53,12 @@ async function afterLogin(){
 async function syncAll(){
   toast('กำลังซิงค์...','info');
   try{
+    await BasketPersistence.idle();
     // ข้อมูลจัดซื้ออยู่ที่ลิสต์ ProcurementData แล้ว — โหลดลิสต์ใหม่เป็นหลัก + fallback ค่าเก่าจาก Settings (ย้ายเองตอนเซฟถัดไป)
     let procList=[], oldSettings=[];
-    try{ procList = await getListItems(CONFIG.lists.procurement); }catch(e){ procList=[]; }
-    try{ oldSettings = await getListItems(CONFIG.lists.settings); }catch(e){ oldSettings=[]; }
-    _settingsCache = procList.map(i=>({...i,_srcList:CONFIG.lists.procurement}));
+    procList = await getListItems(CONFIG.lists.procurement);
+    oldSettings = await getListItems(CONFIG.lists.settings);
+    _settingsCache = [...new Map(procList.map(i=>[i.Title,{...i,_srcList:CONFIG.lists.procurement}])).values()];
     // นำ key เก่าจาก Settings ที่ยังไม่มีในลิสต์ใหม่มาเสริม (mark _srcList=settings → เซฟครั้งหน้าจะย้ายเข้าลิสต์ใหม่)
     oldSettings.forEach(i=>{
       // SalePro owns DealStatus; an old migrated procurement copy must not shadow it.
@@ -76,6 +77,8 @@ async function syncAll(){
     try{ const qs=await getListItems(CONFIG.lists.quotations); quotesById={}; qs.forEach(q=>{ quotesById[String(q.id)]=q; }); }catch(e){ quotesById={}; }
     // โหลดรายการในใบเสนอราคา (ราคาขายรายชิ้น) เพื่อคิดกำไรเฉพาะรายการที่ดึงมาทำ
     try{ const its=await getListItems(CONFIG.lists.quoteItems); quoteItemsByQuote={}; its.forEach(it=>{ const qid=String(it.QuoteID); (quoteItemsByQuote[qid]=quoteItemsByQuote[qid]||[]).push(it); }); }catch(e){ quoteItemsByQuote={}; }
+    await BasketPersistence.retry([_poBkKey('PurchaseBaskets'),_poBkKey('PurchaseBasketMap')],putSetting);
+    loadPoBaskets(); // Replace any empty basket cache initialized before remote data arrived.
     renderDash(); renderPurchases(); renderVendors();
     toast('Sync สำเร็จ','success');
     checkReminderEmails().catch(e=>console.warn('reminder mail',e.message));
@@ -183,18 +186,18 @@ function rowFor(p){
 let _poBaskets=null, _poBasketMap=null, _poActiveBasket='__none__', _poBasketView='', _poAssignId=null;
 const PO_BASKET_COLORS=['#d97706','#2563eb','#059669','#7c3aed','#db2777','#dc2626','#0d9488','#ca8a04'];
 function _getSettingVal(key){ const it=(_settingsCache||[]).find(i=>i.Title===key); return it&&it.Value?it.Value:''; }
-function _poBkUser(){ return ((currentUser && currentUser.email) || 'anon').toLowerCase(); }
+function _poBkUser(){ return ((currentUser && currentUser.email) || 'anon').trim().toLowerCase(); }
 function _poBkKey(base){ return base+'_'+_poBkUser(); }
 function loadPoBaskets(){
-  try{ _poBaskets=JSON.parse(_getSettingVal(_poBkKey('PurchaseBaskets'))||_getSettingVal('PurchaseBaskets')||'[]')||[]; }catch(e){ _poBaskets=[]; }
-  try{ _poBasketMap=JSON.parse(_getSettingVal(_poBkKey('PurchaseBasketMap'))||_getSettingVal('PurchaseBasketMap')||'{}')||{}; }catch(e){ _poBasketMap={}; }
+  try{ _poBaskets=JSON.parse(BasketPersistence.load(_poBkKey('PurchaseBaskets'),_getSettingVal(_poBkKey('PurchaseBaskets')),_getSettingVal('PurchaseBaskets')||'[]'))||[]; }catch(e){ _poBaskets=[]; }
+  try{ _poBasketMap=JSON.parse(BasketPersistence.load(_poBkKey('PurchaseBasketMap'),_getSettingVal(_poBkKey('PurchaseBasketMap')),_getSettingVal('PurchaseBasketMap')||'{}'))||{}; }catch(e){ _poBasketMap={}; }
 }
 function poBaskets(){ if(_poBaskets===null) loadPoBaskets(); return _poBaskets; }
 function poBasketMap(){ if(_poBasketMap===null) loadPoBaskets(); return _poBasketMap; }
 function poItemBaskets(id){ return poBasketMap()[String(id)]||[]; }
 function poBasketById(bid){ return poBaskets().find(b=>b.id===bid); }
-async function savePoBaskets(){ await putSetting(_poBkKey('PurchaseBaskets'), JSON.stringify(poBaskets())); }
-async function savePoBasketMap(){ await putSetting(_poBkKey('PurchaseBasketMap'), JSON.stringify(poBasketMap())); }
+async function savePoBaskets(){ await BasketPersistence.save(_poBkKey('PurchaseBaskets'), JSON.stringify(poBaskets()),putSetting); }
+async function savePoBasketMap(){ await BasketPersistence.save(_poBkKey('PurchaseBasketMap'), JSON.stringify(poBasketMap()),putSetting); }
 // ── tree helpers (sub-ตะกร้าไม่จำกัดชั้น) ──
 function poBasketChildren(pid){ return poBaskets().filter(b=>(b.parentId||'')===(pid||'')); }
 function poBasketDescendants(bid){ const out=[bid]; poBasketChildren(bid).forEach(c=>out.push(...poBasketDescendants(c.id))); return out; }
@@ -277,8 +280,8 @@ function renderPoBasketManage(){
   const rows=_poManageTreeRows('',0);
   list.innerHTML = rows || '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px">ยังไม่มีตะกร้า</div>';
 }
-async function poBasketRename(bid,name){ const b=poBasketById(bid); if(!b) return; b.name=(name||'').trim()||b.name; try{ await savePoBaskets(); }catch(e){} renderPoBasketBar(); }
-async function poBasketSetColor(bid,color){ const b=poBasketById(bid); if(!b) return; b.color=color; try{ await savePoBaskets(); }catch(e){} renderPoBasketBar(); renderPoBasketManage(); }
+async function poBasketRename(bid,name){ const b=poBasketById(bid); if(!b) return; b.name=(name||'').trim()||b.name; try{ await savePoBaskets(); }catch(e){toast('ยังบันทึกชื่อตะกร้าขึ้นระบบไม่ได้ เก็บรอส่งซ้ำบนเครื่องนี้แล้ว: '+e.message,'error');} renderPoBasketBar(); }
+async function poBasketSetColor(bid,color){ const b=poBasketById(bid); if(!b) return; b.color=color; try{ await savePoBaskets(); }catch(e){toast('ยังบันทึกสีตะกร้าขึ้นระบบไม่ได้ เก็บรอส่งซ้ำบนเครื่องนี้แล้ว: '+e.message,'error');} renderPoBasketBar(); renderPoBasketManage(); }
 async function poBasketDelete(bid){
   const b=poBasketById(bid); if(!b) return;
   const hasKids=poBasketHasChildren(bid);
