@@ -29,7 +29,7 @@ async function _call(payload, _attempt) {
   } catch (e) {
     // retry เฉพาะข้อผิดพลาดเครือข่าย/CORS/redirect (TypeError: Failed to fetch) หรือ HTTP ชั่วคราว
     const retriable = (e instanceof TypeError) || /Failed to fetch|HTTP 5|HTTP 429|NetworkError|Load failed/i.test(e.message || '');
-    if (retriable && _attempt < MAX) {
+    if (retriable && payload.action !== 'sendEmail' && _attempt < MAX) {
       await _sleep(300 * _attempt);           // backoff: 300, 600, 900ms
       return _call(payload, _attempt + 1);
     }
@@ -108,18 +108,21 @@ function _buildRawEmail(from, fromName, to, subject, body, attachments){
   }
   return _mimeB64(mime).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
-// ส่งอีเมล "ในนามผู้ที่ล็อกอินจริง ๆ" ผ่าน Gmail API (ไม่ผ่าน Apps Script)
+// Workflow mail uses the existing Apps Script sender; reply goes to the operator.
 async function _sendMail(to, subject, body, attachments) {
-  const _u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : null;
-  if (!_u || !_u.email) throw new Error('ยังไม่ได้เข้าสู่ระบบ');
-  const token = await getGmailToken();   // ขอสิทธิ์ gmail.send (consent ครั้งแรก)
-  const raw = _buildRawEmail(_u.email, _u.displayName || _u.email, to, subject, body, attachments);
-  const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-    method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw: raw })
-  });
-  if (!r.ok) throw new Error('ส่งอีเมลไม่สำเร็จ (Gmail ' + r.status + '): ' + await r.text());
-  return r.json();
+  const user = typeof currentUser !== 'undefined' ? currentUser : null;
+  try {
+    if (!user || !user.email) throw new Error('ยังไม่ได้เข้าสู่ระบบ');
+    const recipients = String(to || '').split(/[;,\n]+/).map(s => s.trim()).filter(Boolean);
+    if (!recipients.length || recipients.some(email => !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email))) throw new Error('กรุณาตรวจสอบอีเมลผู้รับ');
+    const files = (attachments || []).filter(a => a && (a.base64 || a.contentBytes)).map(a => ({name:a.name || 'attachment',contentType:a.contentType || 'application/octet-stream',base64:a.base64 || a.contentBytes}));
+    const response = await _call({action:'sendEmail',to:recipients.join(','),subject:subject || '',body:body || '',attachments:files,fromName:user.displayName || 'D On Net',replyTo:user.email});
+    if (!response || response.ok !== true) throw new Error('เซิร์ฟเวอร์ยังไม่ยืนยันการส่งอีเมล');
+    return response.result || {};
+  } catch (error) {
+    if (typeof toast === 'function') toast('อีเมลยังไม่สำเร็จ: ' + error.message + ' — ตรวจสอบสถานะก่อนส่งซ้ำ', 'error');
+    throw error;
+  }
 }
 async function _uploadFile(folder, fileName, mimeType, base64Data) {
   const d = await _call({ action: 'uploadFile', folder, fileName, mimeType, base64: base64Data });

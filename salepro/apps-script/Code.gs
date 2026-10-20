@@ -173,19 +173,22 @@ function deleteWhere(name, field, value) {
 }
 
 function sendEmail(req) {
+  var recipients = String(req.to || '').split(/[;,\n]+/).map(function (s) { return s.trim(); }).filter(Boolean);
+  if (!recipients.length || recipients.some(function (s) { return !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(s); })) throw new Error('อีเมลผู้รับไม่ถูกต้อง');
+  if (MailApp.getRemainingDailyQuota() < recipients.length) throw new Error('โควตาส่งอีเมลของ Apps Script ไม่เพียงพอ');
   var isHtml = /<[a-z][\s\S]*>/i.test(req.body || '');
   var opts = { name: req.fromName || 'SalePro' };        // ชื่อผู้ส่ง = ผู้ที่ล็อกอิน (ถ้าส่งมา)
   if (req.replyTo) opts.replyTo = req.replyTo;            // ตอบกลับไปหาผู้ที่ล็อกอินโดยตรง
   if (isHtml) opts.htmlBody = req.body;
-  var atts = (req.attachments || []).filter(function (a) { return a && a.base64; });
+  var atts = (req.attachments || []).filter(function (a) { return a && (a.base64 || a.contentBytes); });
   if (atts.length) {
     opts.attachments = atts.map(function (a) {
-      var bytes = Utilities.base64Decode(a.base64);
+      var bytes = Utilities.base64Decode(a.base64 || a.contentBytes);
       return Utilities.newBlob(bytes, a.contentType || 'application/octet-stream', a.name || 'attachment');
     });
   }
-  MailApp.sendEmail(req.to, req.subject || '', isHtml ? '' : (req.body || ''), opts);
-  return {};
+  MailApp.sendEmail(recipients.join(','), req.subject || '', isHtml ? 'เปิดอีเมลในโปรแกรมที่รองรับ HTML เพื่ออ่านรายละเอียด' : (req.body || ''), opts);
+  return { sent: true };
 }
 function uploadFile(req) {
   if (!UPLOAD_FOLDER_ID || UPLOAD_FOLDER_ID.indexOf('PASTE') === 0) throw new Error('ยังไม่ได้ตั้งค่า UPLOAD_FOLDER_ID');

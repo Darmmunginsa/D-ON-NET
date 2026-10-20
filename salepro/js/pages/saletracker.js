@@ -665,7 +665,7 @@ async function sendPORequest(){
   if(!reqDate){toast('กรุณาระบุวันที่ต้องการของ','error');return;}
   try{localStorage.setItem('po_recipients_'+(currentUser?.email||''),JSON.stringify(poRecipients));}catch(e){}
   try{
-    toast('กำลังเปิด Email...','info');
+    toast('กำลังส่ง Email...','info');
     const vendor=document.getElementById('po-vendor')?.value||'';
     const costCenter=document.getElementById('po-costcenter')?.value||'';
     const notes=document.getElementById('po-note')?.value||'';
@@ -684,8 +684,7 @@ async function sendPORequest(){
       '\n\n─────────────────────────────────\n'+
       'ส่งโดย: '+(currentUser?.displayName||'')+' | SalePro System'
     );
-    const mailtoUrl='mailto:'+valid.join(',')+'?subject='+subject+'&body='+body;
-    window.open(mailtoUrl,'_blank');
+    await apiPost('sendEmail', '_', null, {to:valid.join(','),subject:decodeURIComponent(subject),body:decodeURIComponent(body)});
     stDealData.notes=stDealData.notes||[];
     stDealData.notes.push({id:Date.now(),user:currentUser?.displayName||'User',text:'📦 ส่งคำขอจัดซื้อแล้ว → '+valid.join(', ')+'\nต้องการของภายใน: '+reqDate,ts:new Date().toISOString(),type:'procurement'});
     await saveSTDealData();
@@ -696,8 +695,8 @@ async function sendPORequest(){
     }catch(e2){console.warn('ProcurementEmails save failed:',e2.message);}
     switchSTTab('timeline',document.querySelector('.st-tab[data-tab="timeline"]'));
     renderSTTimeline();
-    toast('✅ เปิด Email client สำเร็จ — กรุณาส่ง Email จาก client','success');
-  }catch(e){toast('เปิด Email ไม่สำเร็จ: '+e.message,'error');}
+    toast('ส่ง Email คำขอจัดซื้อแล้ว','success');
+  }catch(e){toast('ส่ง Email ไม่สำเร็จ: '+e.message,'error');}
 }
 // ---- CLOSE DEAL ----
 
