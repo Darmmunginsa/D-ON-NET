@@ -863,7 +863,7 @@ const DEFAULT_TPL = {
   rfq:
 `เรียน คุณ{contact}
 
-ทาง iT Services สนใจสั่งซื้อสินค้า/บริการ และขอความอนุเคราะห์ใบเสนอราคาตามรายการดังนี้ครับ/ค่ะ
+ทาง D On Net สนใจสั่งซื้อสินค้า/บริการ และขอความอนุเคราะห์ใบเสนอราคาตามรายการดังนี้ครับ/ค่ะ
 
 {items}
 
@@ -876,7 +876,7 @@ const DEFAULT_TPL = {
   confirm:
 `เรียน คุณ{contact}
 
-ตามที่ได้เสนอราคามา ทาง iT Services ขอยืนยันการสั่งซื้อตามรายการดังนี้ครับ/ค่ะ
+ตามที่ได้เสนอราคามา ทาง D On Net ขอยืนยันการสั่งซื้อตามรายการดังนี้ครับ/ค่ะ
 
 {items}
 
@@ -889,7 +889,7 @@ const DEFAULT_TPL = {
   sendback:
 `เรียน คุณ{contact}
 
-ทาง iT Services ขอส่งเอกสารที่ลงนามเรียบร้อยแล้วกลับมา ตามรายการที่ตกลงสั่งซื้อครับ/ค่ะ
+ทาง D On Net ขอส่งเอกสารที่ลงนามเรียบร้อยแล้วกลับมา ตามรายการที่ตกลงสั่งซื้อครับ/ค่ะ
 
 {items}
 
@@ -1059,7 +1059,7 @@ function renderPOStage(){
   return head+cards;
 }
 // ── #4 พิมพ์ใบสั่งซื้อ (PO) ส่ง Vendor ──
-let COMPANY = { name:'บริษัท ไอที เซอร์วิสเซส จำกัด', nameEn:'IT SERVICES CO.,LTD.', address:'สำนักงานใหญ่ : 168/8 ถนนพัฒนาชนบท 3 แขวงคลองสองต้นนุ่น เขตลาดกระบัง กรุงเทพมหานคร 10520', taxId:'0105559006113', phone:'02-108-6113', fax:'02-108-6113', logo:'', stamp:'', approverSign:'' };
+let COMPANY = { name:'บริษัท ดี ออน เน็ต จำกัด', nameEn:'D ON NET CO.,LTD.', address:'สำนักงานใหญ่ : เลขที่ 78 หมู่ที่ 11 ตำบลผาเลือด อำเภอท่าปลา จังหวัดอุตรดิตถ์ 53190', taxId:'535569001005', phone:'091-5192945', fax:'-', logo:'', stamp:'', approverSign:'' };
 // โหลด/บันทึกตั้งค่าบริษัท (เก็บใน Settings JSON คีย์ POCompany — รูป base64)
 function loadPOCompany(){
   try{ const it=(_settingsCache||[]).find(i=>i.Title==='POCompany'); if(it&&it.Value){ const o=JSON.parse(it.Value)||{}; COMPANY=Object.assign(COMPANY,o); } }catch(e){}
