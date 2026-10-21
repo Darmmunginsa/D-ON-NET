@@ -991,8 +991,8 @@ function renderRFQ(){
   return subjectField()+`<div style="font-size:13px;margin-bottom:8px">เลือก Vendor ที่จะขอราคา (ดึงจากหน้า Vendor)</div>
     <div id="rfq-sel-chips" style="margin-bottom:8px">${selChips}</div>
     <div style="position:relative;max-width:360px;margin-bottom:6px">
-      <input id="rfq-vsearch" oninput="rfqFilterVendors(this.value)" onfocus="rfqFilterVendors(this.value)" autocomplete="off" placeholder="🔍 ค้นหา Vendor เพื่อเพิ่ม…" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:8px;font-size:13px;background:var(--card);color:var(--text)">
-      <div id="rfq-vresults" style="display:none;position:absolute;z-index:30;left:0;right:0;top:100%;margin-top:2px;max-height:220px;overflow:auto;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18)"></div>
+      <input id="rfq-vsearch" oninput="rfqFilterVendors(this.value)" onfocus="rfqFilterVendors(this.value)" autocomplete="off" placeholder="🔍 ค้นหา Vendor เพื่อเพิ่ม…" style="width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:8px;font-size:13px;background:var(--surface,#161b22);color:var(--text)">
+      <div id="rfq-vresults" style="display:none;position:absolute;z-index:2000;left:0;right:0;top:100%;margin-top:2px;max-height:220px;overflow:auto;background:var(--surface,#161b22);border:1px solid var(--border2);border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.45)"></div>
     </div>
     ${noMailWarn?'<div style="font-size:11px;color:var(--red);margin-bottom:8px">⚠ Vendor ที่มี ⚠ ยังไม่มีอีเมล — เพิ่มอีเมลที่หน้า Vendor ก่อนส่ง</div>':''}
     <div style="font-size:12px;color:var(--muted);margin:10px 0 6px">Tag Vendor ให้แต่ละรายการ (ไม่ tag = ขอทุกเจ้าที่เลือก)</div>
