@@ -7,7 +7,55 @@
 // เรียก Apps Script web app — ใช้ content-type text/plain เพื่อเลี่ยง CORS preflight
 // มี auto-retry กัน CORS/redirect ของ Apps Script หลุดเป็นครั้งคราว
 function _sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-async function _call(payload) { return GatewayClient.call(CONFIG.appsScriptUrl,payload); }
+
+// ── Save overlay (กัน user กดซ้ำ/เปลี่ยนหน้าระหว่างบันทึก) — โผล่อัตโนมัติทุกครั้งที่ "เขียนข้อมูล" ──
+let _saveN = 0, _saveHadErr = false, _saveEndT = null, _saveHideT = null;
+function _saveOverlayEl() {
+  let o = document.getElementById('save-ov');
+  if (!o) {
+    o = document.createElement('div'); o.id = 'save-ov';
+    o.style.cssText = 'position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;background:rgba(10,16,28,.45)';
+    o.innerHTML = '<div style="background:var(--card,#161f30);border:1px solid var(--border,#26324a);border-radius:14px;padding:20px 26px;min-width:250px;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.45)">'
+      + '<div id="save-ov-msg" style="color:var(--text,#e7ecf5);font-size:14px;font-weight:600;margin-bottom:12px">กำลังบันทึก…</div>'
+      + '<div style="height:7px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden"><div id="save-ov-bar" style="height:100%;width:40%;border-radius:4px;background:var(--accent2,#6aa6e0)"></div></div>'
+      + '<div id="save-ov-hint" style="color:var(--muted,#9aa6ba);font-size:11px;margin-top:10px">กรุณารอสักครู่ — อย่าปิดหรือเปลี่ยนหน้า</div></div>';
+    document.body.appendChild(o);
+    if (!document.getElementById('save-ov-style')) { const st = document.createElement('style'); st.id = 'save-ov-style'; st.textContent = '@keyframes saveslide{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}'; document.head.appendChild(st); }
+  }
+  return o;
+}
+function _showSaving() {
+  clearTimeout(_saveHideT); clearTimeout(_saveEndT);
+  const o = _saveOverlayEl();
+  const bar = document.getElementById('save-ov-bar'), msg = document.getElementById('save-ov-msg'), hint = document.getElementById('save-ov-hint');
+  if (bar) { bar.style.animation = 'saveslide 0.9s ease-in-out infinite'; bar.style.width = '40%'; bar.style.background = 'var(--accent2,#6aa6e0)'; }
+  if (msg) { msg.textContent = 'กำลังบันทึก…'; msg.style.color = 'var(--text,#e7ecf5)'; }
+  if (hint) hint.style.display = 'block';
+  o.style.display = 'flex';
+}
+function _finishSaving(ok) {
+  const o = document.getElementById('save-ov'); if (!o) return;
+  const bar = document.getElementById('save-ov-bar'), msg = document.getElementById('save-ov-msg'), hint = document.getElementById('save-ov-hint');
+  if (bar) { bar.style.animation = 'none'; bar.style.width = '100%'; bar.style.background = ok ? 'var(--green,#34d399)' : 'var(--red,#f87171)'; }
+  if (msg) { msg.textContent = ok ? 'บันทึกสำเร็จ ✓' : 'บันทึกไม่สำเร็จ ✕ — ลองใหม่'; msg.style.color = ok ? 'var(--green,#34d399)' : 'var(--red,#f87171)'; }
+  if (hint) hint.style.display = 'none';
+  _saveHideT = setTimeout(() => { o.style.display = 'none'; }, ok ? 650 : 1800);
+}
+function _saveStart() { _saveN++; _showSaving(); }
+function _saveEnd(ok) {
+  _saveN = Math.max(0, _saveN - 1);
+  if (!ok) _saveHadErr = true;
+  clearTimeout(_saveEndT);
+  _saveEndT = setTimeout(() => { if (_saveN === 0) { _finishSaving(!_saveHadErr); _saveHadErr = false; } }, 130);
+}
+
+async function _call(payload) {
+  const write = payload && payload.action && !['list','multiList','get'].includes(payload.action);
+  if (write) _saveStart();
+  let ok = false;
+  try { const r = await GatewayClient.call(CONFIG.appsScriptUrl, payload); ok = true; return r; }
+  finally { if (write) _saveEnd(ok); }
+}
 
 // แปลงชนิดข้อมูลตัวเลข/บูลีน ให้เก็บใน Sheet เป็นค่าที่ถูกต้อง
 // หมายเหตุ: ห้ามใส่ฟิลด์ที่เป็น "id อ้างอิง" (เช่น QuoteID) เพราะ Google version ใช้ UUID

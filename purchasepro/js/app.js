@@ -21,14 +21,23 @@ const STAGES = [
   { n:3, key:'quotes',    label:'รับราคา' },
   { n:4, key:'compare',   label:'เทียบราคา' },
   { n:5, key:'po',        label:'ออก PO' },
-  { n:6, key:'payment',   label:'จ่ายเงิน' },
-  { n:7, key:'shipping',  label:'ยืนยันส่ง' },
-  { n:8, key:'receive',   label:'รับของครบ' }
+  { n:6, key:'shipping',  label:'ยืนยันส่ง' },
+  { n:7, key:'receive',   label:'รับของครบ' },
+  { n:8, key:'payment',   label:'จ่ายเงิน' }     // จ่ายเงินท้ายสุด: รับของครบก่อนแล้วค่อยจ่าย
 ];
 const STAGE_BADGE = {
   1:['รับงาน','#8b949e'], 2:['ขอราคา','#f59e0b'], 3:['รับราคา','#f59e0b'], 4:['เทียบราคา','#a78bfa'],
-  5:['ออก PO','#4f8ef7'], 6:['จ่ายเงิน','#4f8ef7'], 7:['รอส่ง','#fbbf24'], 8:['รับครบ','#34d399']
+  5:['ออก PO','#4f8ef7'], 6:['รอส่ง','#fbbf24'], 7:['รับครบ','#2dd4bf'], 8:['จ่ายเงิน','#34d399']
 };
+// remap ลำดับขั้นเก่า → ใหม่ (เดิม 6=จ่ายเงิน,7=ส่ง,8=รับของ) → (ใหม่ 6=ส่ง,7=รับของ,8=จ่ายเงิน)
+const _STAGE_REMAP = { 6:8, 7:6, 8:7 };
+function _migStage(e){
+  if(!e || e.sv >= 2) return e;
+  if(e.stage && _STAGE_REMAP[e.stage]) e.stage = _STAGE_REMAP[e.stage];
+  if(e.maxStage && _STAGE_REMAP[e.maxStage]) e.maxStage = _STAGE_REMAP[e.maxStage];
+  e.sv = 2;
+  return e;
+}
 // สถานะย่อสำหรับ SalePro (mapping ขั้น → ข้อความ progress)
 const SALE_PROGRESS = {1:'ส่งจัดซื้อแล้ว',2:'กำลังขอราคา',3:'กำลังขอราคา',4:'กำลังเทียบราคา',5:'สั่งซื้อแล้ว',6:'สั่งซื้อแล้ว',7:'รอของ',8:'ของถึงแล้ว'};
 
@@ -70,7 +79,7 @@ async function syncAll(){
     const venItem = _settingsCache.find(i=>i.Title==='Vendors');
     vendorsData = (venItem&&venItem.Value)?(JSON.parse(venItem.Value)||[]):[];
     purchaseExt={};
-    _settingsCache.forEach(i=>{ if((i.Title||'').startsWith('Purchase_')){ try{ purchaseExt[i.Title.slice(9)]=JSON.parse(i.Value)||{}; }catch(e){} } });
+    _settingsCache.forEach(i=>{ if((i.Title||'').startsWith('Purchase_')){ try{ purchaseExt[i.Title.slice(9)]=_migStage(JSON.parse(i.Value)||{}); }catch(e){} } });
     await loadMailTemplates();
     loadPOCompany();   // ตั้งค่าบริษัท (โลโก้/ชื่อ/ที่อยู่) จาก Settings
     // โหลดใบเสนอราคา (ไซต์เดียวกัน) เพื่อเทียบกำไร
@@ -89,7 +98,7 @@ async function syncAll(){
 function getPurchases(){
   return procurements.map(p=>{
     const ext = purchaseExt[String(p.id)] || {};
-    return Object.assign({}, p, { stage: ext.stage||1, stageData: ext.stageData||{}, history: ext.history||[], closed: !!ext.closed, assetType: ext.assetType||'sale', assetCategory: ext.assetCategory||'' });
+    return Object.assign({}, p, { stage: ext.stage||1, maxStage: Math.max(ext.maxStage||0, ext.stage||1), stageData: ext.stageData||{}, history: ext.history||[], closed: !!ext.closed, assetType: ext.assetType||'sale', assetCategory: ext.assetCategory||'' });
   });
 }
 function getVendorById(id){ return vendorsData.find(v=>String(v.id)===String(id))||null; }
@@ -178,7 +187,7 @@ function rowFor(p){
   return `<tr style="cursor:pointer" onclick="openPO('${p.id}')">
     <td style="font-family:var(--mono);font-size:12px">${esc(p.quoteTitle||'-')}</td>
     <td>${esc(p.client||'-')}</td><td>${esc(p.vendorName||'-')}</td>
-    <td style="font-family:var(--mono)">${fmt(poValue(p))}</td><td>${stageBadge(p.stage)}</td></tr>`;
+    <td style="font-family:var(--mono)">${fmt(poValue(p))}</td><td>${stageBadge(p.maxStage||p.stage)}</td></tr>`;
 }
 // ===== ตะกร้า (Baskets) — จัดกลุ่มงานจัดซื้อ (เก็บใน Settings JSON) =====
 //   PurchaseBaskets   = [{id,name,color}]
@@ -317,7 +326,7 @@ function renderPurchases(){
       <td>${esc(p.client||'-')}</td><td>${esc(p.vendorName||'-')}</td>
       <td style="color:var(--muted)">${(p.items||[]).length} รายการ</td>
       <td style="font-family:var(--mono)">${fmt(poValue(p))}</td>
-      <td>${p.closed?'<span class="badge" style="background:#34d39922;color:var(--green)">✓ ปิดงานแล้ว</span>':stageBadge(p.stage)}</td>
+      <td>${p.closed?'<span class="badge" style="background:#34d39922;color:var(--green)">✓ ปิดงานแล้ว</span>':stageBadge(p.maxStage||p.stage)}</td>
       <td style="white-space:nowrap"><div style="display:flex;align-items:center;justify-content:flex-end;gap:6px"><button class="btn btn-sm" onclick="openPoBasketAssign('${p.id}')" title="จัดเข้าตะกร้า" style="display:inline-flex;align-items:center;justify-content:center;padding:6px 8px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg></button>${p.closed?`<button class="btn btn-sm" onclick="openPO('${p.id}',true)">📖 ประวัติ</button>`:`<button class="btn btn-sm" onclick="openPO('${p.id}')">เปิด</button>`}</div></td>
     </tr>`).join('') : '<tr><td colspan=7 style="text-align:center;padding:28px;color:var(--muted)">ยังไม่มีงานจัดซื้อในมุมมองนี้</td></tr>';
 }
@@ -408,7 +417,7 @@ async function saveNewPurchase(){
     await putSetting('Procurements', JSON.stringify(procurements));
     // ตั้งประเภทการซื้อไว้ใน Purchase_<id>
     const at=document.getElementById('np-assettype').value||'asset';
-    purchaseExt[String(id)]={stage:1,closed:false,assetType:at,assetCategory:'',stageData:{},history:[]};
+    purchaseExt[String(id)]={sv:2,stage:1,maxStage:1,closed:false,assetType:at,assetCategory:'',stageData:{},history:[]};
     await putSetting('Purchase_'+id, JSON.stringify(purchaseExt[String(id)]));
     closeModal('newpo-modal');
     renderDash(); renderPurchases();
@@ -499,10 +508,14 @@ function _lockedNotice(){
 }
 function renderStepper(){
   const locked=poStagesLocked();
+  const cur=editingPO.stage, mx=Math.max(editingPO.maxStage||cur, cur);
+  const reviewing = cur < mx;   // กำลังย้อนดูขั้นก่อนหน้า (ขั้นจริงไปถึง mx แล้ว)
   document.getElementById('pom-stepper').innerHTML=STAGES.map(s=>{
-    const cls=s.n<editingPO.stage?'done':(s.n===editingPO.stage?'current':'');
+    const cls = (s.n===cur) ? 'current' : (s.n<=mx ? 'done' : '');
     const lk=(locked && s.n>=PO_LOCK_FROM_STAGE)?' 🔒':'';
-    return `<div class="step ${cls}" onclick="gotoStage(${s.n})" title="${lk?'ล็อก — รอรับ PO ลูกค้า':''}"><span class="sn">${s.n}</span>${s.label}${lk}</div>`;
+    const rvStyle = (reviewing && s.n===cur) ? ' style="outline:2px dashed #f59e0b;outline-offset:1px;border-radius:8px"' : '';
+    const eye = (reviewing && s.n===cur) ? ' 👁' : '';
+    return `<div class="step ${cls}"${rvStyle} onclick="gotoStage(${s.n})" title="${reviewing&&s.n===cur?'กำลังย้อนดู — ขั้นค้างล่าสุดคือขั้นที่ '+mx:(lk?'ล็อก — รอรับ PO ลูกค้า':'')}"><span class="sn">${s.n}</span>${s.label}${eye}${lk}</div>`;
   }).join('');
 }
 // ปิดงานได้เมื่อขั้น 6-7-8 สมบูรณ์ทุก Vendor (จ่ายเงิน/ส่ง/รับของ)
@@ -594,6 +607,7 @@ async function moveStage(d){
     const el=document.getElementById('f-subject'); if(el){ el.style.borderColor='var(--red)'; el.focus(); }
     return;
   }
+  if(d>0 && editingPO.stage===3 && !_rfqPricesOk()){ toast('กรุณากรอกราคาที่ได้จาก Vendor ให้ครบทุกชิ้นก่อนไปขั้นเทียบราคา','error'); return; }
   const n=Math.max(1,Math.min(8,editingPO.stage+d));
   if(d>0 && !await canEnterPOStage(n)) return;
   editingPO.stage=n; renderStepper(); renderStageBody(); renderFooter(); if(d>0) savePurchase();
@@ -633,11 +647,11 @@ function renderStageBody(){
   } else if(st===5){
     body=renderPOStage();
   } else if(st===6){
-    body=renderPayStage();
-  } else if(st===7){
     body=renderShipStage();
-  } else if(st===8){
+  } else if(st===7){
     body=renderRecvStage();
+  } else if(st===8){
+    body=renderPayStage();
   }
   if(st>=PO_LOCK_FROM_STAGE && poStagesLocked()) body=_lockedNotice();   // ล็อกขั้น 5-8 จนกว่าจะรับ PO ลูกค้า
   document.getElementById('pom-stagebody').innerHTML=body;
@@ -713,6 +727,7 @@ function renderQuotesStage(){
 }
 
 function vendorItemPrice(vid,idx){ return +quoteFor(vid).prices[idx]||0; }
+function _rfqPricesOk(){ const r=rfqData(); if(!r.vendorIds || !r.vendorIds.length) return false; return r.vendorIds.every(vid=>{ const its=itemsForVendor(vid); if(!its.length) return true; const q=quoteFor(vid); return its.every(({idx})=>(+q.prices[idx]||0)>0); }); }
 function setCompareMode(m){ sd().compareMode=m; renderStageBody(); }
 function renderCompareStage(){
   const r=rfqData();
@@ -1211,6 +1226,8 @@ function addPOManualRow(vid,type){
 function delPOManualRow(vid,i){ poManualRows(vid).splice(i,1); _poRefresh(vid); if(typeof savePurchase==='function')savePurchase(); }
 function movePOManualRow(vid,i,dir){ const a=poManualRows(vid); const j=i+dir; if(j<0||j>=a.length)return; const t=a[i]; a[i]=a[j]; a[j]=t; _poRefresh(vid); if(typeof savePurchase==='function')savePurchase(); }
 function setPOManualAlign(vid,i,a){ const rows=poManualRows(vid); if(rows[i])rows[i].align=a; _poRefresh(vid); if(typeof savePurchase==='function')savePurchase(); }
+// ปุ่ม × : ตั้งช่องนั้นให้ว่าง (ช่องว่าง 1 ตัว = แสดงว่างในเอกสาร)
+function setPOManualBlank(vid,i,field){ const rows=poManualRows(vid); if(rows[i])rows[i][field]=' '; _poRefresh(vid); if(typeof savePurchase==='function')savePurchase(); }
 let _poManT=null;
 function setPOManual(vid,i,field,val){
   const a=poManualRows(vid); if(a[i])a[i][field]=val;
@@ -1378,14 +1395,17 @@ function buildPOHtml(vid){
   const note=(vd.printNote!=null?vd.printNote:((editingPO&&editingPO.note)||''));
   // คอลัมน์ที่แสดง (toggle/ปรับความกว้างได้จากพรีวิว)
   const cols=poVisCols(vid), nc=cols.length;
+  // แสดงค่าตัวเลข → จัดรูปแบบเงิน; ข้อความ → แสดงตามจริง; ว่าง → ว่าง (ไม่บังคับคำนวณ)
+  const _cn = v => v!=='' && v!=null && !isNaN(parseFloat(v)) && isFinite(v);
+  const numCell = v => (v===''||v==null) ? '' : (_cn(v) ? fmt2(parseFloat(v)) : esc(String(v)));
   const rowCells=(d)=> cols.map((col,ci)=>{ const bd=(ci===nc-1)?'':cB;
     if(col.k==='name') return '<td style="padding:5px 10px;word-wrap:break-word;overflow-wrap:break-word;'+bd+'"><div style="font-weight:600">'+esc(d.name||'')+'</div>'+(d.desc?'<div style="font-size:10px;color:#555;margin-top:2px;white-space:pre-line;line-height:1.5">'+esc(d.desc)+'</div>':'')+'</td>';
     if(col.k==='pn') return '<td style="padding:5px 8px;text-align:center;font-family:Tahoma,sans-serif;font-size:10px;color:#444;word-wrap:break-word;overflow-wrap:break-word;'+bd+'">'+esc(d.pn||'')+'</td>';
     if(col.k==='seq') return '<td style="padding:5px 6px;text-align:center;'+bd+'">'+esc(d.seq!=null?String(d.seq):'')+'</td>';
     if(col.k==='qty') return '<td style="padding:5px 8px;text-align:center;'+bd+'">'+esc(d.qty!=null?String(d.qty):'')+'</td>';
     if(col.k==='unit') return '<td style="padding:5px 8px;text-align:center;'+bd+'">'+esc(d.unit||'')+'</td>';
-    if(col.k==='price') return '<td style="padding:5px 10px;text-align:right;'+bd+'">'+((d.price!==''&&d.price!=null)?fmt2(+d.price||0):'')+'</td>';
-    if(col.k==='amt') return '<td style="padding:5px 10px;text-align:right;'+bd+'">'+((d.amt!==''&&d.amt!=null)?fmt2(+d.amt||0):'')+'</td>';
+    if(col.k==='price') return '<td style="padding:5px 10px;text-align:right;'+bd+'">'+numCell(d.price)+'</td>';
+    if(col.k==='amt') return '<td style="padding:5px 10px;text-align:right;'+bd+'">'+numCell(d.amt)+'</td>';
     return '<td style="'+bd+'"></td>'; }).join('');
   const itemRow=(rec,i)=>{ const it=rec.it, price=vendorItemPrice(vid,rec.idx), amt=(+it.qty||0)*price;
     return '<tr style="vertical-align:top">'+rowCells({seq:i+1,pn:it.pn||it.partNo||it.PartNumber||'',name:it.name||'-',desc:it.desc||it.Description||'',qty:(it.qty||1),unit:it.unit||'',price:price,amt:amt})+'</tr>'; };
@@ -1394,8 +1414,10 @@ function buildPOHtml(vid){
     if(t==='group'){ const al=row.align==='center'?'center':(row.align==='right'?'right':'left');
       return '<tr><td colspan="'+nc+'" style="padding:6px 10px;font-weight:700;color:'+NAVY+';background:'+NAVY+'0d;text-align:'+al+'">'+esc(row.name||'')+'</td></tr>'; }
     if(t==='note'){ return '<tr><td colspan="'+nc+'" style="padding:5px 10px;white-space:pre-line;line-height:1.5;color:#333">'+(row.name?'<b>'+esc(row.name)+'</b> ':'')+esc(row.desc||'')+'</td></tr>'; }
-    _mno++; const amt=(row.amt!==''&&row.amt!=null)?(+row.amt||0):'';
-    return '<tr style="vertical-align:top">'+rowCells({seq:_mno,pn:row.pn||'',name:row.name||'',desc:row.desc||'',qty:(row.qty!=null?row.qty:''),unit:row.unit||'',price:((row.price!==''&&row.price!=null)?row.price:''),amt:amt})+'</tr>'; };
+    _mno++;
+    // ลำดับ: กรอกเอง (รวมช่องว่าง) = ตามนั้น; ไม่กรอก = อัตโนมัติ — ส่งค่าดิบ ราคา/จำนวนเงิน ให้ numCell จัดการ (ไม่บังคับเป็น 0.00)
+    const _seq = (row.no!=null && String(row.no)!=='') ? row.no : String(_mno);
+    return '<tr style="vertical-align:top">'+rowCells({seq:_seq,pn:row.pn||'',name:row.name||'',desc:row.desc||'',qty:(row.qty!=null?row.qty:''),unit:row.unit||'',price:(row.price!=null?row.price:''),amt:(row.amt!=null?row.amt:'')})+'</tr>'; };
   const blankRow='<tr>'+cols.map((col,ci)=>'<td style="'+(ci===0?'padding:9px 6px;':'')+((ci===nc-1)?'':cB)+'">'+(ci===0?'&nbsp;':'')+'</td>').join('')+'</tr>';
   // แถวยืดเต็มพื้นที่ (height:100%) เส้นคอลัมน์ต่อเนื่องถึงล่าง → ตารางแตะช่องหมายเหตุ
   const fillerRow='<tr style="height:100%">'+cols.map((col,ci)=>'<td style="'+((ci===nc-1)?'':cB)+'">'+(ci===0?'&nbsp;':'')+'</td>').join('')+'</tr>';
@@ -1554,6 +1576,8 @@ function renderPOEditor(vid){
     const moveBtns=function(i){ return '<button onclick="movePOManualRow(\''+vid+'\','+i+',-1)" title="ย้ายขึ้น" '+(i===0?'disabled':'')+' style="border:none;background:none;cursor:pointer;color:'+(i===0?'#cbd5e1':'#64748b')+';font-size:12px;padding:0 1px">▲</button>'
       +'<button onclick="movePOManualRow(\''+vid+'\','+i+',1)" title="ย้ายลง" '+(i===n-1?'disabled':'')+' style="border:none;background:none;cursor:pointer;color:'+(i===n-1?'#cbd5e1':'#64748b')+';font-size:12px;padding:0 1px">▼</button>'; };
     const delBtn=function(i){ return '<button onclick="delPOManualRow(\''+vid+'\','+i+')" title="ลบแถว" style="border:none;background:none;color:#b91c1c;cursor:pointer;font-size:13px;padding:0 2px">✕</button>'; };
+    const bx=function(i,field){ return '<button type="button" onclick="setPOManualBlank(\''+vid+'\','+i+',\''+field+'\')" title="ล้างให้ว่าง" style="position:absolute;top:50%;right:2px;transform:translateY(-50%);width:13px;height:13px;border-radius:50%;border:none;background:#e2e8f0;color:#64748b;font-size:9px;line-height:13px;text-align:center;cursor:pointer;padding:0;z-index:2">×</button>'; };
+    const wx=function(inner,i,field,wrapStyle){ return '<span style="position:relative;display:inline-flex;align-items:center;'+(wrapStyle||'')+'">'+inner+bx(i,field)+'</span>'; };
     h+=rows.map(function(r,i){ const t=r.t||'item';
       if(t==='group'){ const al=r.align||'left'; const ab=function(a,lab){ return '<button onclick="setPOManualAlign(\''+vid+'\','+i+',\''+a+'\')" title="จัด'+lab+'" style="border:none;background:'+(al===a?'#dbeafe':'none')+';color:'+(al===a?'#1d4ed8':'#94a3b8')+';cursor:pointer;font-size:11px;font-weight:700;padding:1px 5px;border-radius:3px">'+lab+'</button>'; };
         return '<div style="border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:6px;margin-bottom:6px">'
@@ -1568,16 +1592,17 @@ function renderPOEditor(vid){
           +'</div>'; }
       // item
       return '<div style="border:1px solid #e2e8f0;border-radius:6px;padding:6px;margin-bottom:6px">'
-      +'<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px"><span style="font-size:10px;color:#94a3b8;min-width:14px">'+(i+1)+'.</span>'
-      +'<input value="'+esc(r.name||'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'name\',this.value)" placeholder="รายการ" style="flex:1;min-width:0;font-size:11px;padding:3px 5px">'
+      +'<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">'
+      +wx('<input value="'+esc(r.no!=null?r.no:'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'no\',this.value)" placeholder="'+(i+1)+'" title="ลำดับ — เว้นว่าง = อัตโนมัติ" style="width:46px;font-size:10px;padding:3px 16px 3px 3px;text-align:center">', i, 'no')
+      +wx('<input value="'+esc(r.name||'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'name\',this.value)" placeholder="รายการ" style="width:100%;font-size:11px;padding:3px 16px 3px 5px">', i, 'name', 'flex:1;min-width:0')
       +moveBtns(i)+delBtn(i)+'</div>'
-      +'<input value="'+esc(r.pn||'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'pn\',this.value)" placeholder="รหัสสินค้า / Part No. (ถ้ามี)" style="width:100%;margin-bottom:4px;font-size:10.5px;padding:3px 5px;font-family:monospace">'
+      +wx('<input value="'+esc(r.pn||'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'pn\',this.value)" placeholder="รหัสสินค้า / Part No. (ถ้ามี)" style="width:100%;font-size:10.5px;padding:3px 16px 3px 5px;font-family:monospace">', i, 'pn', 'width:100%;margin-bottom:4px')
       +'<textarea oninput="setPOManual(\''+vid+'\','+i+',\'desc\',this.value)" placeholder="รายละเอียดเพิ่มเติม (Detail)..." style="width:100%;margin-bottom:4px;min-height:34px;font-size:10.5px;line-height:1.5;padding:3px 5px;color:#475569">'+esc(r.desc||'')+'</textarea>'
       +'<div style="display:flex;gap:4px">'
-      +'<input value="'+esc(r.qty!=null?r.qty:'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'qty\',this.value)" placeholder="จำนวน" style="width:46px;font-size:11px;padding:3px 4px;text-align:center">'
-      +'<input value="'+esc(r.unit||'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'unit\',this.value)" placeholder="หน่วย" style="width:50px;font-size:11px;padding:3px 4px;text-align:center">'
-      +'<input value="'+esc(r.price!=null?r.price:'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'price\',this.value)" placeholder="ราคา/หน่วย" style="flex:1;min-width:0;font-size:11px;padding:3px 4px;text-align:right">'
-      +'<input value="'+esc(r.amt!=null?r.amt:'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'amt\',this.value)" placeholder="จำนวนเงิน" style="flex:1;min-width:0;font-size:11px;padding:3px 4px;text-align:right">'
+      +wx('<input value="'+esc(r.qty!=null?r.qty:'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'qty\',this.value)" placeholder="จำนวน" style="width:100%;font-size:11px;padding:3px 16px 3px 4px;text-align:center">', i, 'qty', 'width:58px')
+      +wx('<input value="'+esc(r.unit||'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'unit\',this.value)" placeholder="หน่วย" style="width:100%;font-size:11px;padding:3px 16px 3px 4px;text-align:center">', i, 'unit', 'width:60px')
+      +wx('<input value="'+esc(r.price!=null?r.price:'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'price\',this.value)" placeholder="ราคา/หน่วย" style="width:100%;font-size:11px;padding:3px 16px 3px 4px;text-align:right">', i, 'price', 'flex:1;min-width:0')
+      +wx('<input value="'+esc(r.amt!=null?r.amt:'')+'" oninput="setPOManual(\''+vid+'\','+i+',\'amt\',this.value)" placeholder="จำนวนเงิน" style="width:100%;font-size:11px;padding:3px 16px 3px 4px;text-align:right">', i, 'amt', 'flex:1;min-width:0')
       +'</div></div>'; }).join('');
     h+='<div style="display:flex;gap:4px;margin-bottom:12px">'
       +'<button onclick="addPOManualRow(\''+vid+'\',\'item\')" style="flex:1;font-size:11px;padding:6px 4px;border:1px dashed #2563a8;background:none;color:#2563a8;border-radius:6px;cursor:pointer">+ รายการ</button>'
@@ -1722,9 +1747,19 @@ async function attachStageDocFile(grp,vid,id,input){ try{ const r=await uploadFi
 function removeStageDoc(grp,vid,id){ const g=_grpFor(grp,vid); g.docs=g.docs.filter(x=>x.id!==id); renderStageBody(); }
 function shipInput(vid,f,val){ shipFor(vid)[f]=val; }
 function recvInput(vid,f,val){ recvFor(vid)[f]=val; }
+function _recvOutTxt(out){ return out>0?('ขาด '+out) : (out<0?('เกิน '+(-out)):'✓ ครบ'); }
+function _recvOutColor(out){ return out>0?'var(--amber)' : (out<0?'var(--red)':'var(--green)'); }
 function recvQtySet(vid,idx,val){ const p=recvFor(vid); p.recvQty=p.recvQty||{}; p.recvQty[idx]=(val===''?'':+val);
-  const its=poItemsForVendor(vid); const done=its.length>0 && its.every(({it,idx})=>(+p.recvQty[idx]||0)>=(+it.qty||0)); p.status=done?'รับครบ':'รับบางส่วน';
-  renderStageBody();
+  const its=poItemsForVendor(vid);
+  // อัปเดตเฉพาะช่อง "คงเหลือ" + ป้ายสถานะ Vendor (ไม่ re-render ทั้งหน้า → โฟกัสไม่หลุด)
+  const item=its.find(x=>x.idx===idx);
+  if(item){ const ord=+item.it.qty||0; const out=ord-(+p.recvQty[idx]||0);
+    const cell=document.getElementById('recv-out-'+vid+'-'+idx);
+    if(cell){ cell.textContent=_recvOutTxt(out); cell.style.color=_recvOutColor(out); } }
+  const done=its.length>0 && its.every(({it,idx})=>(+p.recvQty[idx]||0)>=(+it.qty||0)); p.status=done?'รับครบ':'รับบางส่วน';
+  const stEl=document.getElementById('recv-st-'+vid);
+  if(stEl){ stEl.textContent=done?'✓ รับครบ':'⏳ รับบางส่วน'; stEl.style.color=done?'var(--green)':'var(--amber)'; }
+  if(typeof renderFooter==='function') renderFooter();
 }
 
 function renderShipStage(){
@@ -1751,9 +1786,9 @@ function renderRecvStage(){
     const its=poItemsForVendor(vid);
     let allDone=its.length>0;
     const itemRows=its.map(({it,idx})=>{ const ord=+it.qty||0; const got=(p.recvQty[idx]==null?'':+p.recvQty[idx]); const out=ord-(+got||0); if(out>0)allDone=false;
-      return `<tr><td>${esc(it.name)}</td><td style="text-align:center">${ord} ${esc(it.unit||'')}</td><td style="text-align:center"><input type="number" min="0" max="${ord}" value="${got}" placeholder="${ord}" oninput="recvQtySet('${vid}',${idx},this.value)" style="max-width:70px;text-align:center;background:var(--surface);border:1px solid var(--border2);border-radius:5px;padding:3px 5px;color:var(--text)"></td><td style="text-align:center;color:${out>0?'var(--amber)':'var(--green)'}">${out>0?'ขาด '+out:'✓ ครบ'}</td></tr>`;
+      return `<tr><td>${esc(it.name)}</td><td style="text-align:center">${ord} ${esc(it.unit||'')}</td><td style="text-align:center"><input type="number" min="0" value="${got}" placeholder="${ord}" oninput="recvQtySet('${vid}',${idx},this.value)" style="max-width:70px;text-align:center;background:var(--surface);border:1px solid var(--border2);border-radius:5px;padding:3px 5px;color:var(--text)"></td><td id="recv-out-${vid}-${idx}" style="text-align:center;color:${_recvOutColor(out)}">${_recvOutTxt(out)}</td></tr>`;
     }).join('');
-    return `<div class="card" style="margin-bottom:14px"><div class="card-head">🏢 ${esc(v?v.name:'?')}<span style="margin-left:auto;font-size:11px;color:${allDone?'var(--green)':'var(--amber)'}">${allDone?'✓ รับครบ':'⏳ รับบางส่วน'}</span></div>
+    return `<div class="card" style="margin-bottom:14px"><div class="card-head">🏢 ${esc(v?v.name:'?')}<span id="recv-st-${vid}" style="margin-left:auto;font-size:11px;color:${allDone?'var(--green)':'var(--amber)'}">${allDone?'✓ รับครบ':'⏳ รับบางส่วน'}</span></div>
       <div style="padding:12px 14px">
       <table style="margin-bottom:10px"><thead><tr><th>รายการ</th><th style="text-align:center">สั่ง</th><th style="text-align:center">รับจริง</th><th style="text-align:center">คงเหลือ</th></tr></thead><tbody>${itemRows||'<tr><td colspan=4 style="text-align:center;color:var(--muted);padding:10px">—</td></tr>'}</tbody></table>
       <div class="form-grid">
@@ -1816,9 +1851,10 @@ async function savePurchase(){
   editingPO.history=editingPO.history||[];
   editingPO.history.push({ts:new Date().toISOString(),stage:editingPO.stage,by:currentUser?.displayName||currentUser?.email||''});
   try{
-    await putSetting('Purchase_'+editingPO.id, JSON.stringify({stage:editingPO.stage,closed:!!editingPO.closed,assetType:editingPO.assetType||'sale',assetCategory:editingPO.assetCategory||'',stageData:editingPO.stageData,history:editingPO.history.slice(-50)}));
+    editingPO.maxStage=Math.max(editingPO.maxStage||0, editingPO.stage||1);
+    await putSetting('Purchase_'+editingPO.id, JSON.stringify({sv:2,stage:editingPO.stage,maxStage:editingPO.maxStage,closed:!!editingPO.closed,assetType:editingPO.assetType||'sale',assetCategory:editingPO.assetCategory||'',stageData:editingPO.stageData,history:editingPO.history.slice(-50)}));
     // ส่ง progress ย่อให้ SalePro อ่าน (อิง quoteId)
-    if(editingPO.quoteId!=null){ await putSetting('PurchaseStatus_'+editingPO.quoteId, JSON.stringify({stage:editingPO.stage,text:SALE_PROGRESS[editingPO.stage]||'',vendorName:editingPO.vendorName||'',updatedAt:new Date().toISOString()})); }
+    if(editingPO.quoteId!=null){ await putSetting('PurchaseStatus_'+editingPO.quoteId, JSON.stringify({stage:editingPO.maxStage,text:SALE_PROGRESS[editingPO.maxStage]||'',vendorName:editingPO.vendorName||'',updatedAt:new Date().toISOString()})); }
     // ส่งราคาต้นทุนรายชิ้น (ที่จัดซื้อได้) กลับให้ SalePro โชว์อัตโนมัติ
     try{ await publishItemCosts(); }catch(e){ console.warn('publishItemCosts',e.message); }
     purchaseExt[String(editingPO.id)]={stage:editingPO.stage,closed:!!editingPO.closed,assetType:editingPO.assetType||'sale',assetCategory:editingPO.assetCategory||'',stageData:editingPO.stageData,history:editingPO.history};
