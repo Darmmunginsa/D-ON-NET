@@ -1061,18 +1061,50 @@ function renderPOStage(){
 // ── #4 พิมพ์ใบสั่งซื้อ (PO) ส่ง Vendor ──
 let COMPANY = { name:'บริษัท ดี ออน เน็ต จำกัด', nameEn:'D ON NET CO.,LTD.', address:'สำนักงานใหญ่ : เลขที่ 78 หมู่ที่ 11 ตำบลผาเลือด อำเภอท่าปลา จังหวัดอุตรดิตถ์ 53190', taxId:'535569001005', phone:'091-5192945', fax:'-', logo:'', stamp:'', approverSign:'' };
 // โหลด/บันทึกตั้งค่าบริษัท (เก็บใน Settings JSON คีย์ POCompany — รูป base64)
+function decodePOCompany(value,settings){
+  const company=JSON.parse(value)||{};
+  for(const key of ['logo','stamp','approverSign']){
+    const ref=company[key];
+    if(!ref || typeof ref!=='object')continue;
+    if(!Array.isArray(ref.parts))throw new Error('ข้อมูลรูปภาพไม่ครบ');
+    company[key]=ref.parts.map(title=>{
+      const part=settings.find(row=>row.Title===title);
+      if(!part || typeof part.Value!=='string')throw new Error('ข้อมูลรูปภาพไม่ครบ');
+      return part.Value;
+    }).join('');
+  }
+  return company;
+}
+async function persistPOCompany(company,write){
+  const record=Object.assign({},company);
+  const version=Date.now().toString(36)+'_'+Math.random().toString(36).slice(2);
+  for(const key of ['logo','stamp','approverSign']){
+    const image=record[key]||'';
+    if(image.length<=12000)continue;
+    const parts=[];
+    for(let offset=0;offset<image.length;offset+=40000){
+      const title='POImage_'+version+'_'+key+'_'+parts.length;
+      await write(title,image.slice(offset,offset+40000));
+      parts.push(title);
+    }
+    record[key]={parts};
+  }
+  // Publish references only after every image part has been saved.
+  await write('POCompany',JSON.stringify(record));
+}
 function loadPOCompany(){
-  try{ const it=(_settingsCache||[]).find(i=>i.Title==='POCompany'); if(it&&it.Value){ const o=JSON.parse(it.Value)||{}; COMPANY=Object.assign(COMPANY,o); } }catch(e){}
+  try{ const it=(_settingsCache||[]).find(i=>i.Title==='POCompany'); if(it&&it.Value) COMPANY=Object.assign(COMPANY,decodePOCompany(it.Value,_settingsCache)); }
+  catch(e){ toast('โหลดรูปบริษัทไม่สำเร็จ: '+e.message,'error'); }
 }
 // รูป 3 ชนิด: logo / stamp (ตราประทับ) / sign (ลายเซนผู้อนุมัติ → COMPANY.approverSign)
 const _POIMG={ logo:{key:'logo',ph:'คลิกเพื่ออัปโหลดโลโก้'}, stamp:{key:'stamp',ph:'คลิกเพื่ออัปโหลดตราประทับ'}, sign:{key:'approverSign',ph:'คลิกเพื่ออัปโหลดลายเซน'} };
 let _pendingPOImg={};
-function _poImgPrev(type){ const m=_POIMG[type]; const p=document.getElementById('co-'+type+'-preview'); if(!p)return; const src=_pendingPOImg[type]||COMPANY[m.key]||''; p.innerHTML = src ? '<img src="'+src+'" style="max-width:100%;max-height:100%;object-fit:contain">' : '<span style="font-size:12px;color:var(--muted)">'+m.ph+'</span>'; }
+function _poImgPrev(type){ const m=_POIMG[type]; const p=document.getElementById('co-'+type+'-preview'); if(!p)return; const src=Object.prototype.hasOwnProperty.call(_pendingPOImg,type)?_pendingPOImg[type]:(COMPANY[m.key]||''); p.innerHTML = src ? '<img src="'+src+'" style="max-width:100%;max-height:100%;object-fit:contain">' : '<span style="font-size:12px;color:var(--muted)">'+m.ph+'</span>'; }
 function previewPOImage(input,type){
   const file=input.files&&input.files[0]; if(!file)return;
   const r=new FileReader(); r.onload=e=>{ _pendingPOImg[type]=e.target.result; _poImgPrev(type); }; r.readAsDataURL(file);
 }
-function clearPOImage(type){ _pendingPOImg[type]=''; COMPANY[_POIMG[type].key]=''; _poImgPrev(type); }
+function clearPOImage(type){ _pendingPOImg[type]=''; _poImgPrev(type); }
 function renderCompanyForm(){
   const g=(id,v)=>{ const el=document.getElementById(id); if(el)el.value=v==null?'':v; };
   g('co-name',COMPANY.name); g('co-nameen',COMPANY.nameEn); g('co-address',COMPANY.address);
@@ -1081,12 +1113,14 @@ function renderCompanyForm(){
 }
 async function saveCompanySettings(){
   const g=id=>document.getElementById(id)?document.getElementById(id).value.trim():'';
-  Object.keys(_POIMG).forEach(t=>{ if(_pendingPOImg[t]) COMPANY[_POIMG[t].key]=_pendingPOImg[t]; });
-  COMPANY.name=g('co-name'); COMPANY.nameEn=g('co-nameen'); COMPANY.address=g('co-address');
-  COMPANY.phone=g('co-phone'); COMPANY.fax=g('co-fax'); COMPANY.taxId=g('co-taxid');
+  const next=Object.assign({},COMPANY);
+  Object.keys(_POIMG).forEach(t=>{ if(Object.prototype.hasOwnProperty.call(_pendingPOImg,t)) next[_POIMG[t].key]=_pendingPOImg[t]; });
+  next.name=g('co-name'); next.nameEn=g('co-nameen'); next.address=g('co-address');
+  next.phone=g('co-phone'); next.fax=g('co-fax'); next.taxId=g('co-taxid');
   try{
     toast('กำลังบันทึก...','info');
-    await putSetting('POCompany', JSON.stringify({name:COMPANY.name,nameEn:COMPANY.nameEn,address:COMPANY.address,phone:COMPANY.phone,fax:COMPANY.fax,taxId:COMPANY.taxId,logo:COMPANY.logo||'',stamp:COMPANY.stamp||'',approverSign:COMPANY.approverSign||''}));
+    await persistPOCompany(next,putSetting);
+    COMPANY=next;
     _pendingPOImg={};
     toast('บันทึกตั้งค่าบริษัทสำเร็จ','success');
   }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
