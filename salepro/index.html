@@ -864,6 +864,9 @@
         <div id="st-timeline-list" style="max-height:320px;overflow-y:auto"></div>
       </div>
       <div id="st-tab-docs" style="display:none">
+        <!-- คลังฟอร์มบริษัท (ดาวน์โหลดไปกรอก → อัปโหลด PDF กลับเข้าดีล) -->
+        <div id="st-form-library" style="margin-bottom:14px"></div>
+        <input type="file" id="st-formtpl-input" accept=".xls,.xlsx,.doc,.docx,.pdf" style="display:none" onchange="uploadFormTemplateFile(this)">
         <!-- Checklist เอกสารส่งมอบ (Flow ขั้น 8) -->
         <div id="st-delivery-checklist" style="margin-bottom:14px"></div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
@@ -909,7 +912,7 @@
           <div class="form-grid">
             <div class="form-group"><label>จำนวนเงิน (บาท)</label><input id="st-pay-amount" type="number" placeholder="0.00" oninput="renderWHTHint()"></div>
             <div class="form-group"><label>วันที่รับชำระ</label><input id="st-pay-date" type="date"></div>
-            <div class="form-group"><label>วิธีชำระ</label><select id="st-pay-method"><option>เงินสด</option><option>โอนเงิน</option><option>Cheque</option></select></div>
+            <div class="form-group"><label>วิธีชำระ</label><select id="st-pay-method" onchange="renderWHTHint()"><option>เงินสด</option><option>โอนเงิน</option><option>Cheque</option><option>ลดหนี้ (ปรับปรุงหนี้)</option></select></div>
             <div class="form-group"><label>เลขอ้างอิง</label><input id="st-pay-ref" placeholder="เลขโอน"></div>
             <div class="form-group"><label>ลูกค้าหัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:6px;align-items:center"><input id="st-pay-wht" type="number" min="0" max="100" step="0.5" placeholder="0" oninput="renderWHTHint()" style="max-width:80px"><button class="action-btn" onclick="document.getElementById('st-pay-wht').value=3;renderWHTHint()" title="ค่าบริการ 3%" style="font-size:11px;padding:3px 8px">3%</button></div></div>
             <div class="form-group"><label>ยอดหลังหัก (รับจริง)</label><div id="st-pay-wht-hint" style="font-size:12px;color:var(--muted);padding-top:8px">—</div></div>
@@ -1072,8 +1075,11 @@
         </div>
         <div id="cpo-print-section" style="display:none;margin-bottom:12px;padding:10px 14px;background:rgba(79,142,247,0.06);border:1px solid rgba(79,142,247,0.2);border-radius:8px">
           <div style="font-size:11px;font-weight:600;color:var(--accent2);margin-bottom:8px">📄 ออกเอกสาร (เลือกทีละใบ)</div>
-          <div style="margin-bottom:10px;padding:8px 10px;border:1px dashed var(--border2);border-radius:6px;background:var(--surface)">
-            <label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer"><input type="checkbox" id="cpo-manual-toggle" onchange="toggleDocManual(this.checked)" style="width:15px;height:15px"> พิมพ์รายการเอง (Manual) — กรอกทุกคอลัมน์เอง (ยอดรวม/VAT ยังคำนวณจากใบเสนอราคาเดิม)</label>
+          <div style="margin-bottom:10px;padding:8px 10px;border:1px dashed var(--border2);border-radius:6px;background:var(--surface);font-size:11px;color:var(--muted)">
+            ✎ ปรับรายการเอง (Manual) · จัดหน้า · แบ่งหน้า · ซ่อน/แสดงคอลัมน์ — ทำได้ในหน้า <b>พรีวิว</b> เมื่อกดออกเอกสารด้านล่าง
+          </div>
+          <div style="display:none">
+            <label><input type="checkbox" id="cpo-manual-toggle" onchange="toggleDocManual(this.checked)"></label>
             <div id="cpo-manual-box" style="display:none;margin-top:8px">
               <table style="width:100%;border-collapse:collapse;font-size:11px">
                 <thead><tr style="color:var(--muted)">
@@ -1394,7 +1400,7 @@
 <script src="js/pages/signature.js?v=admin1"></script>
 <script src="js/pages/company.js?v=admin1"></script>
 <script src="js/pages/pdf.js?v=admin1"></script>
-<script src="js/pages/saletracker.js?v=admin1"></script>
+<script src="js/pages/saletracker.js?v=admin2"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>
 <script src="js/pages/belowcost.js?v=admin1"></script>

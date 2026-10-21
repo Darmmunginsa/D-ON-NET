@@ -500,14 +500,14 @@ async function renderSTPayHistory(q) {
     const pays=paymentsCache.filter(p=>String(p.QuoteID)===String(stQuoteId));
     if(!pays.length){el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:4px 0 8px">ยังไม่มีประวัติการชำระ</div>';return;}
     el.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em">ประวัติการชำระ</div>'+
-      pays.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:12px">
-        <span style="color:var(--green);font-family:var(--mono)">${fmt(p.AmountPaid||0)}</span>
+      pays.map(p=>{ const _isCredit=/ลดหนี้/.test(p.PaymentMethod||''); return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:12px">
+        <span style="color:${_isCredit?'var(--amber)':'var(--green)'};font-family:var(--mono)">${_isCredit?'▼ ':''}${fmt(p.AmountPaid||0)}</span>
         <span style="color:var(--muted)">${fmtDate(p.PaymentDate)}</span>
-        <span class="badge badge-draft" style="font-size:10px">${p.PaymentMethod||''}</span>
+        <span class="badge badge-draft" style="font-size:10px${_isCredit?';background:rgba(251,191,36,0.15);color:var(--amber)':''}">${p.PaymentMethod||''}</span>
         ${(+p.WHTAmount>0)?`<span style="color:var(--amber);font-size:11px" title="ลูกค้าหัก ณ ที่จ่าย ${p.WHTPercent||''}%">หัก ${fmt(p.WHTAmount)}</span>`:''}
         ${p.Reference?`<span style="color:var(--muted);font-size:11px">${escHtml(p.Reference)}</span>`:''}
         ${p.SlipURL && p.SlipURL.startsWith('http')?`<span style="margin-left:auto">${docThumb(p.SlipURL,'สลิปโอนเงิน',{small:true})}</span>`:''}
-      </div>`).join('');
+      </div>`; }).join('');
   } catch(e){el.innerHTML='';}
 }
 
@@ -1006,7 +1006,7 @@ function _docManual() { stDealData.docManual = stDealData.docManual || {}; if (!
 function toggleDocManual(on) {
   const dm = _docManual();
   dm.on = !!on;
-  if (on && !dm.rows.length) dm.rows.push({ no:'', desc:'', qty:'', price:'', amount:'' });
+  if (on && !dm.rows.length) dm.rows = (typeof _cdSeedRowsFromItems==='function') ? _cdSeedRowsFromItems() : [{ t:'item', no:'', desc:'', qty:'', price:'', amount:'' }];
   const box = document.getElementById('cpo-manual-box'); if (box) box.style.display = on ? '' : 'none';
   renderDocManualRows();
   saveSTDealData();
@@ -1014,23 +1014,36 @@ function toggleDocManual(on) {
 function renderDocManualRows() {
   const tb = document.getElementById('cpo-manual-rows'); if (!tb) return;
   const dm = _docManual();
-  const inp = (i,f,v,ph,align) => '<input value="'+escHtml(String(v||''))+'" oninput="updateDocManualCell('+i+',\''+f+'\',this.value)" placeholder="'+(ph||'')+'" style="width:100%;font-size:11px;text-align:'+(align||'left')+'">';
-  tb.innerHTML = dm.rows.map((r,i) =>
-    '<tr>'
+  const xbtn = (i,f) => '<button onclick="clearDocManualCell('+i+',\''+f+'\')" title="ล้างให้ว่าง" style="flex:0 0 auto;width:16px;height:16px;line-height:14px;padding:0;border-radius:50%;border:1px solid var(--border,#ccc);background:none;cursor:pointer;color:var(--muted);font-size:10px">×</button>';
+  const inp = (i,f,v,ph,align) => '<div style="display:flex;gap:2px;align-items:center"><input value="'+escHtml(String(v||''))+'" oninput="updateDocManualCell('+i+',\''+f+'\',this.value)" placeholder="'+(ph||'')+'" style="flex:1 1 auto;min-width:0;font-size:11px;text-align:'+(align||'left')+'">'+xbtn(i,f)+'</div>';
+  const _mainText = r => r.name!=null && String(r.name).trim()!=='' ? r.name : (r.desc||'');  // บรรทัดหลัก (รองรับทั้ง name และ desc เดิม)
+  tb.innerHTML = dm.rows.map((r,i) => {
+    const t = r.t || 'item';
+    if (t==='group' || t==='note') {
+      const lbl = t==='group' ? '▦ กลุ่ม' : '📝 หมายเหตุ';
+      return '<tr><td colspan="6" style="padding:4px 2px">'
+        + '<div style="display:flex;gap:6px;align-items:center;background:var(--surface2);border-radius:6px;padding:4px 8px">'
+        + '<span style="font-size:10px;color:var(--muted);font-weight:700;white-space:nowrap">'+lbl+'</span>'
+        + '<input value="'+escHtml(String(r.name||''))+'" oninput="updateDocManualCell('+i+',\'name\',this.value)" placeholder="หัวข้อ" style="flex:1;min-width:0;font-size:11px;font-weight:600">'
+        + '<button onclick="removeDocManualRow('+i+')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px" title="ลบแถว">✕</button>'
+        + '<span style="font-size:10px;color:var(--muted);white-space:nowrap">แก้เต็มที่พรีวิว</span></div></td></tr>';
+    }
+    return '<tr>'
     + '<td style="padding:2px">'+inp(i,'no',r.no,'','center')+'</td>'
-    + '<td style="padding:2px"><textarea oninput="updateDocManualCell('+i+',\'desc\',this.value);_autoGrow(this)" placeholder="รายละเอียด..." rows="1" style="width:100%;font-size:11px;min-height:1.7em;overflow:hidden;resize:none;line-height:1.4">'+escHtml(String(r.desc||''))+'</textarea></td>'
+    + '<td style="padding:2px"><textarea oninput="updateDocManualCell('+i+',\''+(r.name!=null&&String(r.name).trim()!==''?'name':'desc')+'\',this.value);_autoGrow(this)" placeholder="รายการ..." rows="1" style="width:100%;font-size:11px;min-height:1.7em;overflow:hidden;resize:none;line-height:1.4">'+escHtml(String(_mainText(r)))+'</textarea></td>'
     + '<td style="padding:2px">'+inp(i,'qty',r.qty,'','center')+'</td>'
     + '<td style="padding:2px">'+inp(i,'price',r.price,'','center')+'</td>'
-    + '<td style="padding:2px"><input value="'+escHtml(String(r.amount||''))+'" oninput="updateDocManualCell('+i+',\'amount\',this.value)" onblur="blurDocManualAmount(this,'+i+')" placeholder="0.00" style="width:100%;font-size:11px;text-align:right"></td>'
+    + '<td style="padding:2px"><div style="display:flex;gap:2px;align-items:center"><input value="'+escHtml(String(r.amount||''))+'" oninput="updateDocManualCell('+i+',\'amount\',this.value)" onblur="blurDocManualAmount(this,'+i+')" placeholder="0.00" style="flex:1 1 auto;min-width:0;font-size:11px;text-align:right">'+xbtn(i,'amount')+'</div></td>'
     + '<td style="padding:2px;text-align:center"><button onclick="removeDocManualRow('+i+')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px" title="ลบแถว">✕</button></td>'
-    + '</tr>'
-  ).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:6px;font-size:11px">— ยังไม่มีแถว กด "+ เพิ่มแถว" —</td></tr>';
+    + '</tr>';
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:6px;font-size:11px">— ยังไม่มีแถว กด "+ เพิ่มแถว" —</td></tr>';
   // ปรับความสูง textarea รายการให้พอดีเนื้อหาตอนเปิดมา
   [...tb.querySelectorAll('textarea')].forEach(_autoGrow);
 }
 function _autoGrow(el) { if (!el) return; el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
 function addDocManualRow() { _docManual().rows.push({ no:'', desc:'', qty:'', price:'', amount:'' }); renderDocManualRows(); saveSTDealData(); }
-function removeDocManualRow(i) { const dm=_docManual(); dm.rows.splice(i,1); renderDocManualRows(); saveSTDealData(); }
+function removeDocManualRow(i) { const dm=_docManual(); dm.rows.splice(i,1); renderDocManualRows(); if(typeof _cdRefresh==='function')_cdRefresh(); saveSTDealData(); }
+function clearDocManualCell(i, field) { const dm=_docManual(); if(!dm.rows[i])return; dm.rows[i][field]=''; renderDocManualRows(); if(typeof _cdRefreshFrame==='function')_cdRefreshFrame(); saveSTDealData(); }
 let _docManualSaveT = null;
 function updateDocManualCell(i, field, val) {
   const dm = _docManual(); if (!dm.rows[i]) return; dm.rows[i][field] = val;
@@ -1045,6 +1058,347 @@ function blurDocManualAmount(el, i) {
   }
   updateDocManualCell(i, 'amount', el.value);
   clearTimeout(_docManualSaveT); saveSTDealData();
+}
+
+// ════════ PO ลูกค้า: ระบบจัดหน้าเอกสาร (พรีวิวแยกซ้าย-ขวา · คอลัมน์ · Manual · AI/Excel) ════════
+// คอลัมน์ตาราง — ซ่อน/แสดง + ปรับความกว้าง (เก็บใน stDealData.docManual.cols)
+const CUST_DOC_COLS = [
+  { k:'seq',  th:'ลำดับ',       en:'ITEM',       w:42 },
+  { k:'pn',   th:'รหัสสินค้า',   en:'CODE',       w:84, opt:true },
+  { k:'name', th:'รายการ',       en:'DESCRIPTION', flex:true, always:true },
+  { k:'qty',  th:'จำนวน',        en:'QUANTITY',   w:70 },
+  { k:'unit', th:'หน่วยนับ',     en:'UNIT',       w:64, opt:true },
+  { k:'price',th:'ราคาต่อหน่วย', en:'UNIT PRICE', w:95, priceCol:true },
+  { k:'amt',  th:'จำนวนเงิน',    en:'AMOUNT',     w:105, priceCol:true }
+];
+function _cdColCfg() { const dm=_docManual(); if(!dm.cols||typeof dm.cols!=='object')dm.cols={}; if(!dm.cols.vis)dm.cols.vis={}; if(!dm.cols.w)dm.cols.w={}; return dm.cols; }
+function _cdColW(k) { const c=_cdColCfg(); const def=(CUST_DOC_COLS.find(x=>x.k===k)||{}).w; return (c.w[k]!=null&&c.w[k]!=='')?+c.w[k]:def; }
+function toggleCDCol(k,on) { _cdColCfg().vis[k]=!!on; saveSTDealData(); _cdRefresh(); }
+let _cdColWT=null;
+function setCDColWidth(k,val) { _cdColCfg().w[k]=val; const lbl=document.getElementById('cd-cw-'+k); if(lbl)lbl.textContent=val+'px'; clearTimeout(_cdColWT); _cdColWT=setTimeout(function(){ _cdRefreshFrame(); saveSTDealData(); },250); }
+
+// รีเฟรชทั้ง editor ฝั่งซ้าย + inline box + พรีวิวฝั่งขวา
+function _docManualChanged() { try{ renderDocManualRows(); }catch(e){} _cdRefresh(); }
+let _cdManT=null;
+function setCDManual(i,field,val) { const r=_docManual().rows; if(r[i])r[i][field]=val; if(typeof _cdUpdateWarn==='function')_cdUpdateWarn(); clearTimeout(_cdManT); _cdManT=setTimeout(function(){ _cdRefreshFrame(); try{renderDocManualRows();}catch(e){} saveSTDealData(); },350); }
+function setCDManualBlank(i,field) { const r=_docManual().rows; if(r[i])r[i][field]=' '; _docManualChanged(); saveSTDealData(); }
+function setCDManualAlign(i,a) { const r=_docManual().rows; if(r[i])r[i].align=a; _docManualChanged(); saveSTDealData(); }
+function moveCDManualRow(i,dir) { const a=_docManual().rows; const j=i+dir; if(j<0||j>=a.length)return; const t=a[i];a[i]=a[j];a[j]=t; _docManualChanged(); saveSTDealData(); }
+function addCDManualRow(type) {
+  const row = type==='group' ? {t:'group',name:'หัวข้อกลุ่ม',align:'left'}
+            : type==='note'  ? {t:'note',name:'',desc:''}
+            : {t:'item',no:'',pn:'',name:'',desc:'',qty:'',unit:'',price:'',amount:''};
+  _docManual().rows.push(row); _docManualChanged(); saveSTDealData();
+}
+
+// ยอดรวมโหมด Manual (เฉพาะแถว item)
+function _cdManualSum() { const _num=v=>{const s=String(v==null?'':v).trim(); if(s===''||!/^-?[\d,]*\.?\d*$/.test(s))return 0; const n=parseFloat(s.replace(/,/g,'')); return isFinite(n)?n:0;}; return (_docManual().rows||[]).reduce((s,r)=> s + ((r.t==='group'||r.t==='note')?0:_num(r.amount)), 0); }
+function _cdWarnHtml() { const man=_cdManualSum(); const fmt2=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); return '<span style="color:#15803d">Σ รวมรายการ (ก่อน VAT) = <b>'+fmt2(man)+'</b> บาท · VAT 7% = '+fmt2(man*0.07)+' · รวมสุทธิ '+fmt2(man*1.07)+'</span>'; }
+function _cdUpdateWarn() { const el=document.getElementById('cd-man-warn'); if(el)el.innerHTML=_cdWarnHtml(); }
+
+// ── นำเข้ารายการ: วางจากตาราง (Excel) ──
+function _cdNum(s){ const n=parseFloat(String(s).replace(/[,\s฿]/g,'')); return isNaN(n)?'':n; }
+function _cdIsNum(s){ s=String(s).trim(); return s!=='' && /^[\d,.\s฿]+$/.test(s) && !isNaN(parseFloat(s.replace(/[,\s฿]/g,''))); }
+function parseCDPaste(text){
+  const out=[];
+  String(text||'').split(/\r?\n/).forEach(function(line){
+    if(!line.trim()) return;
+    let cells = line.indexOf('\t')>=0 ? line.split('\t') : line.split(/\s{2,}|\s*\|\s*|,(?=\s)/);
+    cells = cells.map(c=>c.trim()).filter((c,i,a)=>!(c===''&&(i===0||i===a.length-1)));
+    if(!cells.length) return;
+    const joined=cells.join(' ').toLowerCase();
+    const hasNum=cells.some(_cdIsNum);
+    if(!hasNum && /(รายการ|description|จำนวนเงิน|amount|unit\s*price|ราคา|ลำดับ|qty|จำนวน|หน่วย)/.test(joined)) return;
+    if(cells.length>=4 && /^\d+\.?$/.test(cells[0])) cells=cells.slice(1);
+    if(!cells.length) return;
+    const name=cells[0]||''; const rest=cells.slice(1);
+    const nums=[], texts=[];
+    rest.forEach(c=>{ if(_cdIsNum(c)) nums.push(_cdNum(c)); else if(c) texts.push(c); });
+    let qty='',unit=texts[0]||'',price='',amt='';
+    if(nums.length>=3){ qty=nums[0]; price=nums[nums.length-2]; amt=nums[nums.length-1]; }
+    else if(nums.length===2){ price=nums[0]; amt=nums[1]; }
+    else if(nums.length===1){ amt=nums[0]; }
+    if(name || amt!=='') out.push({t:'item',no:'',pn:'',name:name,desc:'',qty:qty,unit:unit,price:price,amount:amt});
+  });
+  return out;
+}
+function openCDPasteImport(){
+  const old=document.getElementById('_cdPaste'); if(old)old.remove();
+  const ov=document.createElement('div'); ov.id='_cdPaste';
+  ov.style.cssText='position:fixed;inset:0;z-index:100003;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:10px;width:560px;max-width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">'
+    +'<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#17356b">📋 วางจากตาราง (Excel)</div>'
+    +'<div style="padding:12px 16px;overflow:auto">'
+    +'<div style="font-size:12px;color:#64748b;margin-bottom:8px">คัดลอกตารางรายการ (Excel / PDF / Word) แล้ววางด้านล่าง<br>คอลัมน์ที่รองรับ: <b>รายการ · จำนวน · หน่วย · ราคา/หน่วย · จำนวนเงิน</b> (ระบบเดาคอลัมน์ให้ ปรับแก้ภายหลังได้)</div>'
+    +'<textarea id="_cdPasteTxt" placeholder="วางที่นี่ (Ctrl+V)..." style="width:100%;min-height:200px;font-size:12px;font-family:monospace;border:1px solid #cbd5e1;border-radius:6px;padding:8px;line-height:1.5"></textarea>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:10px"><input type="checkbox" id="_cdPasteAppend"> เพิ่มต่อท้ายรายการเดิม (ไม่ติ๊ก = แทนที่ทั้งหมด)</label>'
+    +'</div>'
+    +'<div style="padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px">'
+    +'<button id="_cdPasteCancel" style="padding:7px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer">ยกเลิก</button>'
+    +'<button id="_cdPasteOk" style="padding:7px 16px;border:none;background:#17356b;color:#fff;border-radius:6px;cursor:pointer">แปลง & ใส่</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  const txt=document.getElementById('_cdPasteTxt'); if(txt)txt.focus();
+  document.getElementById('_cdPasteCancel').onclick=()=>ov.remove();
+  ov.addEventListener('click',e=>{ if(e.target===ov)ov.remove(); });
+  document.getElementById('_cdPasteOk').onclick=function(){
+    const parsed=parseCDPaste(document.getElementById('_cdPasteTxt').value);
+    if(!parsed.length){ toast('ไม่พบรายการจากข้อความที่วาง','error'); return; }
+    const dm=_docManual(); dm.on=true;
+    const append=document.getElementById('_cdPasteAppend').checked;
+    dm.rows = append ? (dm.rows||[]).concat(parsed) : parsed;
+    ov.remove();
+    const _tg=document.getElementById('cpo-manual-toggle'); if(_tg)_tg.checked=true;
+    const _bx=document.getElementById('cpo-manual-box'); if(_bx)_bx.style.display='';
+    _docManualChanged(); saveSTDealData();
+    toast('นำเข้า '+parsed.length+' รายการแล้ว','success');
+  };
+}
+// ── นำเข้ารายการด้วย AI (Claude Vision) จากไฟล์ใบเสนอราคา/รูป/PDF ──
+function _cdGetAIKey(){ try{ return localStorage.getItem('cd_ai_key')||''; }catch(e){ return ''; } }
+function _cdSetAIKey(k){ try{ localStorage.setItem('cd_ai_key', k||''); }catch(e){} }
+function _cdFileToB64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(String(e.target.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(file); }); }
+async function _cdClaudeExtract(b64, mediaType){
+  const key=_cdGetAIKey(); if(!key) throw new Error('ยังไม่ได้ใส่ API key');
+  const isPdf=/pdf/i.test(mediaType||'');
+  const fileBlock = isPdf ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } }
+                          : { type:'image', source:{ type:'base64', media_type:(mediaType||'image/png'), data:b64 } };
+  const PROMPT='นี่คือใบเสนอราคา/เอกสารรายการสินค้า. ดึงเฉพาะ "รายการสินค้า/บริการ" ในตาราง ส่งกลับเป็น JSON array เท่านั้น ห้ามมีข้อความอื่น. '
+    +'แต่ละ object มีคีย์: name (ชื่อรายการ string), qty (จำนวน ตัวเลข หรือ ""), unit (หน่วยนับ string), '
+    +'price (ราคาต่อหน่วย ตัวเลขไม่มีคอมมา หรือ ""), amt (จำนวนเงินรวมของรายการนั้น ตัวเลข หรือ ""). '
+    +'ห้ามรวมแถวหัวตาราง, ส่วนลด, VAT, หรือยอดรวมสุทธิ. ตอบเป็น JSON array ล้วน ๆ.';
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{ 'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+    body: JSON.stringify({ model:'claude-sonnet-5', max_tokens:4096, messages:[{ role:'user', content:[ fileBlock, { type:'text', text:PROMPT } ] }] })
+  });
+  if(!r.ok){ let msg=''; try{ msg=(await r.json()).error?.message||''; }catch(e){ msg=await r.text(); } throw new Error('AI '+r.status+': '+(msg||'').slice(0,200)); }
+  const data=await r.json();
+  let t=(data.content||[]).map(c=>c.text||'').join('').trim();
+  const m=t.match(/\[[\s\S]*\]/); if(m)t=m[0];
+  let arr; try{ arr=JSON.parse(t); }catch(e){ throw new Error('อ่านผลลัพธ์ AI ไม่สำเร็จ'); }
+  if(!Array.isArray(arr)) throw new Error('ผลลัพธ์ไม่ใช่รายการ');
+  const num=v=>{ if(v===''||v==null)return ''; const n=parseFloat(String(v).replace(/[,\s฿]/g,'')); return isNaN(n)?'':n; };
+  return arr.map(r=>({ t:'item', no:'', pn:'', name:String(r.name||r.description||''), desc:'', qty:num(r.qty!=null?r.qty:r.quantity), unit:String(r.unit||''), price:num(r.price!=null?r.price:r.unitPrice), amount:num(r.amt!=null?r.amt:(r.amount!=null?r.amount:r.total)) }))
+            .filter(x=>x.name||x.amount!=='');
+}
+function openCDAIImport(){
+  const old=document.getElementById('_cdAI'); if(old)old.remove();
+  const ov=document.createElement('div'); ov.id='_cdAI';
+  ov.style.cssText='position:fixed;inset:0;z-index:100003;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML='<div style="background:#fff;border-radius:10px;width:520px;max-width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden">'
+    +'<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#17356b">🤖 ดูดรายการจากไฟล์ใบเสนอราคา (AI)</div>'
+    +'<div style="padding:12px 16px;overflow:auto">'
+    +'<div style="font-size:12px;color:#334155;font-weight:600;margin-bottom:4px">Anthropic API key</div>'
+    +'<input id="_cdaiKey" type="password" value="'+escHtml(_cdGetAIKey())+'" placeholder="sk-ant-..." style="width:100%;font-size:12px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;margin-bottom:4px">'
+    +'<div style="font-size:10.5px;color:#b45309;margin-bottom:10px">⚠ key เก็บในเบราว์เซอร์นี้ และส่งตรงไป Anthropic — อย่าใช้ในเครื่องสาธารณะ</div>'
+    +'<div style="font-size:12px;color:#334155;font-weight:600;margin-bottom:4px">ไฟล์ (PDF หรือ รูปภาพ)</div>'
+    +'<input id="_cdaiFile" type="file" accept=".pdf,image/*" style="width:100%;font-size:12px;margin-bottom:10px">'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px"><input type="checkbox" id="_cdaiAppend"> เพิ่มต่อท้ายรายการเดิม (ไม่ติ๊ก = แทนที่)</label>'
+    +'<div id="_cdaiStatus" style="font-size:12px;color:#64748b;min-height:18px"></div>'
+    +'</div>'
+    +'<div style="padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px">'
+    +'<button id="_cdaiCancel" style="padding:7px 14px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer">ยกเลิก</button>'
+    +'<button id="_cdaiOk" style="padding:7px 16px;border:none;background:#17356b;color:#fff;border-radius:6px;cursor:pointer">ดูดข้อมูล</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  document.getElementById('_cdaiCancel').onclick=close;
+  ov.addEventListener('click',e=>{ if(e.target===ov)close(); });
+  document.getElementById('_cdaiOk').onclick=async function(){
+    const key=document.getElementById('_cdaiKey').value.trim(); _cdSetAIKey(key);
+    const f=document.getElementById('_cdaiFile').files[0];
+    const st=document.getElementById('_cdaiStatus');
+    if(!key){ st.innerHTML='<span style="color:#b91c1c">กรุณาใส่ API key</span>'; return; }
+    if(!f){ st.innerHTML='<span style="color:#b91c1c">กรุณาเลือกไฟล์</span>'; return; }
+    st.innerHTML='⏳ กำลังอ่านไฟล์และวิเคราะห์ด้วย AI...';
+    const okBtn=document.getElementById('_cdaiOk'); okBtn.disabled=true; okBtn.style.opacity='0.6';
+    try{
+      const b64=await _cdFileToB64(f);
+      const mt=f.type|| (/\.pdf$/i.test(f.name)?'application/pdf':'image/png');
+      const rows=await _cdClaudeExtract(b64, mt);
+      if(!rows.length){ st.innerHTML='<span style="color:#b91c1c">ไม่พบรายการในไฟล์</span>'; okBtn.disabled=false; okBtn.style.opacity='1'; return; }
+      const dm=_docManual(); dm.on=true;
+      dm.rows = document.getElementById('_cdaiAppend').checked ? (dm.rows||[]).concat(rows) : rows;
+      close();
+      const _tg=document.getElementById('cpo-manual-toggle'); if(_tg)_tg.checked=true;
+      const _bx=document.getElementById('cpo-manual-box'); if(_bx)_bx.style.display='';
+      _docManualChanged(); saveSTDealData();
+      toast('ดูดข้อมูลสำเร็จ '+rows.length+' รายการ','success');
+    }catch(e){ st.innerHTML='<span style="color:#b91c1c">ไม่สำเร็จ: '+escHtml(e.message)+'</span>'; okBtn.disabled=false; okBtn.style.opacity='1'; }
+  };
+}
+
+// ── Editor ฝั่งซ้ายของพรีวิว (จัดหน้า · คอลัมน์ · Manual) ──
+function renderCDEditor() {
+  const dm=_docManual(); const _manual=!!dm.on;
+  const kind=_cdPreview?_cdPreview.kind:'delivery';
+  const noPrice=(kind==='tempdelivery');
+  const esc=escHtml;
+  let h='';
+  // ชนิดเอกสาร + สำเนา (สลับได้ในพรีวิว)
+  const kinds=[['delivery','ใบส่งของ/ใบแจ้งหนี้'],['tax','ใบกำกับภาษี'],['receipt','ใบเสร็จรับเงิน'],['tempdelivery','ใบส่งของชั่วคราว']];
+  h+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:4px">ชนิดเอกสาร</div>';
+  h+='<select onchange="switchCDKind(this.value)" style="width:100%;font-size:12px;margin-bottom:8px">'+kinds.map(k=>'<option value="'+k[0]+'" '+(kind===k[0]?'selected':'')+'>'+k[1]+'</option>').join('')+'</select>';
+  const copies=[['customer','ต้นฉบับลูกค้า'],['acct','สำเนา (บัญชี)'],['company','สำเนาบริษัท']];
+  h+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:4px">สำเนา</div>';
+  h+='<select onchange="switchCDCopy(this.value)" style="width:100%;font-size:12px;margin-bottom:12px">'+copies.map(c=>'<option value="'+c[0]+'" '+((_cdPreview&&_cdPreview.copy)===c[0]?'selected':'')+'>'+c[1]+'</option>').join('')+'</select>';
+  // สินค้าเป็น Hardware → เลขเอกสารใช้ TAX แทน IV/RV
+  h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer;padding:6px 8px;border:1px dashed #cbd5e1;border-radius:6px"><input type="checkbox" '+(dm.hardware?'checked':'')+' onchange="setCDHardware(this.checked)"> 📦 สินค้าเป็น Hardware — เลขเอกสารใช้ <b>TAX</b> แทน IV/RV</label>';
+  // ข้อความเหนือ E.&O.E.
+  const rn=(stDealData.docReferNote||{})[kind]||'';
+  h+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:4px">ข้อความเหนือ "ผิด ตก ยกเว้น" (ต่อชนิดเอกสาร)</div>';
+  h+='<textarea oninput="setCDReferNote(this.value)" placeholder="เช่น อ้างอิงใบเสนอราคา..." style="width:100%;min-height:52px;font-size:12px;line-height:1.5;margin-bottom:12px">'+esc(rn)+'</textarea>';
+  // คอลัมน์: ซ่อน/แสดง + ความกว้าง
+  h+='<div style="border-top:1px solid #e2e8f0;margin:6px 0 8px"></div>';
+  h+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:6px">คอลัมน์ตาราง (ซ่อน/แสดง · ปรับความกว้าง)</div>';
+  h+=CUST_DOC_COLS.map(function(col){
+    const forcedOff = col.priceCol && noPrice;
+    const _cv = _cdColCfg().vis;
+    const vis = col.always ? true : (col.priceCol ? !noPrice : (col.opt ? _cv[col.k]===true : _cv[col.k]!==false));
+    const showChk = !col.always && !col.priceCol;
+    const chk = showChk
+      ? '<input type="checkbox" '+(vis?'checked':'')+' onchange="toggleCDCol(\''+col.k+'\',this.checked)" style="margin:0">'
+      : '<span style="display:inline-block;width:13px"></span>';
+    let row='<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">'
+      +'<label style="display:flex;align-items:center;gap:6px;min-width:100px;font-size:11px;color:#334155;cursor:'+(showChk?'pointer':'default')+'">'+chk+' '+col.th+(col.always?' <span style="color:#94a3b8">(คงที่)</span>':(col.priceCol?' <span style="color:#94a3b8">(ตามชนิด)</span>':''))+'</label>';
+    if(col.flex){ row+='<span style="font-size:10px;color:#94a3b8">ยืดอัตโนมัติ</span>'; }
+    else { const w=_cdColW(col.k);
+      row+='<input type="range" min="30" max="200" value="'+w+'" oninput="setCDColWidth(\''+col.k+'\',this.value)" '+(forcedOff?'disabled':'')+' style="flex:1;min-width:0">'
+         +'<span id="cd-cw-'+col.k+'" style="font-size:10px;font-family:monospace;color:#64748b;min-width:34px;text-align:right">'+w+'px</span>'; }
+    return row+'</div>';
+  }).join('');
+  h+='<div style="font-size:10px;color:#94a3b8;margin-bottom:12px">* คอลัมน์ "รายการ" ยืดเต็มพื้นที่ที่เหลือเสมอ</div>';
+  // Manual toggle
+  h+='<div style="border-top:1px solid #e2e8f0;margin:6px 0 10px"></div>';
+  h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#334155;margin-bottom:6px;cursor:pointer"><input type="checkbox" '+(_manual?'checked':'')+' onchange="toggleCDManual(this.checked)"> ✎ ปรับรายการเอง (Manual)</label>';
+  if(_manual){
+    const rows=dm.rows||[];
+    h+='<div style="font-size:10.5px;color:#64748b;margin-bottom:6px">แก้ได้ทุกช่อง ไม่จำกัดบรรทัด · ยอดรวม/VAT/สุทธิ คิดจากคอลัมน์ "จำนวนเงิน" ที่กรอกเอง</div>';
+    h+='<button onclick="fillCDFromQuote()" style="width:100%;font-size:12px;padding:7px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;border-radius:6px;cursor:pointer;margin-bottom:6px;font-weight:600">⟲ ดึงรายการจากใบเสนอราคามาแก้</button>';
+    h+='<button onclick="openCDAIImport()" style="width:100%;font-size:12px;padding:7px;border:none;background:#17356b;color:#fff;border-radius:6px;cursor:pointer;margin-bottom:6px;font-weight:600">🤖 ดูดจากไฟล์ใบเสนอราคา (AI · PDF/รูป)</button>';
+    h+='<button onclick="openCDPasteImport()" style="width:100%;font-size:12px;padding:6px;border:1px solid #2563a8;background:#eff6ff;color:#1d4ed8;border-radius:6px;cursor:pointer;margin-bottom:8px">📋 วางจากตาราง (Excel)</button>';
+    if(!noPrice) h+='<div id="cd-man-warn" style="font-size:11px;margin-bottom:8px">'+_cdWarnHtml()+'</div>';
+    const n=rows.length;
+    const moveBtns=i=>'<button onclick="moveCDManualRow('+i+',-1)" title="ย้ายขึ้น" '+(i===0?'disabled':'')+' style="border:none;background:none;cursor:pointer;color:'+(i===0?'#cbd5e1':'#64748b')+';font-size:12px;padding:0 1px">▲</button>'
+      +'<button onclick="moveCDManualRow('+i+',1)" title="ย้ายลง" '+(i===n-1?'disabled':'')+' style="border:none;background:none;cursor:pointer;color:'+(i===n-1?'#cbd5e1':'#64748b')+';font-size:12px;padding:0 1px">▼</button>';
+    const delBtn=i=>'<button onclick="removeDocManualRow('+i+')" title="ลบแถว" style="border:none;background:none;color:#b91c1c;cursor:pointer;font-size:13px;padding:0 2px">✕</button>';
+    const bx=(i,field)=>'<button type="button" onclick="setCDManualBlank('+i+',\''+field+'\')" title="ล้างให้ว่าง" style="position:absolute;top:50%;right:2px;transform:translateY(-50%);width:13px;height:13px;border-radius:50%;border:none;background:#e2e8f0;color:#64748b;font-size:9px;line-height:13px;text-align:center;cursor:pointer;padding:0;z-index:2">×</button>';
+    const wx=(inner,i,field,wrapStyle)=>'<span style="position:relative;display:inline-flex;align-items:center;'+(wrapStyle||'')+'">'+inner+bx(i,field)+'</span>';
+    h+=rows.map(function(r,i){ const t=r.t||'item';
+      if(t==='group'){ const al=r.align||'left'; const ab=(a,lab)=>'<button onclick="setCDManualAlign('+i+',\''+a+'\')" title="จัด'+lab+'" style="border:none;background:'+(al===a?'#dbeafe':'none')+';color:'+(al===a?'#1d4ed8':'#94a3b8')+';cursor:pointer;font-size:11px;font-weight:700;padding:1px 5px;border-radius:3px">'+lab+'</button>';
+        return '<div style="border:1px solid #c7d2fe;background:#eef2ff;border-radius:6px;padding:6px;margin-bottom:6px">'
+          +'<div style="display:flex;gap:4px;align-items:center"><span style="font-size:10px;color:#6366f1;font-weight:700">▦ กลุ่ม</span>'+ab('left','L')+ab('center','C')+ab('right','R')
+          +'<span style="margin-left:auto">'+moveBtns(i)+delBtn(i)+'</span></div>'
+          +'<input value="'+esc(r.name||'')+'" oninput="setCDManual('+i+',\'name\',this.value)" placeholder="หัวข้อกลุ่ม" style="width:100%;margin-top:4px;font-size:11px;font-weight:600;padding:3px 5px">'
+          +'</div>'; }
+      if(t==='note'){ return '<div style="border:1px dashed #cbd5e1;background:#f8fafc;border-radius:6px;padding:6px;margin-bottom:6px">'
+          +'<div style="display:flex;gap:4px;align-items:center"><span style="font-size:10px;color:#64748b;font-weight:700">📝 หมายเหตุ</span><span style="margin-left:auto">'+moveBtns(i)+delBtn(i)+'</span></div>'
+          +'<input value="'+esc(r.name||'')+'" oninput="setCDManual('+i+',\'name\',this.value)" placeholder="หัวข้อ (ไม่บังคับ)" style="width:100%;margin-top:4px;font-size:11px;font-weight:600;padding:3px 5px">'
+          +'<textarea oninput="setCDManual('+i+',\'desc\',this.value)" placeholder="ข้อความ..." style="width:100%;margin-top:4px;min-height:44px;font-size:11px;line-height:1.5;padding:3px 5px">'+esc(r.desc||'')+'</textarea>'
+          +'</div>'; }
+      // item
+      return '<div style="border:1.5px solid #94a3b8;border-radius:7px;padding:8px;margin-bottom:9px;box-shadow:0 1px 3px rgba(15,23,42,.1)">'
+        +'<div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">'
+        +wx('<input value="'+esc(r.no!=null?r.no:'')+'" oninput="setCDManual('+i+',\'no\',this.value)" placeholder="'+(i+1)+'" title="ลำดับ — เว้นว่าง = อัตโนมัติ" style="width:46px;font-size:10px;padding:3px 16px 3px 3px;text-align:center">', i, 'no')
+        +wx('<input value="'+esc(r.name||'')+'" oninput="setCDManual('+i+',\'name\',this.value)" placeholder="รายการ" style="width:100%;font-size:11px;padding:3px 16px 3px 5px">', i, 'name', 'flex:1;min-width:0')
+        +moveBtns(i)+delBtn(i)+'</div>'
+        +wx('<input value="'+esc(r.pn||'')+'" oninput="setCDManual('+i+',\'pn\',this.value)" placeholder="รหัสสินค้า / Part No. (ถ้ามี)" style="width:100%;font-size:10.5px;padding:3px 16px 3px 5px;font-family:monospace">', i, 'pn', 'width:100%;margin-bottom:4px')
+        +'<textarea oninput="setCDManual('+i+',\'desc\',this.value)" placeholder="รายละเอียดเพิ่มเติม (Detail)..." style="width:100%;margin-bottom:4px;min-height:34px;font-size:10.5px;line-height:1.5;padding:3px 5px;color:#475569">'+esc(r.desc||'')+'</textarea>'
+        +'<div style="display:flex;gap:4px">'
+        +wx('<input value="'+esc(r.qty!=null?r.qty:'')+'" oninput="setCDManual('+i+',\'qty\',this.value)" placeholder="จำนวน" style="width:100%;font-size:11px;padding:3px 16px 3px 4px;text-align:center">', i, 'qty', 'width:58px')
+        +wx('<input value="'+esc(r.unit||'')+'" oninput="setCDManual('+i+',\'unit\',this.value)" placeholder="หน่วย" style="width:100%;font-size:11px;padding:3px 16px 3px 4px;text-align:center">', i, 'unit', 'width:60px')
+        +wx('<input value="'+esc(r.price!=null?r.price:'')+'" oninput="setCDManual('+i+',\'price\',this.value)" placeholder="ราคา/หน่วย" style="width:100%;font-size:11px;padding:3px 16px 3px 4px;text-align:right">', i, 'price', 'flex:1;min-width:0')
+        +wx('<input value="'+esc(r.amount!=null?r.amount:'')+'" oninput="setCDManual('+i+',\'amount\',this.value)" placeholder="จำนวนเงิน" style="width:100%;font-size:11px;padding:3px 16px 3px 4px;text-align:right">', i, 'amount', 'flex:1;min-width:0')
+        +'</div></div>'; }).join('');
+    h+='<div style="display:flex;gap:4px;margin-bottom:12px">'
+      +'<button onclick="addCDManualRow(\'item\')" style="flex:1;font-size:11px;padding:6px 4px;border:1px dashed #2563a8;background:none;color:#2563a8;border-radius:6px;cursor:pointer">+ รายการ</button>'
+      +'<button onclick="addCDManualRow(\'group\')" style="flex:1;font-size:11px;padding:6px 4px;border:1px dashed #6366f1;background:none;color:#4f46e5;border-radius:6px;cursor:pointer">+ หัวข้อกลุ่ม</button>'
+      +'<button onclick="addCDManualRow(\'note\')" style="flex:1;font-size:11px;padding:6px 4px;border:1px dashed #94a3b8;background:none;color:#475569;border-radius:6px;cursor:pointer">+ หมายเหตุ</button>'
+      +'</div>';
+    // ── แบ่งหน้า (ขึ้นหน้าใหม่หลังรายการ) — index อ้างอิงลำดับรายการที่แสดงจริง ──
+    const _hasC = r => (r.t==='group'||r.t==='note') ? String(r.name||r.desc||'').trim()!=='' : ['no','pn','name','desc','qty','unit','price','amount'].some(f=>String(r[f]||'').trim());
+    const _rr = rows.filter(_hasC);
+    const brks = Array.isArray(dm.breaks)?dm.breaks:[];
+    h+='<div style="border-top:1px solid #e2e8f0;margin:6px 0 8px"></div>';
+    h+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:6px">แบ่งหน้า (ขึ้นหน้าใหม่หลังรายการ)</div>';
+    if(!_rr.length){ h+='<div style="font-size:11px;color:#94a3b8;margin-bottom:12px">— ยังไม่มีรายการ —</div>'; }
+    else h+=_rr.map(function(r,idx){ const t=r.t||'item';
+      const lbl = t==='group'?('▦ '+(r.name||'')):(t==='note'?('📝 '+(r.name||r.desc||'')):(r.name||r.desc||('รายการ '+(idx+1))));
+      const has = brks.indexOf(idx)>=0;
+      return '<div style="display:flex;align-items:center;gap:6px;border-top:1px solid #f1f5f9;padding:3px 0;font-size:11px">'
+        +'<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#475569">'+(idx+1)+'. '+esc(String(lbl).slice(0,40))+'</span>'
+        +(has?'<button onclick="delCDBreak('+idx+')" title="ยกเลิกขึ้นหน้าใหม่" style="border:none;background:#fde68a;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;color:#92400e;white-space:nowrap">⤵ ขึ้นหน้าใหม่ ✕</button>'
+             :'<button onclick="addCDBreak('+idx+')" style="border:1px dashed #d97706;background:none;border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;color:#b45309;white-space:nowrap">+ ขึ้นหน้าใหม่</button>')
+        +'</div>';
+    }).join('')+'<div style="margin-bottom:12px"></div>';
+  }
+  return h;
+}
+function addCDBreak(idx){ const dm=_docManual(); if(!Array.isArray(dm.breaks))dm.breaks=[]; if(dm.breaks.indexOf(idx)<0)dm.breaks.push(idx); _cdRefresh(); saveSTDealData(); }
+function delCDBreak(idx){ const dm=_docManual(); dm.breaks=(dm.breaks||[]).filter(n=>n!==idx); _cdRefresh(); saveSTDealData(); }
+function setCDReferNote(val){ const kind=_cdPreview?_cdPreview.kind:'delivery'; stDealData.docReferNote=stDealData.docReferNote||{}; stDealData.docReferNote[kind]=val||''; const _el=document.getElementById(kind==='tax'?'cpo-refnote-tax':(kind==='receipt'?'cpo-refnote-receipt':null)); if(_el)_el.value=val||''; clearTimeout(_cdManT); _cdManT=setTimeout(function(){ _cdRefreshFrame(); saveSTDealData(); },350); }
+// สร้างแถว Manual จากรายการในใบเสนอราคา (ดึงมาแก้ต่อ)
+function _cdSeedRowsFromItems(){
+  const items=_cdItemsCache||[];
+  if(!items.length) return [{t:'item',no:'',pn:'',name:'',desc:'',qty:'',unit:'',price:'',amount:''}];
+  return items.map(function(it){
+    const q=parseFloat(it.Quantity||0), p=parseFloat(it.UnitPrice||0), d=parseFloat(it.DiscountPct||0)/100;
+    const amt=q*p*(1-d);
+    return { t:'item', no:'', pn:(it.PartNumber||it.PartNo||it.Code||it.ProductCode||''),
+      name:(it.Title||it.Description||''), desc:((it.Description&&it.Title)?it.Description:''),
+      qty:(q||''), unit:(it.Unit||it.UnitName||''), price:(p||''), amount:(amt||'') };
+  });
+}
+function fillCDFromQuote(){
+  const dm=_docManual();
+  if((dm.rows||[]).some(r=>String(r.name||r.desc||r.amount||'').trim()) && !confirm('แทนที่รายการที่กรอกไว้ด้วยรายการจากใบเสนอราคา?')) return;
+  dm.on=true; dm.rows=_cdSeedRowsFromItems();
+  const _tg=document.getElementById('cpo-manual-toggle'); if(_tg)_tg.checked=true;
+  const _bx=document.getElementById('cpo-manual-box'); if(_bx)_bx.style.display='';
+  _docManualChanged(); saveSTDealData();
+  toast('ดึง '+(dm.rows.length)+' รายการจากใบเสนอราคาแล้ว','success');
+}
+function toggleCDManual(on){ const dm=_docManual(); dm.on=!!on; if(on && !(dm.rows||[]).length) dm.rows=_cdSeedRowsFromItems(); const _tg=document.getElementById('cpo-manual-toggle'); if(_tg)_tg.checked=!!on; const _bx=document.getElementById('cpo-manual-box'); if(_bx)_bx.style.display=on?'':'none'; _docManualChanged(); saveSTDealData(); }
+function setCDHardware(on){ _docManual().hardware=!!on; _cdRefreshFrame(); saveSTDealData(); }
+function switchCDKind(k){ if(_cdPreview)_cdPreview.kind=k; _cdRefresh(); }
+function switchCDCopy(c){ if(_cdPreview)_cdPreview.copy=c; _cdRefresh(); }
+
+// ── พรีวิวแยกซ้าย-ขวา (editor | เอกสารจริง) ──
+let _cdPreview=null, _cdItemsCache=[], _cdQCache=null;
+function _cdBuildHtml(){
+  const q=_cdQCache||quotesData.find(x=>x.id===stQuoteId)||{};
+  const po=(stDealData.custPOs||[])[0]||{};
+  const co=companySettings||{};
+  const kind=_cdPreview?_cdPreview.kind:'delivery';
+  const copy=_cdPreview?_cdPreview.copy:'customer';
+  const referNote=(stDealData.docReferNote||{})[kind]||'';
+  return buildCustomerDocHTML(kind, copy, q, _cdItemsCache||[], po, co, stDealData.docManual||null, referNote);
+}
+function _cdRefresh(){ if(!_cdPreview)return; const ed=document.getElementById('_cdEditor'); if(ed)ed.innerHTML=renderCDEditor(); _cdRefreshFrame(); }
+function _cdRefreshFrame(){ if(!_cdPreview)return; const f=document.getElementById('_cdFrame'); if(f)f.srcdoc=_cdBuildHtml(); }
+function openCDPreview(kind, copy){
+  _cdPreview={kind:kind||'delivery', copy:copy||'customer'};
+  const old=document.getElementById('_docOverlay'); if(old)old.remove();
+  const ov=document.createElement('div'); ov.id='_docOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,0.62);display:flex;flex-direction:column;padding:10px 12px;gap:8px';
+  const bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px';
+  bar.innerHTML='<div style="color:#fff;font-size:13px;font-weight:600">พรีวิว / จัดหน้าเอกสาร PO ลูกค้า</div>';
+  const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px';
+  const printBtn=document.createElement('button'); printBtn.textContent='🖨 พิมพ์ / บันทึก PDF'; printBtn.style.cssText='padding:8px 18px;background:#17356b;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer';
+  const closeBtn=document.createElement('button'); closeBtn.textContent='✕ ปิด'; closeBtn.style.cssText='padding:8px 16px;background:#fff;color:#334155;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;cursor:pointer';
+  btns.appendChild(printBtn); btns.appendChild(closeBtn); bar.appendChild(btns); ov.appendChild(bar);
+  const wrap=document.createElement('div'); wrap.style.cssText='flex:1;min-height:0;display:flex;gap:10px';
+  const ed=document.createElement('div'); ed.id='_cdEditor'; ed.style.cssText='width:min(460px,42vw);flex-shrink:0;background:#fff;border-radius:8px;padding:12px;overflow:auto';
+  ed.innerHTML=renderCDEditor();
+  const f=document.createElement('iframe'); f.id='_cdFrame'; f.style.cssText='flex:1;min-width:0;border:none;border-radius:8px;background:#fff;box-shadow:0 12px 44px rgba(0,0,0,0.45)'; f.srcdoc=_cdBuildHtml();
+  wrap.appendChild(ed); wrap.appendChild(f); ov.appendChild(wrap);
+  document.body.appendChild(ov);
+  function close(){ ov.remove(); _cdPreview=null; document.removeEventListener('keydown',onKey); if(typeof renderCustPOTab==='function')renderCustPOTab(); }
+  function onKey(e){ if(e.key==='Escape'){ e.stopPropagation(); close(); } }
+  printBtn.onclick=function(){ const html=_cdBuildHtml(); const w=window.open('','_blank'); if(!w){ toast('เบราว์เซอร์บล็อกป๊อปอัป — โปรดอนุญาตแล้วลองใหม่','error'); return; } w.document.open(); w.document.write(html); w.document.close(); setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} },500); };
+  closeBtn.onclick=close;
+  document.addEventListener('keydown',onKey);
 }
 
 // ── ขอข้ามการรับ PO (ต้องผ่านการอนุมัติจาก Approver ก่อนออกเอกสารได้) ──
@@ -1193,12 +1547,9 @@ async function printCustomerDoc(kind, copy) {
   try { q._docSeq = await ensureCustDocSeq(q); } catch(e) { console.warn('doc seq', e.message); }
   if (typeof loadCustomers === 'function') { try { await loadCustomers(); } catch(e) {} }
   else if (typeof loadCustomerCodes === 'function') { loadCustomerCodes(); }
-  const items = await getQuoteItemsForST();
-  const po = (stDealData.custPOs || [])[0] || {};
-  const co = companySettings || {};
-  const referNote = (stDealData.docReferNote || {})[kind] || '';
-  const html = buildCustomerDocHTML(kind, copy, q, items, po, co, stDealData.docManual || null, referNote);
-  printViaIframe(html);
+  _cdItemsCache = await getQuoteItemsForST();
+  _cdQCache = q;
+  openCDPreview(kind, copy);   // เปิดพรีวิวแยกซ้าย-ขวา (editor | เอกสารจริง)
 }
 
 // พรีวิวเอกสารในแอป (modal) — มีปุ่มพิมพ์/ปิดชัดเจน กดปิดครั้งเดียว ไม่กระทบหน้าหลัก
@@ -1245,11 +1596,11 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const DOC_CLIENT = ((typeof customerThaiNameByAny === 'function' && customerThaiNameByAny(q.ClientName, q.CustomerTaxID)) || q.ClientName || '');
   const DOC_ADDR   = (q.CustomerAddress || '');   // ADDRESS = ภาษาไทยเสมอ
   // ── หัวบริษัท Fix ตายตัว (ยกเว้นโลโก้ดึงจาก Company Settings) ──
-  const CO_NAME_TH = 'บริษัท ดี ออน เน็ต จำกัด';
-  const CO_NAME_EN = 'D ON NET CO.,LTD.';
-  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = 'เลขที่ 78 หมู่ที่ 11 ตำบลผาเลือด อำเภอท่าปลา จังหวัดอุตรดิตถ์ 53190';
-  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = 'No. 78, Moo 11, Pha Lueat Subdistrict, Tha Pla District, Uttaradit Province';
-  const CO_TEL = '091-5192945', CO_FAX = '-', CO_TAXID = '535569001005';
+  const CO_NAME_TH = 'บริษัท ไอที เซอร์วิสเซส จำกัด';
+  const CO_NAME_EN = 'IT SERVICES CO.,LTD.';
+  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = '168/8 ถนนพัฒนาชนบท 3 แขวงคลองสองต้นนุ่น เขตลาดกระบัง กรุงเทพมหานคร 10520';
+  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = '168/8 Patthana Chonabot 3 Rd, Khlong Song Ton Nun Sub District, Lat Krabang District, Bangkok 10520';
+  const CO_TEL = '02-108-6113', CO_FAX = '02-108-6113', CO_TAXID = '0105559006113';
   const F_TH = "'Sarabun','Segoe UI',sans-serif";                        // ฟอนต์เดิมทั้งเอกสาร (Sarabun)
   const F_EN = "'Sarabun','Segoe UI',sans-serif";
   const F_NUM = "'Sarabun','Segoe UI',sans-serif";
@@ -1260,6 +1611,8 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   // เลขเอกสาร: ใบเสร็จใช้ RV แทน IV (ชนิดอื่นคงเดิม)
   let docNo = custDocNo(q);
   if (kind === 'receipt') docNo = docNo.replace(/IV/i, 'RV');
+  // สินค้าเป็น Hardware → เลขเอกสารใช้ TAX แทน IV/RV
+  if (manual && manual.hardware) docNo = docNo.replace(/IV|RV/i, 'TAX');
   const poRef = po.poNumber || q.PONumber || '-';
   const isReceipt = kind === 'receipt';
   const isTax = kind === 'tax';
@@ -1277,51 +1630,103 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   // จำนวนเงินโหมด Manual: ถ้าเป็นตัวเลข → จัดรูปแบบ 1,000.00 ; ถ้าเป็นข้อความ (เช่น Included, -) → แสดงตามเดิม
   const _fmtAmt = v => { const s=String(v==null?'':v).trim(); if(s===''){return '';} const n=parseFloat(s.replace(/,/g,'')); return (isFinite(n) && /^-?[\d,]*\.?\d*$/.test(s)) ? fmt2(n) : esc(s); };
 
-  const subTotal = items.reduce((s,it)=>{ const d=parseFloat(it.DiscountPct||0)/100; return s + parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d); }, 0);
+  // แถวรายการ + เติมแถวว่างให้ตารางเต็มหน้า
+  const cellB = 'border-right:1px solid '+NAVY+'55;';
+  const _isGN = r => r.t==='group' || r.t==='note';
+  const _mHas = r => _isGN(r) ? String(r.name||r.desc||'').trim()!=='' : ['no','pn','name','desc','qty','unit','price','amount'].some(f => String(r[f]||'').trim());
+  const _manualRows = (manual && manual.on && Array.isArray(manual.rows)) ? manual.rows.filter(_mHas) : [];
+  const _manualOn = _manualRows.length > 0;
+  // ยอดเงิน: โหมด Manual คิดยอดจากคอลัมน์ "จำนวนเงิน" ที่กรอกเอง (ข้อความ/ว่าง = 0) — ไม่งั้นคิดจากใบเสนอราคา
+  const _amtNum = v => { const s=String(v==null?'':v).trim(); if(s===''||!/^-?[\d,]*\.?\d*$/.test(s)) return 0; const n=parseFloat(s.replace(/,/g,'')); return isFinite(n)?n:0; };
+  const subTotal = _manualOn
+    ? _manualRows.reduce((s,r)=> s + (_isGN(r)?0:_amtNum(r.amount)), 0)
+    : items.reduce((s,it)=>{ const d=parseFloat(it.DiscountPct||0)/100; return s + parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d); }, 0);
   const vatAmt = subTotal * 0.07;
   const grand = subTotal + vatAmt;
   const bahtWords = (typeof bahtText === 'function') ? bahtText(grand) : '';
 
-  // แถวรายการ + เติมแถวว่างให้ตารางเต็มหน้า
-  const cellB = 'border-right:1px solid '+NAVY+'55;';
-  const _mHas = r => ['no','desc','qty','price','amount'].some(f => String(r[f]||'').trim());
-  const _manualRows = (manual && manual.on && Array.isArray(manual.rows)) ? manual.rows.filter(_mHas) : [];
-  const _manualOn = _manualRows.length > 0;
-  let rows;
+  // ── คอลัมน์ตาราง (ซ่อน/แสดง + ความกว้าง) — ตั้งค่าจากพรีวิว, เก็บใน manual.cols ──
+  const _cfg = (manual && manual.cols && typeof manual.cols==='object') ? manual.cols : {vis:{},w:{}};
+  const _cvis = (_cfg.vis||{}), _cw = (_cfg.w||{});
+  const _colVis = c => c.always ? true : (c.priceCol ? !noPrice : (c.opt ? _cvis[c.k]===true : _cvis[c.k]!==false));
+  const visCols = CUST_DOC_COLS.filter(_colVis);
+  const _colW = c => { if(c.flex) return null; return (_cw[c.k]!=null&&_cw[c.k]!=='')?+_cw[c.k]:c.w; };
+  const _lastK = visCols.length ? visCols[visCols.length-1].k : '';
+  const _bR = c => (c.k===_lastK ? '' : cellB);
+
+  // สร้าง td รายการ 1 แถว ตามคอลัมน์ที่แสดง (vals = {seq,pn,name,qty,unit,price,amt})
+  const _itemTds = vals => visCols.map(c => {
+    let v='', align='left', ff='', wsp='nowrap';
+    if (c.k==='seq'){ v=vals.seq; align='center'; }
+    else if (c.k==='pn'){ v=vals.pn; align='center'; ff='font-family:'+F_NUM+';'; }
+    else if (c.k==='name'){ v=vals.name; align='left'; wsp='normal'; }
+    else if (c.k==='qty'){ v=vals.qty; align='center'; }
+    else if (c.k==='unit'){ v=vals.unit; align='center'; }
+    else if (c.k==='price'){ v=vals.price; align='right'; ff='font-family:'+F_NUM+';'; }
+    else if (c.k==='amt'){ v=vals.amt; align='right'; ff='font-family:'+F_NUM+';'; }
+    return '<td style="padding:5px 8px;text-align:'+align+';'+ff+_bR(c)+'white-space:'+wsp+'">'+v+'</td>';
+  }).join('');
+
+  // rowArr = อาเรย์ของ <tr> (เพื่อแบ่งหน้าได้), markSeq = เลขลำดับที่แสดงของแต่ละ index (ใช้โชว์ในเครื่องมือแบ่งหน้า)
+  let rowArr;
   if (_manualOn) {
-    // โหมด Manual: กรอกรายการเองทีละคอลัมน์ (ไม่ดึงจากใบเสนอราคา) — ยอดรวมด้านล่างยังคำนวณจากใบเสนอราคาเดิม
-    rows = _manualRows.map(r =>
-      '<tr style="vertical-align:top">'
-      +'<td style="padding:5px 6px;text-align:center;'+cellB+'">'+esc(r.no||'')+'</td>'
-      +'<td style="padding:5px 10px;'+cellB+'white-space:pre-line;line-height:1.5">'+esc(r.desc||'')+'</td>'
-      +'<td style="padding:5px 8px;text-align:center;'+cellB+'">'+esc(r.qty||'')+'</td>'
-      +(noPrice ? ''
-        : '<td style="padding:5px 10px;text-align:center;'+cellB+'font-family:'+F_NUM+'">'+esc(r.price||'')+'</td>'
-          +'<td style="padding:5px 10px;text-align:right;font-family:'+F_NUM+'">'+_fmtAmt(r.amount)+'</td>')
-      +'</tr>'
-    ).join('');
+    // โหมด Manual: กรอกรายการเองทีละคอลัมน์ (item/กลุ่ม/หมายเหตุ) — ยอดรวม/VAT/รวมทั้งสิ้น คิดจากคอลัมน์จำนวนเงินที่กรอกเอง
+    let _auto = 0;
+    rowArr = _manualRows.map(r => {
+      if (r.t==='group') {
+        const al = r.align||'left';
+        return '<tr><td colspan="'+visCols.length+'" style="padding:6px 10px;font-weight:700;text-align:'+al+';background:'+NAVY+'0d;color:'+NAVY+'">'+esc(r.name||r.desc||'')+'</td></tr>';
+      }
+      if (r.t==='note') {
+        return '<tr><td colspan="'+visCols.length+'" style="padding:5px 10px;line-height:1.5">'+(r.name?'<b>'+esc(r.name)+'</b> ':'')+'<span style="white-space:pre-line">'+esc(r.desc||'')+'</span></td></tr>';
+      }
+      _auto++;
+      const nm = esc(r.name||''), ds = esc(r.desc||'');
+      // ถ้าไม่มี name (แถวที่กรอกจากกล่องเดิมซึ่งใช้ desc เป็นบรรทัดหลัก) → ใช้ desc เป็นบรรทัดหลัก
+      const nameCell = nm
+        ? ('<div style="font-weight:500">'+nm+'</div>' + (ds?'<div style="font-size:10px;color:#555;margin-top:2px;white-space:pre-line;line-height:1.5">'+ds+'</div>':''))
+        : (ds?'<div style="white-space:pre-line;line-height:1.5">'+ds+'</div>':'');
+      return '<tr style="vertical-align:top">'+_itemTds({
+        seq:  (r.no!=null && String(r.no)!=='') ? esc(r.no) : String(_auto),   // กรอกเอง (รวมช่องว่าง) = ตามนั้น, ไม่กรอก = อัตโนมัติ
+        pn:   esc(r.pn||''),
+        name: nameCell,
+        qty:  esc(r.qty||''),
+        unit: esc(r.unit||''),
+        price:_fmtAmt(r.price),
+        amt:  _fmtAmt(r.amount)
+      })+'</tr>';
+    });
   } else {
-    rows = items.map((it,i)=>{
+    rowArr = items.map((it,i)=>{
       const d=parseFloat(it.DiscountPct||0)/100, line=parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d);
-      return '<tr style="vertical-align:top">'
-        +'<td style="padding:5px 6px;text-align:center;'+cellB+'">'+(i+1)+'</td>'
-        +'<td style="padding:5px 10px;'+cellB+'"><div style="font-weight:500">'+esc(it.Title||it.Description||'-')+'</div>'+((it.Description&&it.Title)?'<div style="font-size:10px;color:#555;margin-top:2px;white-space:pre-line;line-height:1.5">'+esc(it.Description)+'</div>':'')+'</td>'
-        +'<td style="padding:5px 8px;text-align:center;'+cellB+'">'+fmt2(it.Quantity||0)+'</td>'
-        +(noPrice ? ''
-          : '<td style="padding:5px 10px;text-align:right;'+cellB+'font-family:'+F_NUM+'">'+fmt2(it.UnitPrice||0)+'</td>'
-            +'<td style="padding:5px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(line)+'</td>')
-        +'</tr>';
-    }).join('');
+      const nameCell = '<div style="font-weight:500">'+esc(it.Title||it.Description||'-')+'</div>'
+        + ((it.Description&&it.Title)?'<div style="font-size:10px;color:#555;margin-top:2px;white-space:pre-line;line-height:1.5">'+esc(it.Description)+'</div>':'');
+      return '<tr style="vertical-align:top">'+_itemTds({
+        seq:  (i+1),
+        pn:   esc(it.PartNumber||it.PartNo||it.Code||it.ProductCode||''),
+        name: nameCell,
+        qty:  fmt2(it.Quantity||0),
+        unit: esc(it.Unit||it.UnitName||''),
+        price:fmt2(it.UnitPrice||0),
+        amt:  fmt2(line)
+      })+'</tr>';
+    });
   }
+  // จุดขึ้นหน้าใหม่ (เก็บ index ของแถวที่จะตัดหน้าหลังแถวนั้น) — เก็บใน manual.breaks
+  const _breaks = (manual && Array.isArray(manual.breaks)) ? manual.breaks.slice().filter(n=>n>=0&&n<rowArr.length) : [];
+  const rowPages = [[]];
+  rowArr.forEach((tr,idx)=>{ rowPages[rowPages.length-1].push(tr); if(_breaks.indexOf(idx)>=0) rowPages.push([]); });
   // แถว filler ที่ "ดิ้น" ยืดเต็มพื้นที่ที่เหลือ (height:100%) — ดันยอดรวมไปชิดล่าง เส้นคอลัมน์ต่อเนื่อง
   // E.&O.E. อยู่ล่างสุดของคอลัมน์ "รายการ/DESCRIPTION" (ไม่แยกเป็นแถวเต็มความกว้าง)
   const _refNote = String(referNote||'').trim();
-  const fillerRow = '<tr style="height:100%"><td style="'+cellB+'">&nbsp;</td>'
-    +'<td style="'+cellB+';vertical-align:bottom;padding:0 10px 4px">'
-      +(_refNote?'<div style="text-align:left;font-size:12px;color:#1a1a2e;margin-bottom:5px;white-space:pre-line;line-height:1.5">'+esc(_refNote)+'</div>':'')
-      +'<div style="text-align:center;font-size:10px;color:#777">ผิด ตก ยกเว้น E. &amp; O.E.</div>'
-    +'</td>'
-    +'<td style="'+cellB+'"></td>'+(noPrice?'':'<td style="'+cellB+'"></td><td></td>')+'</tr>';
+  const fillerRow = '<tr style="height:100%">'+visCols.map(c => {
+    if (c.k==='name') {
+      return '<td style="'+_bR(c)+'vertical-align:bottom;padding:0 10px 4px">'
+        +(_refNote?'<div style="text-align:left;font-size:12px;color:#1a1a2e;margin-bottom:5px;white-space:pre-line;line-height:1.5">'+esc(_refNote)+'</div>':'')
+        +'<div style="text-align:center;font-size:10px;color:#777">ผิด ตก ยกเว้น E. &amp; O.E.</div></td>';
+    }
+    return '<td style="'+_bR(c)+'">&nbsp;</td>';
+  }).join('')+'</tr>';
 
   const colspanFull = noPrice ? 3 : 5;
   const logoHtml = (co.LogoURL||co.LogoBase64) ? '<img src="'+(co.LogoBase64||co.LogoURL)+'" style="max-height:85px;max-width:115px;object-fit:contain"/>' : '';
@@ -1329,7 +1734,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   // กล่องหัวข้อ (ป้ายสำเนา + เอกสารออกเป็นชุด + ไม่ใช่ใบกำกับภาษี)
   const copyBox = '<div style="text-align:right;flex-shrink:0;white-space:nowrap">'
     +'<div style="display:inline-block;background:'+NAVY+';color:#fff;border-radius:16px;padding:6px 22px;font-weight:700;font-size:15px;white-space:nowrap">'+copy.recip+'</div>'
-    +'<div style="margin-top:34px">'
+    +'<div style="margin-top:6px">'
     +(notTax?'<div style="color:#c0392b;font-size:10px;line-height:1.2">ไม่ใช่ใบกำกับภาษี</div>':'')
     +'<div style="color:#888;font-size:10px;line-height:1.2">เอกสารออกเป็นชุด</div>'
     +'</div></div>';
@@ -1413,22 +1818,15 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
     +'<tr>'+totLabel('ยอดเงินสุทธิ','GRAND TOTAL')+'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+';font-weight:700;font-size:14px">'+fmt2(grand)+'</td></tr>'
     +'</table>';
 
-  return '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"/>'
-    +'<title>'+esc(titleTh)+' '+docNo+'</title>'
-    +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">'
-    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Sarabun","Segoe UI",sans-serif;font-size:12px;color:#1a1a2e;background:#fff;padding:24px}thead{display:table-header-group}.doc-foot{page-break-inside:avoid}@media print{body{padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:5mm}button{display:none!important}}</style>'
-    +'</head><body><div style="width:200mm;max-width:100%;margin:0 auto;min-height:285mm;display:flex;flex-direction:column">'
-    // header — กล่องสำเนา "ลอย" มุมขวาบน (absolute) เพื่อไม่ให้เบียดกับที่อยู่
-    +'<div style="position:relative;display:flex;align-items:flex-start;gap:12px">'
+  // ── ส่วนหัว (ซ้ำทุกหน้า) ──
+  const COMPANY_HEADER = '<div style="position:relative;display:flex;align-items:flex-start;gap:12px">'
     +logoHtml
     +'<div style="flex:1;min-width:0">'
     +(co.HeaderNameImage
-      // ใช้ภาพชื่อบริษัท (ระยะห่างเป๊ะแบบฟอร์มจริง) — ดึง/ย่นตามขนาด กว้าง/สูง ที่ตั้งไว้
       ? '<img src="'+co.HeaderNameImage+'" style="'+(co.HeaderNameW?('width:'+(+co.HeaderNameW)+'px;'):'')+(co.HeaderNameH?('height:'+(+co.HeaderNameH)+'px;'):'height:auto;')+((co.HeaderNameW&&co.HeaderNameH)?'object-fit:fill;':'object-fit:contain;')+'display:block"/>'
-      // ไม่มีภาพ → ใช้ข้อความ + ปรับ letter-spacing ให้ยาวเสมอกัน (สคริปต์ท้ายเอกสาร)
       : '<div style="display:inline-block">'
-        +'<div id="_cnTh" style="font-family:'+F_HEAD+';font-size:21px;font-weight:700;color:'+NAVY+';line-height:1.1;letter-spacing:-0.3px;white-space:nowrap">'+CO_NAME_TH+'</div>'
-        +'<div id="_cnEn" style="font-family:'+F_HEAD+';font-size:16px;font-weight:700;color:'+NAVY+';line-height:1.15;white-space:nowrap;-webkit-text-stroke:0.35px '+NAVY+'">'+CO_NAME_EN+'</div>'
+        +'<div class="_cnTh" style="font-family:'+F_HEAD+';font-size:21px;font-weight:700;color:'+NAVY+';line-height:1.1;letter-spacing:-0.3px;white-space:nowrap">'+CO_NAME_TH+'</div>'
+        +'<div class="_cnEn" style="font-family:'+F_HEAD+';font-size:16px;font-weight:700;color:'+NAVY+';line-height:1.15;white-space:nowrap;-webkit-text-stroke:0.35px '+NAVY+'">'+CO_NAME_EN+'</div>'
         +'</div>')
     +'<table style="border-collapse:collapse;margin-top:3px;font-family:'+F_ADDR+'"><tbody>'
     +'<tr><td style="font-size:17px;color:#222;white-space:nowrap;vertical-align:top;line-height:1.1">'+CO_ADDR_TH_L+'</td><td style="font-size:17px;color:#222;vertical-align:top;padding:0 5px;line-height:1.1">:</td><td style="font-size:17px;color:#222;white-space:nowrap;vertical-align:top;line-height:1.1">'+CO_ADDR_TH_V+'</td></tr>'
@@ -1437,13 +1835,11 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
     +'<div style="font-family:'+F_ADDR+';font-size:17px;color:#333;margin-top:2px">TEL. '+CO_TEL+' &nbsp;&nbsp; FAX. '+CO_FAX+'</div>'
     +'</div>'
     +'<div style="position:absolute;top:0;right:0">'+copyBox+'</div></div>'
-    // tax id + title pill + no
     +'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 10px">'
     +'<div style="font-size:11px;color:#1a1a2e">เลขประจำตัวผู้เสียภาษีอากร '+CO_TAXID+'</div>'
     +'<div style="background:'+NAVY+';color:#fff;border-radius:16px;padding:6px 22px;text-align:center"><div style="font-size:15px;font-weight:700">'+esc(titleTh)+'</div><div style="font-size:9px;letter-spacing:0.05em">'+titleEn+'</div></div>'
     +'<div style="font-size:11px;text-align:right"><b>เลขที่</b><br>NO. '+esc(docNo)+'</div>'
     +'</div>'
-    // customer + info — 2 กล่องแยก (กรอบมน)
     +'<div style="display:flex;gap:10px;margin-bottom:8px;align-items:stretch">'
     +'<div style="flex:1.5;border:1px solid '+NAVY+';border-radius:8px;padding:8px 10px">'
     +'<table style="border-collapse:collapse;width:100%">'
@@ -1454,36 +1850,50 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
     +(q.CustomerTaxID?'<tr><td colspan="3" style="padding:5px 0 0;font-size:10px;color:#555;font-family:'+F_TH+'">เลขประจำตัวผู้เสียภาษี : '+esc(q.CustomerTaxID)+'</td></tr>':'')
     +'</table>'
     +'</div>'
-    +'<div style="flex:1">'+infoBox+'</div></div>'
-    // items table — กรอบโค้งมุม + ตารางยืดเต็ม wrapper (flex:1 ให้ table grow, filler row ดันยอดรวมชิดล่าง)
-    +'<div style="flex:1;border:1px solid '+NAVY+';border-radius:10px;overflow:hidden;display:flex;flex-direction:column">'
-    +'<table style="width:100%;flex:1;border-collapse:collapse">'
+    +'<div style="flex:1">'+infoBox+'</div></div>';
+  // thead (ซ้ำทุกหน้า) + totals (หน้าสุดท้าย)
+  const tableHead = '<colgroup>'+visCols.map(c=>'<col'+(c.flex?'':' style="width:'+_colW(c)+'px"')+'>').join('')+'</colgroup>'
     +'<thead><tr style="background:'+NAVY+';color:#fff;font-size:11px">'
-    +'<th style="padding:6px 6px;width:42px;border-right:1px solid #fff5">ลำดับ<br><span style="font-weight:400;font-size:9px">ITEM</span></th>'
-    +'<th style="padding:6px 10px;border-right:1px solid #fff5">รายการ<br><span style="font-weight:400;font-size:9px">DESCRIPTION</span></th>'
-    +'<th style="padding:6px 8px;width:70px;border-right:1px solid #fff5">จำนวน<br><span style="font-weight:400;font-size:9px">QUANTITY</span></th>'
-    +(noPrice?''
-      :'<th style="padding:6px 8px;width:95px;border-right:1px solid #fff5">ราคาต่อหน่วย<br><span style="font-weight:400;font-size:9px">UNIT PRICE</span></th>'
-       +'<th style="padding:6px 8px;width:105px">จำนวนเงิน<br><span style="font-weight:400;font-size:9px">AMOUNT</span></th>')
-    +'</tr></thead><tbody>'+rows+fillerRow
-    // ── หมายเหตุ + ยอดรวม เป็นแถวต่อในตารางเดียวกัน (เส้นคอลัมน์ตรงกับด้านบน) ──
-    +(noPrice
-      ? '<tr><td colspan="3" style="border:1px solid '+NAVY+';padding:8px 10px;font-size:10px;line-height:1.55;color:#333;vertical-align:top">'+NOTE_TERMS+'</td></tr>'
-      : '<tr>'
-        +'<td colspan="3" rowspan="3" style="border:1px solid '+NAVY+';padding:8px 10px;vertical-align:top">'+NOTE_TERMS+'<div style="margin-top:8px;font-size:11px;border-top:1px solid '+NAVY+'55;padding-top:5px;text-align:center;font-weight:600">'+esc(bahtWords)+'</div></td>'
-        +'<td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:6px 10px;font-size:11px"><b>รวมเงิน</b> TOTAL</td>'
-        +'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(subTotal)+'</td></tr>'
-        +'<tr><td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:6px 10px;font-size:11px"><b>ภาษีมูลค่าเพิ่ม</b> PLUS VAT</td>'
-        +'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(vatAmt)+'</td></tr>'
-        +'<tr><td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:7px 10px;font-size:11px"><b>ยอดเงินสุทธิ</b> GRAND TOTAL</td>'
-        +'<td style="border:1px solid '+NAVY+';padding:7px 10px;text-align:right;font-family:'+F_NUM+';font-weight:700;font-size:14px">'+fmt2(grand)+'</td></tr>')
-    +'</tbody></table></div>'
-    // footer signatures
-    +'<div class="doc-foot" style="margin-top:12px">'+footer+'</div>'
-    +'<div style="text-align:center;margin-top:16px;padding-top:10px;border-top:1px dashed #ccc"><button onclick="window.print()" style="padding:8px 24px;background:'+NAVY+';color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">🖨 พิมพ์ / บันทึก PDF</button></div>'
-    +'</div>'
-    // ปรับความยาวชื่อบริษัท 2 แถวให้เสมอกัน: ยืด letter-spacing ของอังกฤษให้เท่าความกว้างของไทย
-    +'<script>(function(){function eq(){var th=document.getElementById("_cnTh"),en=document.getElementById("_cnEn");if(!th||!en)return;en.style.letterSpacing="0px";var t=th.getBoundingClientRect().width,e=en.getBoundingClientRect().width,n=(en.textContent||"").length;if(n>1){var ls=(t-e)/(n-1);if(ls<-0.6)ls=-0.6;if(ls>6)ls=6;en.style.letterSpacing=ls+"px";}}if(document.fonts&&document.fonts.ready){document.fonts.ready.then(eq);}eq();setTimeout(eq,120);})();<\/script>'
+    +visCols.map(c=>'<th style="padding:6px 8px;'+(c.k===_lastK?'':'border-right:1px solid #fff5')+'">'+c.th+'<br><span style="font-weight:400;font-size:9px">'+c.en+'</span></th>').join('')
+    +'</tr></thead>';
+  const totalsRows = noPrice
+    ? '<tr><td colspan="'+visCols.length+'" style="border:1px solid '+NAVY+';padding:8px 10px;font-size:10px;line-height:1.55;color:#333;vertical-align:top">'+NOTE_TERMS+'</td></tr>'
+    : '<tr>'
+      +'<td colspan="'+(visCols.length-2)+'" rowspan="3" style="border:1px solid '+NAVY+';padding:8px 10px;vertical-align:top">'+NOTE_TERMS+'<div style="margin-top:8px;font-size:11px;border-top:1px solid '+NAVY+'55;padding-top:5px;text-align:center;font-weight:600">'+esc(bahtWords)+'</div></td>'
+      +'<td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:6px 10px;font-size:11px"><b>รวมเงิน</b> TOTAL</td>'
+      +'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(subTotal)+'</td></tr>'
+      +'<tr><td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:6px 10px;font-size:11px"><b>ภาษีมูลค่าเพิ่ม</b> PLUS VAT</td>'
+      +'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(vatAmt)+'</td></tr>'
+      +'<tr><td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:7px 10px;font-size:11px"><b>ยอดเงินสุทธิ</b> GRAND TOTAL</td>'
+      +'<td style="border:1px solid '+NAVY+';padding:7px 10px;text-align:right;font-family:'+F_NUM+';font-weight:700;font-size:14px">'+fmt2(grand)+'</td></tr>';
+  // ประกอบหลายหน้า — header ซ้ำทุกหน้า, filler ดันเนื้อหาเต็มหน้า, totals+footer เฉพาะหน้าสุดท้าย
+  const nP = rowPages.length;
+  const pagesHtml = rowPages.map(function(prows, pi){
+    const isLast = pi===nP-1;
+    const body = prows.join('') + fillerRow + (isLast ? totalsRows : '');
+    const pageLabel = nP>1 ? '<div style="text-align:right;color:#888;font-size:10px;margin-top:4px">หน้า '+(pi+1)+' / '+nP+'</div>' : '';
+    return '<div class="cd-page">'
+      + COMPANY_HEADER
+      + '<div style="flex:1;border:1px solid '+NAVY+';border-radius:10px;overflow:hidden;display:flex;flex-direction:column">'
+      + '<table style="width:100%;flex:1;border-collapse:collapse;table-layout:fixed">'+tableHead+'<tbody>'+body+'</tbody></table>'
+      + '</div>'
+      + (isLast ? '<div class="doc-foot" style="margin-top:12px">'+footer+'</div>' : '')
+      + pageLabel
+      + '</div>';
+  }).join('');
+
+  return '<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"/>'
+    +'<title>'+esc(titleTh)+' '+docNo+'</title>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Sarabun","Segoe UI",sans-serif;font-size:12px;color:#1a1a2e;background:#e5e7eb}'
+    +'.cd-page{background:#fff;padding:10mm;min-height:287mm;display:flex;flex-direction:column;page-break-after:always;break-after:page}'
+    +'.cd-page:last-of-type{page-break-after:auto;break-after:auto}thead{display:table-header-group}tr{page-break-inside:avoid}.doc-foot{page-break-inside:avoid}'
+    +'@media screen{.cd-page{width:210mm;max-width:100%;margin:0 auto 10px;box-shadow:0 2px 14px rgba(0,0,0,.18)}}'
+    +'@media print{body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:0}button{display:none!important}.no-print{display:none!important}.cd-page{box-shadow:none;margin:0}}</style>'
+    +'</head><body>'+pagesHtml
+    +'<div class="no-print" style="text-align:center;margin:4px auto 18px;max-width:210px"><button onclick="window.print()" style="padding:8px 24px;background:'+NAVY+';color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">🖨 พิมพ์ / บันทึก PDF</button></div>'
+    // ปรับความยาวชื่อบริษัท 2 แถวให้เสมอกัน (ทุกหน้า): ยืด letter-spacing ของอังกฤษให้เท่าความกว้างของไทย
+    +'<script>(function(){function eq(){var ths=document.querySelectorAll("._cnTh"),ens=document.querySelectorAll("._cnEn");for(var k=0;k<ths.length;k++){var th=ths[k],en=ens[k];if(!th||!en)continue;en.style.letterSpacing="0px";var t=th.getBoundingClientRect().width,e=en.getBoundingClientRect().width,n=(en.textContent||"").length;if(n>1){var ls=(t-e)/(n-1);if(ls<-0.6)ls=-0.6;if(ls>6)ls=6;en.style.letterSpacing=ls+"px";}}}if(document.fonts&&document.fonts.ready){document.fonts.ready.then(eq);}eq();setTimeout(eq,120);})();<\/script>'
     +'</body></html>';
 }
 
@@ -2231,8 +2641,117 @@ function renderDeliveryChecklist() {
     </div>`;
 }
 
+// ════════ คลังฟอร์มบริษัท (template กลาง · Admin ดูแล) ════════
+// เก็บรายการใน Settings list คีย์ "FormTemplates" เป็น JSON; ไฟล์เก็บใน Document Library โฟลเดอร์ FormTemplates
+const FORM_TPL_CATS = ['ฟอร์มขาย','ฟอร์มบริการ/ติดตั้ง','ฟอร์มการเงิน/เบิกจ่าย','สัญญา/ข้อตกลง','อื่นๆ'];
+function _formTemplates() { try { return JSON.parse(getSettingValue('FormTemplates') || '[]') || []; } catch(e) { return []; } }
+async function _saveFormTemplates(arr) { await putSettingValue('FormTemplates', JSON.stringify(arr)); }
+function _fmtFileIcon(name) { const e=(String(name||'').split('.').pop()||'').toLowerCase(); if(/xls/.test(e))return '📊'; if(/docx?|rtf/.test(e))return '📝'; if(/pdf/.test(e))return '📄'; return '📎'; }
+
+function renderSTFormLibrary() {
+  const box = document.getElementById('st-form-library'); if (!box) return;
+  const isAdmin = !!(userRoles.isAdmin);
+  const tpls = _formTemplates();
+  let h = '<div style="border:1px solid var(--border);border-radius:8px;background:var(--surface2);padding:10px 12px">';
+  h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    + '<span style="font-size:12px;font-weight:600;color:var(--text)">🗂 คลังฟอร์มบริษัท</span>'
+    + '<span style="font-size:10.5px;color:var(--muted)">ดาวน์โหลดไปกรอก แล้วอัปโหลด PDF กลับเข้าดีลด้านล่าง</span>'
+    + (isAdmin ? '<button class="btn btn-sm btn-primary" style="margin-left:auto;font-size:11px" onclick="openAddFormTemplate()">+ เพิ่มฟอร์ม</button>' : '')
+    + '</div>';
+  if (!tpls.length) {
+    h += '<div style="font-size:11.5px;color:var(--muted);padding:4px 0">— ยังไม่มีฟอร์มในคลัง'+(isAdmin?' (กด “+ เพิ่มฟอร์ม”)':'')+' —</div>';
+  } else {
+    FORM_TPL_CATS.forEach(function(cat){
+      const inCat = tpls.filter(t=>(t.category||'อื่นๆ')===cat);
+      if (!inCat.length) return;
+      h += '<div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:6px 0 4px">'+escHtml(cat)+'</div>';
+      h += inCat.map(function(t){
+        return '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:5px;background:var(--surface)">'
+          + '<span style="font-size:15px">'+_fmtFileIcon(t.fileName)+'</span>'
+          + '<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(t.name||t.fileName)+'</div>'
+          + '<div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escHtml(t.fileName||'')+'</div></div>'
+          + '<button class="btn btn-sm" style="font-size:11px;border:1px solid var(--accent2);color:var(--accent2)" onclick="downloadFormTemplate(\''+t.id+'\')">⬇ ดาวน์โหลด</button>'
+          + (isAdmin ? '<button onclick="deleteFormTemplate(\''+t.id+'\')" title="ลบฟอร์ม" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px">✕</button>' : '')
+          + '</div>';
+      }).join('');
+    });
+  }
+  h += '</div>';
+  box.innerHTML = h;
+}
+async function downloadFormTemplate(id) {
+  const t = _formTemplates().find(x=>String(x.id)===String(id)); if (!t) return;
+  try {
+    toast('กำลังเตรียมไฟล์...', 'info');
+    if (typeof graphFetchBlobUrl === 'function') {
+      const burl = await graphFetchBlobUrl(t.fileUrl);
+      const a = document.createElement('a'); a.href = burl; a.download = t.fileName || (t.name+'.xlsx'); document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(burl), 4000);
+    } else {
+      window.open(t.fileUrl, '_blank');   // Google edition: เปิดลิงก์ไฟล์ตรง
+    }
+  } catch(e) { window.open(t.fileUrl, '_blank'); }
+}
+let _addFormTplFile = null;
+function openAddFormTemplate() {
+  const old=document.getElementById('_addFormTpl'); if(old)old.remove();
+  const ov=document.createElement('div'); ov.id='_addFormTpl';
+  ov.style.cssText='position:fixed;inset:0;z-index:100003;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:16px';
+  const _inp='width:100%;font-size:12px;padding:6px 8px;margin-bottom:10px;background:var(--surface,#181c27);color:var(--text,#e8eaf0);border:1px solid var(--border2,rgba(255,255,255,.12));border-radius:6px;font-family:var(--font,inherit)';
+  ov.innerHTML='<div style="background:var(--surface2,#1e2333);border:1px solid var(--border2,rgba(255,255,255,.12));border-radius:10px;width:440px;max-width:100%;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,.5)">'
+    +'<div style="padding:12px 16px;border-bottom:1px solid var(--border,rgba(255,255,255,.07));font-weight:600;color:var(--text,#e8eaf0)">🗂 เพิ่มฟอร์มเข้าคลัง</div>'
+    +'<div style="padding:14px 16px">'
+    +'<div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text,#e8eaf0)">ชื่อฟอร์ม</div>'
+    +'<input id="_ftName" placeholder="เช่น ใบส่งมอบงาน, ใบเบิกอุปกรณ์" style="'+_inp+'">'
+    +'<div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text,#e8eaf0)">หมวดหมู่</div>'
+    +'<select id="_ftCat" style="'+_inp+'">'+FORM_TPL_CATS.map(c=>'<option style="background:var(--surface,#181c27);color:var(--text,#e8eaf0)">'+c+'</option>').join('')+'</select>'
+    +'<div style="font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text,#e8eaf0)">ไฟล์ต้นฉบับ (Excel / Word / PDF)</div>'
+    +'<button class="btn btn-sm" style="font-size:12px" onclick="document.getElementById(\'st-formtpl-input\').click()">เลือกไฟล์…</button> <span id="_ftFileName" style="font-size:11px;color:var(--muted,#7b8299)">ยังไม่เลือกไฟล์</span>'
+    +'<div id="_ftStatus" style="font-size:12px;color:var(--muted,#7b8299);min-height:18px;margin-top:8px"></div>'
+    +'</div>'
+    +'<div style="padding:12px 16px;border-top:1px solid var(--border,rgba(255,255,255,.07));display:flex;justify-content:flex-end;gap:8px">'
+    +'<button class="btn btn-sm" onclick="(function(){var o=document.getElementById(\'_addFormTpl\');if(o)o.remove();_addFormTplFile=null;})()">ยกเลิก</button>'
+    +'<button class="btn btn-sm btn-primary" onclick="saveFormTemplate()">บันทึกเข้าคลัง</button>'
+    +'</div></div>';
+  document.body.appendChild(ov);
+  _addFormTplFile=null;
+  ov.addEventListener('mousedown',e=>{ if(e.target===ov){ ov.remove(); _addFormTplFile=null; } });
+}
+function uploadFormTemplateFile(input) {
+  const f = input.files && input.files[0]; if(!f) return;
+  _addFormTplFile = f;
+  const el=document.getElementById('_ftFileName'); if(el)el.textContent=f.name;
+  const nm=document.getElementById('_ftName'); if(nm && !nm.value) nm.value = f.name.replace(/\.[^.]+$/,'');
+  input.value='';
+}
+async function saveFormTemplate() {
+  const name=(document.getElementById('_ftName')||{}).value||'';
+  const cat=(document.getElementById('_ftCat')||{}).value||'อื่นๆ';
+  const st=document.getElementById('_ftStatus');
+  if(!_addFormTplFile){ if(st)st.innerHTML='<span style="color:var(--red)">กรุณาเลือกไฟล์</span>'; return; }
+  if(!name.trim()){ if(st)st.innerHTML='<span style="color:var(--red)">กรุณาตั้งชื่อฟอร์ม</span>'; return; }
+  if(st)st.textContent='⏳ กำลังอัปโหลด...';
+  try {
+    const b64 = await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(String(e.target.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(_addFormTplFile); });
+    const safe = _addFormTplFile.name.replace(/[\\/:*?"<>|]/g,'_');
+    const up = await _uploadFileGraph('FormTemplates', Date.now()+'_'+safe, _addFormTplFile.type||'application/octet-stream', b64);
+    const arr = _formTemplates();
+    arr.push({ id:'ft'+Date.now(), name:name.trim(), category:cat, fileUrl:up.fileUrl, fileName:_addFormTplFile.name, mime:_addFormTplFile.type||'', by:(currentUser&&(currentUser.displayName||currentUser.email))||'', at:new Date().toISOString() });
+    await _saveFormTemplates(arr);
+    const o=document.getElementById('_addFormTpl'); if(o)o.remove(); _addFormTplFile=null;
+    renderSTFormLibrary();
+    toast('เพิ่มฟอร์มเข้าคลังแล้ว','success');
+  } catch(e) { if(st)st.innerHTML='<span style="color:var(--red)">ไม่สำเร็จ: '+escHtml(e.message)+'</span>'; }
+}
+async function deleteFormTemplate(id) {
+  if(!confirm('ลบฟอร์มนี้ออกจากคลัง?')) return;
+  try { await _saveFormTemplates(_formTemplates().filter(t=>String(t.id)!==String(id))); renderSTFormLibrary(); toast('ลบฟอร์มแล้ว','success'); }
+  catch(e){ toast('ลบไม่สำเร็จ: '+e.message,'error'); }
+}
+
 function renderSTDocs() {
   renderDeliveryChecklist();
+  renderSTFormLibrary();
   const list = document.getElementById('st-docs-list');
   if (!list) return;
   const savedDocs = stDealData.docs || [];
