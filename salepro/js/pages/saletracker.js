@@ -183,7 +183,7 @@ let paymentsCache = null; // cache payments ใน memory ลด API calls
 
 
 function switchSTTab(tab, el) {
-  ['timeline','docs','payment','procurement','custpo','tech','expense'].forEach(t => {
+  ['timeline','docs','payment','procurement','custpo','tech','expense','expiry'].forEach(t => {
     const panel = document.getElementById('st-tab-' + t);
     if (panel) panel.style.display = t === tab ? 'block' : 'none';
   });
@@ -196,7 +196,135 @@ function switchSTTab(tab, el) {
   if (tab === 'tech') renderTechJobList();
   if (tab === 'custpo') renderCustPOTab();
   if (tab === 'expense') renderExpenseTab();
+  if (tab === 'expiry') renderExpiryTab();
 }
+
+// ============================================================
+// SALE TRACKER — แจ้งเตือนวันหมดอายุ/ต่ออายุ (อุปกรณ์/License/Warranty) รายสินค้า
+// เก็บใน stDealData.expiries = [{id,type,name,serial,startDate,expiryDate,qty,note,emails[],remindDays,remindSentAt,renewed,renewedAt}]
+// ============================================================
+const EXPIRY_TYPES = ['อุปกรณ์','License','Warranty','สัญญาบริการ','อื่นๆ'];
+function _stExpiries() { if (!Array.isArray(stDealData.expiries)) stDealData.expiries = []; return stDealData.expiries; }
+// สถานะอายุ: คืน {days, label, color}  (days = เหลือกี่วัน ติดลบ=เลยกำหนด)
+function expiryStatus(expiryDate, renewed) {
+  if (renewed) return { days: null, label: '✓ ต่ออายุแล้ว', color: 'var(--green)' };
+  if (!expiryDate) return { days: null, label: 'ยังไม่กำหนด', color: 'var(--muted)' };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(expiryDate + 'T00:00:00');
+  const days = Math.round((d - today) / 86400000);
+  if (days < 0) return { days, label: 'หมดอายุแล้ว ' + Math.abs(days) + ' วัน', color: 'var(--red)' };
+  if (days === 0) return { days, label: 'หมดอายุวันนี้', color: 'var(--red)' };
+  if (days <= 30) return { days, label: 'ใกล้หมด เหลือ ' + days + ' วัน', color: 'var(--amber)' };
+  if (days <= 90) return { days, label: 'เหลือ ' + days + ' วัน', color: '#fbbf24' };
+  return { days, label: 'เหลือ ' + days + ' วัน', color: 'var(--green)' };
+}
+function renderExpiryTab() {
+  const host = document.getElementById('st-expiry-list'); if (!host) return;
+  const list = _stExpiries();
+  const isReadOnly = !!stDealData.closed;
+  const typeOpts = (cur) => EXPIRY_TYPES.map(t => '<option ' + (cur===t?'selected':'') + '>' + t + '</option>').join('');
+  const rows = list.map(function(e) {
+    const st = expiryStatus(e.expiryDate, e.renewed);
+    return '<div style="border:1px solid var(--border);border-radius:9px;background:var(--surface2);padding:10px 12px;margin-bottom:9px">'
+      + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
+      + '<select onchange="updateExpiry(\'' + e.id + '\',\'type\',this.value)" style="font-size:12px;max-width:130px">' + typeOpts(e.type) + '</select>'
+      + '<input value="' + escHtml(e.name||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'name\',this.value)" placeholder="ชื่อสินค้า/รุ่น" style="flex:1;min-width:0;font-size:12px">'
+      + '<span style="font-size:11px;color:' + st.color + ';white-space:nowrap;font-weight:600">● ' + st.label + '</span>'
+      + '<button onclick="removeExpiry(\'' + e.id + '\')" title="ลบ" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px">✕</button>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+      + '<label style="font-size:11px;color:var(--muted)">Serial <input value="' + escHtml(e.serial||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'serial\',this.value)" placeholder="S/N" style="font-size:11px;max-width:120px;margin-left:3px"></label>'
+      + '<label style="font-size:11px;color:var(--muted)">จำนวน <input type="number" min="0" value="' + (e.qty!=null?e.qty:'') + '" oninput="updateExpiry(\'' + e.id + '\',\'qty\',this.value)" style="font-size:11px;max-width:60px;margin-left:3px"></label>'
+      + '<label style="font-size:11px;color:var(--muted)">วันเริ่ม <input type="date" value="' + (e.startDate||'') + '" onchange="updateExpiry(\'' + e.id + '\',\'startDate\',this.value)" style="font-size:11px;margin-left:3px"></label>'
+      + '<label style="font-size:11px;color:var(--text);font-weight:600">หมดอายุ <input type="date" value="' + (e.expiryDate||'') + '" onchange="updateExpiry(\'' + e.id + '\',\'expiryDate\',this.value)" style="font-size:11px;margin-left:3px"></label>'
+      + '<span style="font-size:11px;color:var(--muted)">อายุ: <button class="btn btn-sm" onclick="setExpiryDuration(\'' + e.id + '\',1,\'y\')" style="font-size:10px;padding:2px 6px">+1ปี</button><button class="btn btn-sm" onclick="setExpiryDuration(\'' + e.id + '\',3,\'y\')" style="font-size:10px;padding:2px 6px">+3ปี</button><button class="btn btn-sm" onclick="setExpiryDuration(\'' + e.id + '\',5,\'y\')" style="font-size:10px;padding:2px 6px">+5ปี</button> หรือ <input type="number" min="0" placeholder="จำนวน" id="exdur-' + e.id + '" style="font-size:11px;max-width:60px"><select id="exunit-' + e.id + '" style="font-size:11px"><option value="d">วัน</option><option value="m">เดือน</option><option value="y" selected>ปี</option></select><button class="btn btn-sm" onclick="setExpiryDurationInput(\'' + e.id + '\')" style="font-size:10px;padding:2px 6px">คำนวณ</button></span>'
+      + '<label style="font-size:11px;color:var(--muted)">เตือนล่วงหน้า <input type="number" min="0" value="' + (e.remindDays!=null?e.remindDays:30) + '" oninput="updateExpiry(\'' + e.id + '\',\'remindDays\',this.value)" style="font-size:11px;max-width:54px;margin-left:3px"> วัน</label>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">'
+      + '<label style="font-size:11px;color:var(--muted);flex:1;min-width:160px">แจ้งเตือนถึงอีเมล <input value="' + escHtml((e.emails||[]).join(', ')) + '" oninput="updateExpiryEmails(\'' + e.id + '\',this.value)" placeholder="a@x.com, b@y.com" style="font-size:11px;width:100%;margin-top:2px"></label>'
+      + '<input value="' + escHtml(e.note||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'note\',this.value)" placeholder="หมายเหตุ" style="font-size:11px;flex:1;min-width:140px">'
+      + (e.renewed
+          ? '<button class="btn btn-sm" onclick="updateExpiry(\'' + e.id + '\',\'renewed\',false)" style="font-size:11px">ยกเลิกต่ออายุ</button>'
+          : '<button class="btn btn-sm btn-success" onclick="markExpiryRenewed(\'' + e.id + '\')" style="font-size:11px">✓ ต่ออายุแล้ว</button>')
+      + '</div></div>';
+  }).join('');
+  host.innerHTML = (isReadOnly ? '' : '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center"><button class="btn btn-sm btn-primary" onclick="addExpiryRow()">+ เพิ่มรายการ</button><button class="btn btn-sm" onclick="pullExpiryFromQuote()">⟲ ดึงจากใบเสนอราคา</button><button class="btn btn-sm btn-success" style="margin-left:auto" onclick="saveExpiryManual()">💾 บันทึก</button></div>')
+    + (rows || '<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px">ยังไม่มีรายการติดตามวันหมดอายุ</div>');
+}
+let _expirySaveT = null;
+function _expirySaveSoon() { clearTimeout(_expirySaveT); _expirySaveT = setTimeout(function(){ saveSTDealData(); }, 600); }
+function addExpiryRow() { _stExpiries().push({ id: 'ex'+_nextItemId(), type:'License', name:'', serial:'', startDate:'', expiryDate:'', qty:'', note:'', emails:(currentUser&&currentUser.email?[currentUser.email]:[]), remindDays:30, remindSentAt:null, renewed:false }); renderExpiryTab(); saveSTDealData(); }
+function removeExpiry(id) { stDealData.expiries = _stExpiries().filter(e => e.id !== id); renderExpiryTab(); saveSTDealData(); }
+function updateExpiry(id, field, val) { const e = _stExpiries().find(x => x.id === id); if (!e) return;
+  if (field==='qty'||field==='remindDays') val = (val===''?'':+val);
+  if (field==='renewed') { e.renewed = !!val; e.renewedAt = val ? new Date().toISOString() : null; if(!val) e.remindSentAt=null;
+    if (val && typeof _stTimeline==='function') _stTimeline('♻️ ต่ออายุแล้ว: ' + (e.type||'') + ' ' + (e.name||'') + (e.serial?(' (S/N '+e.serial+')'):'') + (e.expiryDate?(' · เดิมหมด '+e.expiryDate):''), 'reminder');
+    renderExpiryTab(); saveSTDealData(); if (typeof renderSTTimeline==='function') renderSTTimeline(); return; }
+  if (field==='expiryDate') e.remindSentAt = null;   // เปลี่ยนวันหมดอายุ → เตือนใหม่ได้
+  e[field] = val;
+  if (field==='type'||field==='expiryDate'||field==='startDate') renderExpiryTab();   // อัปเดตป้ายสถานะ
+  _expirySaveSoon();
+}
+function updateExpiryEmails(id, val) { const e = _stExpiries().find(x => x.id === id); if (!e) return; e.emails = val.split(',').map(s=>s.trim()).filter(Boolean); _expirySaveSoon(); }
+// คำนวณวันหมดอายุจาก "อายุ" (นับจากวันเริ่ม ถ้าไม่มีใช้วันนี้)
+function _addPeriod(ds, n, unit) { const base = ds ? new Date(ds+'T00:00:00') : new Date(); if (isNaN(base)) return ''; const d = new Date(base); if(unit==='y') d.setFullYear(d.getFullYear()+n); else if(unit==='m') d.setMonth(d.getMonth()+n); else d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function setExpiryDuration(id, n, unit) { const e = _stExpiries().find(x => x.id === id); if (!e) return; e.expiryDate = _addPeriod(e.startDate, +n||0, unit); e.remindSentAt = null; renderExpiryTab(); saveSTDealData(); }
+function setExpiryDurationInput(id) { const n = +(document.getElementById('exdur-'+id)?.value||0); const unit = document.getElementById('exunit-'+id)?.value||'y'; if(!n){ toast('ใส่จำนวนก่อน','error'); return; } setExpiryDuration(id, n, unit); }
+async function saveExpiryManual() { try { await saveSTDealData(); toast('บันทึกรายการหมดอายุแล้ว ✓', 'success'); } catch(e) { toast('บันทึกไม่สำเร็จ: '+e.message, 'error'); } }
+function markExpiryRenewed(id) { updateExpiry(id,'renewed',true); }
+async function pullExpiryFromQuote() {
+  try {
+    const items = (typeof getQuoteItemsForST==='function') ? await getQuoteItemsForST() : [];
+    const have = new Set(_stExpiries().map(e => (e.name||'').trim().toLowerCase()));
+    let n = 0;
+    items.forEach(function(it) {
+      const nm = (it.Title||it.Description||'').trim(); if (!nm) return;
+      if (have.has(nm.toLowerCase())) return;
+      _stExpiries().push({ id:'ex'+_nextItemId(), type:'อุปกรณ์', name:nm, serial:'', startDate:'', expiryDate:'', qty:(+it.Quantity||''), note:'', emails:(currentUser&&currentUser.email?[currentUser.email]:[]), remindDays:30, remindSentAt:null, renewed:false }); n++;
+    });
+    renderExpiryTab(); saveSTDealData();
+    toast(n ? ('ดึง '+n+' รายการมาแล้ว — กรอกวันหมดอายุต่อได้เลย') : 'ไม่มีรายการใหม่ให้ดึง', n?'success':'info');
+  } catch(e) { toast('ดึงไม่สำเร็จ: '+e.message, 'error'); }
+}
+// ส่งอีเมลแจ้งเตือนหมดอายุที่ถึงกำหนด (เรียกตอน sync — ล้อ checkFollowUpsDue)
+async function checkExpiriesDue() {
+  if (_expChecked || !currentUser) return;
+  _expChecked = true;
+  const today = new Date().toISOString().split('T')[0];
+  let sent = 0;
+  for (const q of quotesData) {
+    try {
+      const ds = parseDealStatus(q.DealStatus);
+      const exps = Array.isArray(ds.expiries) ? ds.expiries : [];
+      let changed = false;
+      for (const e of exps) {
+        if (e.renewed || e.remindSentAt || !e.expiryDate) continue;
+        const remindDate = _addDaysStr(e.expiryDate, -(+e.remindDays||30));
+        if (remindDate > today) continue;   // ยังไม่ถึงวันเตือน
+        const emails = (e.emails||[]).filter(Boolean);
+        if (!emails.length) continue;
+        const stx = expiryStatus(e.expiryDate, false);
+        const subject = '[SalePro] ⏰ ใกล้หมดอายุ: ' + (e.type||'') + ' ' + (e.name||'') + ' — ' + (q.ClientName||'');
+        const body = 'แจ้งเตือนวันหมดอายุ\n────────────────────────\n'
+          + 'ประเภท: ' + (e.type||'') + '\nสินค้า/รุ่น: ' + (e.name||'') + (e.serial?('\nSerial: '+e.serial):'')
+          + '\nลูกค้า: ' + (q.ClientName||'') + '\nใบเสนอราคา: ' + (q.Title||'')
+          + '\nวันหมดอายุ: ' + e.expiryDate + ' (' + stx.label + ')'
+          + (e.note?('\nหมายเหตุ: '+e.note):'')
+          + '\n────────────────────────\nโปรดติดต่อลูกค้าเพื่อต่ออายุ — ระบบ SalePro';
+        for (const to of emails) { try { await _sendMailGraph(to, subject, body); } catch(err) { console.warn('expiry mail '+to+' failed:', err.message); } }
+        e.remindSentAt = new Date().toISOString(); changed = true; sent++;
+        ds.notes = ds.notes || [];
+        ds.notes.push({ id: Date.now(), user: 'ระบบ', text: '⏰ แจ้งเตือนใกล้หมดอายุ: ' + (e.type||'') + ' ' + (e.name||'') + ' (หมด ' + e.expiryDate + ') → ' + emails.join(', '), ts: e.remindSentAt, type: 'reminder' });
+      }
+      if (changed) { const val = serializeDealStatus(ds); await putStoredDealStatus(q.id, val); q.DealStatus = val; }
+    } catch(e) { console.warn('checkExpiriesDue:', e.message); }
+  }
+  if (sent) toast('⏰ ส่งแจ้งเตือนหมดอายุ ' + sent + ' รายการแล้ว', 'success');
+}
+function _addDaysStr(ds, n) { if(!ds) return ''; const d=new Date(ds+'T00:00:00'); if(isNaN(d))return''; d.setDate(d.getDate()+(+n||0)); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+let _expChecked = false;
+
+
 
 // ============================================================
 // SALE TRACKER — ค่าใช้จ่าย / งบประมาณ
@@ -703,6 +831,7 @@ async function sendPORequest(){
 
 async function saveSTDealData(throwOnError){
   try{
+    _quietWrite=true;   // auto-save หน้าติดตาม = เงียบ ไม่เด้ง save bar
     const toSave={...stDealData,
       docs:(stDealData.docs||[]).map(d=>({id:d.id,name:d.name,docType:d.docType,url:d.url,ts:d.ts})),
       custPOs:(stDealData.custPOs||[]).map(p=>({id:p.id,poNumber:p.poNumber,poDate:p.poDate,note:p.note,fileName:p.fileName,fileUrl:p.fileUrl||'',savedBy:p.savedBy,ts:p.ts}))
@@ -711,6 +840,7 @@ async function saveSTDealData(throwOnError){
     await putStoredDealStatus(stQuoteId, val);   // เก็บใน Settings list — ไม่แตะ quotation item
     const q=quotesData.find(x=>x.id===stQuoteId);if(q)q.DealStatus=val;
   }catch(e){toast('บันทึก DealStatus ไม่สำเร็จ: '+e.message,'error');if(throwOnError)throw e;}
+  finally{ _quietWrite=false; }
 }
 
 // ============================================================

@@ -74,6 +74,14 @@
       </div>
       <div class="nav-group">
         <div class="nav-label">Settings</div>
+        <div class="nav-item" onclick="showPage('expiry',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3L2 6"/><path d="M22 6l-3-3"/></svg>
+          แจ้งเตือนหมดอายุ
+        </div>
+        <div class="nav-item" onclick="showPage('projects',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+          โครงการ (Project)
+        </div>
         <div class="nav-item" onclick="showPage('catalog',this)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
           Catalog สินค้า
@@ -332,12 +340,17 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
               เลือกจาก Catalog
             </button>
+            <button class="btn btn-sm" onclick="openProjectItemPicker()">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+              จาก Project
+            </button>
             <button class="btn btn-sm" onclick="addItem()">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               เพิ่มรายการ
             </button>
             </span><!-- /nq-tools -->
           </div>
+          <div id="nq-project-update" style="display:none"></div>
           <div style="padding:12px">
             <div class="items-wrap">
               <datalist id="qi-unit-opts"><option value="Year"></option><option value="Month"></option><option value="ปี"></option><option value="เดือน"></option><option value="ชิ้น"></option><option value="ชุด"></option><option value="งาน"></option></datalist>
@@ -437,6 +450,23 @@
       </div>
 
       <!-- CATALOG -->
+      <div class="page" id="page-expiry">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <input id="expiry-search" oninput="renderExpiryDashboard()" placeholder="🔍 ค้นหา ชื่อ/ลูกค้า/Serial" style="flex:1;min-width:180px;max-width:320px;font-size:13px;padding:7px 10px">
+          <select id="expiry-filter-type" onchange="renderExpiryDashboard()" style="font-size:13px"><option value="">ทุกประเภท</option></select>
+          <select id="expiry-filter-status" onchange="renderExpiryDashboard()" style="font-size:13px"><option value="">ทุกสถานะ</option><option value="overdue">หมดอายุแล้ว</option><option value="30">ใกล้หมด ≤30 วัน</option><option value="90">ใกล้หมด ≤90 วัน</option><option value="active">ยังไม่หมด</option><option value="renewed">ต่ออายุแล้ว</option></select>
+          <button class="btn btn-sm" onclick="loadExpiryPage()">🔄 รีเฟรช</button>
+        </div>
+        <div id="expiry-summary" style="margin-bottom:12px"></div>
+        <div id="expiry-dashboard"></div>
+      </div>
+      <div class="page" id="page-projects">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <div style="font-size:12px;color:var(--muted)">โครงการที่ต้องใช้ผู้รับเหมา/Vendor หลายเจ้า — สร้างแล้วส่งให้ทีมจัดซื้อหา Vendor แต่ละสายงาน</div>
+          <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openProjectModal()">➕ สร้างโครงการ</button>
+        </div>
+        <div id="projects-list"></div>
+      </div>
       <div class="page" id="page-catalog">
         <div class="filter-row">
           <input id="cat-search" placeholder="ค้นหาสินค้า..." oninput="searchCatalog()" style="flex:1;max-width:280px">
@@ -848,6 +878,7 @@
       <button id="st-tab-btn-tech" class="st-tab" data-tab="tech" onclick="switchSTTab('tech',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">🔧 ช่างติดตั้ง</button>
       <button id="st-tab-btn-payment" class="st-tab" data-tab="payment" onclick="switchSTTab('payment',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">💳 บันทึกชำระ</button>
       <button id="st-tab-btn-expense" class="st-tab" data-tab="expense" onclick="switchSTTab('expense',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">💰 ค่าใช้จ่าย</button>
+      <button id="st-tab-btn-expiry" class="st-tab" data-tab="expiry" onclick="switchSTTab('expiry',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">⏰ หมดอายุ/ต่ออายุ</button>
       <button class="st-tab" data-tab="docs" onclick="switchSTTab('docs',this)" style="padding:9px 11px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;font-family:var(--font)">📎 เอกสาร</button>
     </div>
     <div class="modal-body" style="padding:16px 20px;min-height:320px">
@@ -862,6 +893,10 @@
           </div>
         </div>
         <div id="st-timeline-list" style="max-height:320px;overflow-y:auto"></div>
+      </div>
+      <div id="st-tab-expiry" style="display:none">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">ตั้งวันหมดอายุรายสินค้าที่ส่งมอบลูกค้า (อุปกรณ์/License/Warranty) — ระบบจะเตือนในเมนู “แจ้งเตือนหมดอายุ” และส่งอีเมลเมื่อใกล้กำหนด</div>
+        <div id="st-expiry-list"></div>
       </div>
       <div id="st-tab-docs" style="display:none">
         <!-- คลังฟอร์มบริษัท (ดาวน์โหลดไปกรอก → อัปโหลด PDF กลับเข้าดีล) -->
@@ -1387,11 +1422,11 @@
 <script src="../shared/gateway-client.js?v=admin1"></script>
 <script src="js/config.js?v=admin1"></script>
 <script src="js/auth.js?v=admin1"></script>
-<script src="js/api.js?v=admin1"></script>
-<script src="js/sync.js?v=admin1"></script>
-<script src="js/pages/ui.js?v=admin1"></script>
+<script src="js/api.js?v=g2"></script>
+<script src="js/sync.js?v=admin2"></script>
+<script src="js/pages/ui.js?v=admin2"></script>
 <script src="js/pages/dashboard.js?v=admin1"></script>
-<script src="js/pages/quotes.js?v=admin1"></script>
+<script src="js/pages/quotes.js?v=admin2"></script>
 <script src="js/pages/approve.js?v=admin1"></script>
 <script src="js/pages/payment.js?v=admin1"></script>
 <script src="js/pages/catalog.js?v=admin1"></script>
@@ -1400,11 +1435,13 @@
 <script src="js/pages/signature.js?v=admin1"></script>
 <script src="js/pages/company.js?v=admin1"></script>
 <script src="js/pages/pdf.js?v=admin1"></script>
-<script src="js/pages/saletracker.js?v=admin2"></script>
+<script src="js/pages/saletracker.js?v=admin3"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>
 <script src="js/pages/belowcost.js?v=admin1"></script>
 <script src="js/pages/procurement.js?v=admin1"></script>
+<script src="js/pages/projects.js?v=g1"></script>
+<script src="js/pages/expiry.js?v=g1"></script>
 <script src="js/pages/contracts.js?v=admin1"></script>
 <script src="js/app.js?v=admin1"></script>
 <script src="js/tour.js?v=admin1"></script>

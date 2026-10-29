@@ -138,6 +138,8 @@ async function saveQuoteDefaults(note, terms) {
 }
 function initNewQuote() {
   _dupSourceId = null;   // ใบใหม่เปล่า ไม่ผูกความสัมพันธ์
+  if (typeof _nqProjectId !== 'undefined') _nqProjectId = null;
+  if (typeof dismissProjectUpdate === 'function') dismissProjectUpdate();
   document.getElementById('q-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('q-client').value = '';
   document.getElementById('q-contact').value = '';
@@ -1111,6 +1113,7 @@ async function editQuote(id) {
     // Force full re-render of items
     document.getElementById('items-body').innerHTML = '';
     renderItems();
+    if (typeof renderProjectUpdateBanner === 'function') renderProjectUpdateBanner();
     updateApproverBox();
     // โหลดขนาดฟอนต์ + คอลัมน์ + ระยะห่างของใบนี้ (รายใบ) — ถ้าไม่เคยตั้งใช้ค่าเริ่มต้น
     applyZoneFonts(getQuoteZoneFonts(id));
@@ -1514,6 +1517,11 @@ async function saveQuote(status) {
       quoteId = created.id;
       // ผูกความสัมพันธ์ถ้าใบนี้มาจาก "สร้างใหม่จากใบเก่า"
       if (_dupSourceId) { try { await saveQuoteParent(quoteId, _dupSourceId); } catch(e) {} _dupSourceId = null; }
+    }
+    // ผูกใบเสนอราคาเข้ากับโครงการ (ถ้าดึงรายการมาจาก Project)
+    if (typeof _nqProjectId !== 'undefined' && _nqProjectId && typeof linkQuoteToProject === 'function') {
+      try { await linkQuoteToProject(_nqProjectId, quoteId); } catch(e) {}
+      _nqProjectId = null;
     }
     // Save line items — รวมเป็นชุดเดียวแล้วเขียนทีเดียว (batch) เพื่อลด round-trip (เร็วขึ้นมากบน Google Sheet)
     const itemExtra = [];

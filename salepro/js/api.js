@@ -49,8 +49,9 @@ function _saveEnd(ok) {
 // มี auto-retry กัน CORS/redirect ของ Apps Script หลุดเป็นครั้งคราว
 function _sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 // wrapper: โชว์ progress overlay เฉพาะ action ที่ "เขียนข้อมูล" (ไม่ใช่ list)
+var _quietWrite = false;   // true = บันทึกเงียบ (ไม่โชว์ save bar) — ใช้กับ auto-save ตอนพิมพ์/เลือก
 async function _call(payload) {
-  const write = payload && payload.action && payload.action !== 'list' && payload.action !== 'multiList';
+  const write = payload && payload.action && payload.action !== 'list' && payload.action !== 'multiList' && !_quietWrite;
   if (!write) return _callRaw(payload);
   _saveStart(); let ok = false;
   try { const d = await _callRaw(payload); ok = true; return d; }

@@ -91,6 +91,7 @@ async function syncAll() {
     toast('Sync สำเร็จ', 'success');
     // ตรวจการติดตามที่ถึงกำหนด (ต่อสัญญา ฯลฯ) → ส่งเมลแจ้งผู้เกี่ยวข้อง
     checkFollowUpsDue().catch(e => console.warn('followup check:', e.message));
+    if (typeof checkExpiriesDue === 'function') checkExpiriesDue().catch(e => console.warn('expiry check:', e.message));
     if (typeof checkContractsDue === 'function') checkContractsDue().catch(e => console.warn('contract check:', e.message));
   } catch(e) {
     toast('Sync ไม่สำเร็จ: ' + e.message, 'error');
