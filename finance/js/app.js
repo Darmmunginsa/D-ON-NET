@@ -55,6 +55,7 @@ async function loadAll(){
     finTx  = await getListItems(CONFIG.lists.financeTx).catch(()=>[]);
     finReq = await getListItems(CONFIG.lists.financeReq).catch(()=>[]);
     finCat = await getListItems(CONFIG.lists.financeCat).catch(()=>[]);
+    finParties = await getListItems('FinanceParty');
     // รายรับจาก SalePro (Payments)
     const pays = await getListItems(CONFIG.lists.payments).catch(()=>[]);
     impIncome = (pays||[]).filter(p=>+p.AmountPaid>0).map(p=>({
@@ -87,7 +88,7 @@ function catNames(kind){ const fromSheet=finCat.filter(c=>(c.Kind||'')===kind).m
 
 // รวมทุกแหล่งเป็น ledger เดียว
 function allEntries(){
-  const manual = finTx.map(t=>({ _id:t._id||t.id, date:(t.Date||'').slice(0,10), type:t.TxType||'expense', category:t.Category||'', amount:+t.Amount||0, party:t.Party||'', method:t.Method||'', note:t.Note||'', docUrl:t.DocURL||'', docName:t.DocName||'', source:'Manual', editable:true }));
+  const manual = finTx.map(t=>({ _id:t._id||t.id, date:(t.Date||'').slice(0,10), type:t.TxType||'expense', category:t.Category||'', amount:+t.Amount||0, party:t.Party||'', method:t.Method||'', note:t.Note||'', docUrl:t.DocURL||'', docName:t.DocName||'', source:'Manual', taxKnown:t.TaxVersion==='1', editable:true }));
   const reqPaid = finReq.filter(r=>r.Status==='Paid').map(r=>({ date:(r.PaidDate||r.ApprovedAt||r.Date||'').slice(0,10), type:'expense', category:r.Category||'เบิกจ่าย', amount:+r.Amount||0, party:r.Requester||'', method:r.PaidMethod||'', note:'ใบเบิก '+(r.ReqNo||'')+(r.Reason?' · '+r.Reason:''), docUrl:r.DocURL||'', docName:r.DocName||'', source:'เบิกจ่าย' }));
   return manual.concat(reqPaid, impIncome, impExpense).filter(e=>e.date);
 }
@@ -108,6 +109,7 @@ function go(v){ _view=v;
   else if(v==='req') el.innerHTML=renderReq();
   else if(v==='cat') el.innerHTML=renderCat();
   else if(v==='report') el.innerHTML=renderReport();
+  else if(v==='parties') el.innerHTML=renderParties();
   if(v==='dash') setTimeout(drawCharts,30);
 }
 
@@ -200,26 +202,37 @@ function openTx(type,row){ _editTxId=row?row._id:null; _txDoc=row?{url:row.docUr
     <input type="hidden" id="tx-type" value="${type}">
     <div class="fg"><label>วันที่</label><input type="date" id="tx-date" value="${r.date||_today()}"></div>
     <div class="fg"><label>หมวดหมู่</label><select id="tx-cat">${cats.map(c=>`<option ${r.category===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
-    <div class="fg"><label>จำนวนเงิน (บาท)</label><input type="number" id="tx-amt" step="0.01" value="${r.amount||''}" placeholder="0.00"></div>
-    <div class="fg"><label>${type==='income'?'ผู้จ่าย/ลูกค้า':'ผู้รับ/ผู้ขาย'}</label><input id="tx-party" value="${esc(r.party||'')}"></div>
+    <div class="fg"><label>จำนวนเงิน (บาท)</label><input type="number" id="tx-amt" oninput="updateTxTax()" step="0.01" value="${r.amount||''}" placeholder="0.00"></div>
+    <div class="fg"><label>เลือกจากทะเบียนคู่ค้า</label><select onchange="pickTxParty(this.value)"><option value="">เลือกคู่ค้า / กรอกเองด้านล่าง</option>${partyOptions()}</select></div>
+    <input type="hidden" id="tx-party-id" value="${esc(r.partyId||'')}">
+    <div class="fg"><label>ผู้จ่าย/ลูกค้า / ผู้รับ/ผู้ขาย</label><input id="tx-party" value="${esc(r.party||'')}"></div>
+    <div class="fg"><label>เลขผู้เสียภาษีคู่ค้า</label><input id="tx-party-tax" value="${esc(r.partyTax||'')}"></div>
+    <div class="fg"><label>สาขาคู่ค้า</label><input id="tx-party-branch" value="${esc(r.partyBranch||'')}"></div>
+    ${txTaxForm(r,type)}
     <div class="fg"><label>วิธีชำระ</label><select id="tx-method">${['เงินโอน','เงินสด','เช็ค','บัตรเครดิต','อื่น ๆ'].map(m=>`<option ${r.method===m?'selected':''}>${m}</option>`).join('')}</select></div>
     <div class="fg"><label>หมายเหตุ</label><input id="tx-note" value="${esc(r.note||'')}"></div>
     <div class="fg"><label>เอกสารแนบ</label><input type="file" id="tx-file" onchange="_txUpload(this)"><span id="tx-doc">${_txDoc&&_txDoc.url?docChip(_txDoc.url,_txDoc.name):''}</span></div>
   `,`<button class="btn btn-primary" onclick="saveTx()">บันทึก</button>`);
+  updateTxTax();
 }
-function editTx(id){ const t=finTx.find(x=>String(x._id||x.id)===String(id)); if(!t)return; openTx(t.TxType||'expense',{_id:t._id||t.id,date:(t.Date||'').slice(0,10),category:t.Category,amount:+t.Amount||0,party:t.Party,method:t.Method,note:t.Note,docUrl:t.DocURL,docName:t.DocName}); }
+function editTx(id){ const t=finTx.find(x=>String(x._id||x.id)===String(id)); if(!t)return; openTx(t.TxType||'expense',{_id:t._id||t.id,date:(t.Date||'').slice(0,10),category:t.Category,amount:t.TaxVersion==='1'?+t.InputAmount:+t.Amount||0,taxMode:t.TaxMode,vatRate:t.VatRate,whtRate:t.WhtRate,taxDoc:t.TaxDoc,taxDate:t.TaxDate,vatEligible:t.VatEligible==='true',partyId:t.PartyID,partyTax:t.PartyTaxID,partyBranch:t.PartyBranch,party:t.Party,method:t.Method,note:t.Note,docUrl:t.DocURL,docName:t.DocName}); }
 async function _txUpload(input){ const el=document.getElementById('tx-doc'); if(el)el.textContent='⏳...'; try{ _txDoc=await uploadDoc(input); if(el)el.innerHTML=_txDoc?docChip(_txDoc.url,_txDoc.name):''; }catch(e){ if(el)el.textContent='อัปโหลดไม่สำเร็จ'; } }
 async function saveTx(){
   const type=document.getElementById('tx-type').value;
   const amt=+document.getElementById('tx-amt').value||0; if(amt<=0){ toast('กรอกจำนวนเงิน','error'); return; }
-  const fields={ Date:document.getElementById('tx-date').value, TxType:type, Category:document.getElementById('tx-cat').value,
-    Amount:String(amt), Method:document.getElementById('tx-method').value, Party:document.getElementById('tx-party').value,
+  let tax;try{tax=readTxTax();}catch(e){toast(e.message,'error');return;}
+  const fields={ TaxVersion:'1', InputAmount:String(amt), TaxMode:document.getElementById('tx-tax-mode').value, VatRate:document.getElementById('tx-vat').value, WhtRate:document.getElementById('tx-wht').value, BaseAmount:String(tax.base), VatAmount:String(tax.vat), WhtAmount:String(tax.wht), GrossAmount:String(tax.gross), TaxDoc:document.getElementById('tx-tax-doc').value.trim(), TaxDate:document.getElementById('tx-tax-date').value, VatEligible:String(document.getElementById('tx-vat-eligible').checked), PartyID:document.getElementById('tx-party-id').value, PartyTaxID:document.getElementById('tx-party-tax').value.trim(), PartyBranch:document.getElementById('tx-party-branch').value.trim(), Date:document.getElementById('tx-date').value, TxType:type, Category:document.getElementById('tx-cat').value,
+    Amount:String(tax.net), Method:document.getElementById('tx-method').value, Party:document.getElementById('tx-party').value,
     Note:document.getElementById('tx-note').value, DocURL:_txDoc?_txDoc.url:'', DocName:_txDoc?_txDoc.name:'', CreatedBy:currentUser.email };
-  try{ closeModal();
+  if(!fields.Date || !fields.TaxDate){toast('กรอกวันที่รับ/จ่ายและวันที่เอกสาร','error');return;}
+  if(tax.vat>0&&!fields.TaxDoc){toast('กรอกเลขที่ใบกำกับภาษี','error');return;}
+  if(fields.PartyTaxID&&!/^\d{13}$/.test(fields.PartyTaxID)){toast('เลขผู้เสียภาษีต้องเป็นตัวเลข 13 หลัก','error');return;}
+  const saveButton=document.querySelector('#modal-ov .modal-f button');if(saveButton?.disabled)return;if(saveButton)saveButton.disabled=true;
+  try{
     if(_editTxId){ await updateListItem(CONFIG.lists.financeTx,_editTxId,fields); const i=finTx.findIndex(x=>String(x._id||x.id)===String(_editTxId)); if(i>=0)finTx[i]=Object.assign(finTx[i],fields); }
     else { const it=await createListItem(CONFIG.lists.financeTx,fields); finTx.push(it); }
-    toast('บันทึกแล้ว','success'); go('ledger');
-  }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
+    closeModal(); toast('บันทึกแล้ว','success'); go('ledger');
+  }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }finally{if(saveButton)saveButton.disabled=false;}
 }
 async function delTx(id){ if(!confirm('ลบรายการนี้?'))return; try{ await deleteListItem(CONFIG.lists.financeTx,id); finTx=finTx.filter(x=>String(x._id||x.id)!==String(id)); toast('ลบแล้ว','success'); go('ledger'); }catch(e){ toast('ลบไม่สำเร็จ','error'); } }
 
@@ -319,13 +332,13 @@ function renderReport(){
   const inc=sum('income'), exp=sum('expense'); const ti=inc.reduce((s,p)=>s+p[1],0), te=exp.reduce((s,p)=>s+p[1],0);
   const tbl=(pairs,tot,color)=>pairs.length?pairs.map(p=>`<tr><td>${esc(p[0])}</td><td style="text-align:right;font-family:var(--mono)">${fmt0(p[1])}</td><td style="text-align:right;color:var(--muted)">${tot?Math.round(p[1]/tot*100):0}%</td></tr>`).join(''):'<tr><td colspan="3" class="empty">—</td></tr>';
   const periodBtns=['month','year','all'].map(p=>`<button class="chip ${_period===p?'active':''}" onclick="setPeriodR('${p}')">${p==='month'?'เดือนนี้':p==='year'?'ปีนี้':'ทั้งหมด'}</button>`).join('');
-  return `<div class="page-head"><h2>รายงานสรุป (P&L) <span style="font-size:13px;color:var(--muted);font-weight:400">· ${periodLabel()}</span></h2>
+  return `<div class="page-head"><h2>รายงานรับ–จ่ายและภาษี <span style="font-size:13px;color:var(--muted);font-weight:400">· ${periodLabel()}</span></h2>
     <div style="display:flex;gap:8px;align-items:center"><div class="chips">${periodBtns}</div><button class="btn btn-sm" onclick="exportCSV()">⬇ CSV</button></div></div>
     <div class="grid2">
       <div class="card"><div class="card-h" style="color:var(--green)">รายรับตามหมวด · รวม ${fmt(ti)}</div><table class="tbl"><tbody>${tbl(inc,ti)}</tbody></table></div>
       <div class="card"><div class="card-h" style="color:var(--red)">รายจ่ายตามหมวด · รวม ${fmt(te)}</div><table class="tbl"><tbody>${tbl(exp,te)}</tbody></table></div>
     </div>
-    <div class="card" style="margin-top:14px;text-align:center;padding:16px"><span style="color:var(--muted)">กำไร/ขาดทุนสุทธิ</span> <span style="font-size:22px;font-weight:700;color:${ti-te>=0?'var(--accent2)':'var(--red)'};margin-left:10px">${fmt(ti-te)}</span></div>`;
+    <div class="card" style="margin-top:14px;text-align:center;padding:16px"><span style="color:var(--muted)">เงินรับ − เงินจ่ายสุทธิ</span> <span style="font-size:22px;font-weight:700;color:${ti-te>=0?'var(--accent2)':'var(--red)'};margin-left:10px">${fmt(ti-te)}</span></div>${renderFinanceTaxReport()}`;
 }
 function setPeriodR(p){ _period=p; AppStorage.setItem('fin_period',p); go('report'); }
 function exportCSV(){
