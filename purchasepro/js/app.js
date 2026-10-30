@@ -322,7 +322,7 @@ function renderPurchases(){
   list=list.filter(poPassBasket);
   document.getElementById('purchases-body').innerHTML = list.length ? list.map(p=>`
     <tr>
-      <td style="font-family:var(--mono);font-size:12px">${esc(p.quoteTitle||'-')}${poBasketDots(p.id)}</td>
+      <td style="font-family:var(--mono);font-size:12px">${p.type==='project'?'<span class="badge" style="background:rgba(79,142,247,0.16);color:#4f8ef7;margin-right:5px">🏗 โครงการ</span>':''}${esc(p.quoteTitle||'-')}${poBasketDots(p.id)}</td>
       <td>${esc(p.client||'-')}</td><td>${esc(p.vendorName||'-')}</td>
       <td style="color:var(--muted)">${(p.items||[]).length} รายการ</td>
       <td style="font-family:var(--mono)">${fmt(poValue(p))}</td>
@@ -507,6 +507,7 @@ function _lockedNotice(){
   </div></div>`;
 }
 function renderStepper(){
+  if(editingPO.type==='project'){ const el=document.getElementById('pom-stepper'); if(el)el.innerHTML='<div class="step current" style="cursor:default">🏗 โครงการ — กระดาน Vendor (แต่ละเจ้าเดินงานแยกกัน)</div>'; return; }
   const locked=poStagesLocked();
   const cur=editingPO.stage, mx=Math.max(editingPO.maxStage||cur, cur);
   const reviewing = cur < mx;   // กำลังย้อนดูขั้นก่อนหน้า (ขั้นจริงไปถึง mx แล้ว)
@@ -520,6 +521,7 @@ function renderStepper(){
 }
 // ปิดงานได้เมื่อขั้น 6-7-8 สมบูรณ์ทุก Vendor (จ่ายเงิน/ส่ง/รับของ)
 function canClosePurchase(){
+  if(editingPO && editingPO.type==='project') return _pbAllDone();
   const vids=poVendorList(); if(!vids.length) return false;
   return vids.every(vid=>{ const pay=(sd().payment&&sd().payment.vendors&&sd().payment.vendors[vid])||{}; const sh=(sd().shipping&&sd().shipping.vendors&&sd().shipping.vendors[vid])||{}; const rc=(sd().receive&&sd().receive.vendors&&sd().receive.vendors[vid])||{}; return (+pay.amount>0) && sh.date && rc.date; });
 }
@@ -529,6 +531,13 @@ function renderFooter(){
   const catBtn='<button class="btn btn-sm" onclick="addPurchaseToCatalog()">➕ เพิ่มเข้า Catalog</button>';
   const docBtn='<button class="btn btn-sm" onclick="openAllDocs()">📂 เอกสารทั้งงาน</button>';
   if(_poReadonly){ f.innerHTML='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+docBtn+catBtn+'<span style="font-size:12px;color:var(--muted)">📖 ดูอย่างเดียว</span></div><button class="btn" onclick="closeModal(\'po-modal\')">ปิด</button>'; return; }
+  if(editingPO.type==='project'){
+    const ok=canClosePurchase();
+    const right='<button class="btn" onclick="savePurchase()">💾 บันทึก</button>'
+      + '<button class="btn btn-primary" onclick="closePurchase()" '+(ok?'':'disabled style="opacity:0.5;cursor:not-allowed"')+' title="'+(ok?'':'ต้องปิดงานให้ครบทุก Vendor ก่อน')+'">✓ ปิดโครงการ</button>';
+    f.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'+docBtn+catBtn+'</div><div style="display:flex;gap:8px">'+right+'</div>';
+    return;
+  }
   const st=editingPO.stage;
   let right='<button class="btn" onclick="savePurchase()">💾 บันทึก</button>';
   if(st<8){ right+='<button class="btn btn-primary" onclick="moveStage(1)">ขั้นถัดไป →</button>'; }
@@ -624,8 +633,356 @@ function sd(){ return editingPO.stageData; }
 function setSD(key,val){ editingPO.stageData[key]=val; }
 function field(label,id,val,type){ return `<div class="form-group"><label>${label}</label><input id="${id}" value="${esc(val||'')}" type="${type||'text'}"></div>`; }
 
+let _projCollapse={};
+function projToggleCollapse(key){ _projCollapse[key]=!_projCollapse[key]; renderStageBody(); }
+function _colArrow(key){ return _projCollapse[key]?'▶':'▼'; }
+
+// แผงรายละเอียดโครงการจาก Sale (แสดงเฉพาะงานประเภท project) — brief / สายงาน / ไฟล์แนบ
+function _projBriefPanel(){
+  if(!editingPO || editingPO.type!=='project') return '';
+  const col=!!_projCollapse['brief'];
+  const scopes=(editingPO.scopes||[]).filter(s=>(s&&(s.name||'').trim()));
+  const docs=(editingPO.docs||[]);
+  const scopeHtml = scopes.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">'+scopes.map(s=>'<span class="badge" style="background:rgba(79,142,247,0.14);color:#4f8ef7">🧩 '+esc(s.name)+(s.note?' <span style="color:var(--muted)">('+esc(s.note)+')</span>':'')+'</span>').join('')+'</div>'
+    : '<div style="font-size:12px;color:var(--muted);margin-top:4px">— Sale ไม่ได้ระบุสายงาน —</div>';
+  const docHtml = docs.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">'+docs.map(d=>(typeof docThumb==='function')?docThumb(d.url,d.name,{small:true}):('<a href="'+d.url+'" target="_blank">📎 '+esc(d.name)+'</a>')).join('')+'</div>'
+    : '<div style="font-size:12px;color:var(--muted);margin-top:4px">— ไม่มีไฟล์แนบ —</div>';
+  return '<div class="card" style="margin-bottom:14px;border:1px solid #4f8ef7;background:rgba(79,142,247,0.06)">'
+    +'<div class="card-head" style="cursor:pointer" onclick="projToggleCollapse(\'brief\')">'+_colArrow('brief')+' 🏗 โครงการจาก Sale — รายละเอียดประกอบการหา Vendor</div>'
+    +(col?'':('<div style="padding:12px 14px">'
+      +'<div style="font-size:14px;font-weight:600;color:var(--text)">'+esc(editingPO.quoteTitle||editingPO.projectName||'')+'</div>'
+      +(editingPO.client?'<div style="font-size:12px;color:var(--muted);margin-top:2px">ลูกค้า: '+esc(editingPO.client)+'</div>':'')
+      +(editingPO.note?'<div style="font-size:12px;color:var(--text);margin-top:8px;white-space:pre-line;line-height:1.55"><b>รายละเอียดงาน:</b><br>'+esc(editingPO.note)+'</div>':'')
+      +'<div style="margin-top:10px"><div style="font-size:12px;font-weight:600;color:var(--text)">สายงาน (Scope)</div>'+scopeHtml+'</div>'
+      +'<div style="margin-top:10px"><div style="font-size:12px;font-weight:600;color:var(--text)">ไฟล์แนบ</div>'+docHtml+'</div>'
+      +'<div style="font-size:11px;color:var(--accent2);margin-top:10px">💡 งานนี้ยังไม่มีรายการสินค้า — ทำ RFQ หาราคาจาก Vendor แต่ละสายงาน แล้วบันทึกเป็นรายการโครงการในขั้นถัดไป</div>'
+      +'</div>'))
+    +'</div>';
+}
+// ── โครงการ: ตัวแก้ไขรายการที่จัดซื้อจะขอราคา (เริ่มว่าง — จัดซื้อเติมเองตามสายงาน) ──
+function _projItemsEditor(){
+  const items=editingPO.items||[];
+  const scopes=(editingPO.scopes||[]).filter(s=>(s&&(s.name||'').trim()));
+  const ip='background:var(--surface);border:1px solid var(--border2);border-radius:5px;padding:4px 7px;font-size:12px;color:var(--text);width:100%';
+  const scopeOpts=idx=>{ const cur=(items[idx]&&items[idx].scope)||''; return '<option value="">—</option>'+scopes.map(s=>'<option '+(cur===s.name?'selected':'')+'>'+esc(s.name)+'</option>').join(''); };
+  const rows=items.map((it,idx)=>{ const lk=!!it.locked; const dis=lk?'disabled':''; const rowSt=lk?'opacity:0.55':'';
+    const lockBtn=lk
+      ? `<button class="btn btn-sm" onclick="projToggleLock(${idx})" title="ปลดล็อก (ดึงไปใช้ซ้ำได้)" style="padding:3px 7px;color:var(--amber)">🔒</button>`
+      : `<button class="btn btn-sm" onclick="projToggleLock(${idx})" title="ล็อกรายการนี้ (กันดึงซ้ำ)" style="padding:3px 7px;color:var(--muted)">🔓</button>`;
+    return `<tr style="${rowSt}">
+    <td style="text-align:center;color:var(--muted)">${idx+1}</td>
+    <td><input ${dis} value="${esc(it.name||'')}" oninput="projSetItem(${idx},'name',this.value)" placeholder="ชื่อรายการ/งาน" style="${ip}">${lk&&it.lockedBy?`<div style="font-size:10px;color:var(--amber)">🔒 ใช้แล้ว: ${esc(it.lockedBy)}</div>`:''}</td>
+    <td><input ${dis} value="${esc(it.pn||'')}" oninput="projSetItem(${idx},'pn',this.value)" placeholder="รหัส/PN" style="${ip}"></td>
+    <td><input ${dis} type="number" min="0" value="${it.qty!=null?it.qty:''}" oninput="projSetItem(${idx},'qty',this.value)" placeholder="จำนวน" style="${ip};text-align:center;max-width:70px"></td>
+    <td><input ${dis} value="${esc(it.unit||'')}" oninput="projSetItem(${idx},'unit',this.value)" placeholder="หน่วย" style="${ip};max-width:70px"></td>
+    <td>${scopes.length?`<select ${dis} onchange="projSetItem(${idx},'scope',this.value)" style="${ip}">${scopeOpts(idx)}</select>`:`<input ${dis} value="${esc(it.scope||'')}" oninput="projSetItem(${idx},'scope',this.value)" placeholder="สายงาน" style="${ip}">`}</td>
+    <td style="text-align:center;white-space:nowrap">${lockBtn}${lk?'':`<button class="btn btn-sm" onclick="projDelItem(${idx})" style="color:var(--red);padding:3px 7px">✕</button>`}</td></tr>`; }).join('');
+  const col=!!_projCollapse['items'];
+  return `<div class="card" style="margin-bottom:14px"><div class="card-head" style="cursor:pointer" onclick="projToggleCollapse('items')">${_colArrow('items')} 📋 รายการที่ต้องจัดหา (ขอราคา) — เพิ่มเองตามสายงาน <span style="color:var(--muted);font-weight:400">(${items.length})</span></div>
+    ${col?'':`<div style="padding:10px 12px">
+    <table><thead><tr><th style="width:34px">#</th><th>รายการ</th><th style="width:90px">รหัส/PN</th><th style="width:72px">จำนวน</th><th style="width:72px">หน่วย</th><th style="width:130px">สายงาน</th><th style="width:72px">ล็อก</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:10px">— ยังไม่มีรายการ กด “+ เพิ่มรายการ” —</td></tr>'}</tbody></table>
+    <button class="btn btn-sm" onclick="projAddItem()" style="font-size:11px;margin-top:8px;border:1px dashed var(--accent2);background:none;color:var(--accent2)">+ เพิ่มรายการ</button>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">🔒 รายการที่ถูกดึงไป Vendor แล้วจะล็อกอัตโนมัติ (กันดึงซ้ำ) — กดปลดล็อกเพื่อดึงไปใช้กับเจ้าอื่นได้</div>
+    </div>`}</div>`;
+}
+function projToggleLock(i){ const it=(editingPO.items||[])[i]; if(!it)return; it.locked=!it.locked; if(!it.locked){it.lockedBy='';it.lockedByVid='';} renderStageBody(); _saveProjItemsNow(); }
+let _projItemsT=null;
+function _findProcRec(){ return (typeof procurements!=='undefined'?procurements:[]).find(p=>String(p.id)===String(editingPO.id)); }
+function _saveProjItemsSoon(){ clearTimeout(_projItemsT); _projItemsT=setTimeout(_saveProjItemsNow,500); }
+async function _saveProjItemsNow(){ const rec=_findProcRec(); if(rec){ rec.items=editingPO.items||[]; try{ _quietWrite=true; await putSetting('Procurements', JSON.stringify(procurements)); }catch(e){} finally{ _quietWrite=false; } } }
+function projAddItem(){ editingPO.items=editingPO.items||[]; editingPO.items.push({name:'',pn:'',qty:1,unit:'',scope:''}); renderStageBody(); _saveProjItemsSoon(); }
+function projDelItem(i){ (editingPO.items||[]).splice(i,1); renderStageBody(); _saveProjItemsSoon(); }
+function projSetItem(i,f,v){ const it=(editingPO.items||[])[i]; if(!it)return; it[f]=(f==='qty')?(v===''?'':+v):v; _saveProjItemsSoon(); }
+// บันทึกผลเทียบราคา (รายการ+เจ้า+ราคา) เป็น "รายการโครงการ" ให้ Sale เปิดใบเสนอราคาต่อ
+async function saveProjectItems(){
+  if(editingPO.type!=='project'){ return; }
+  const d=_pb();
+  const engaged=(d.projVendors||[]).map(String);
+  // รวมรายการจากทุก Vendor ตามชื่อ — เลือกเจ้าที่ราคาต่ำสุด (>0) ต่อรายการ
+  const best={};
+  engaged.forEach(vid=>{ const v=getVendorById(vid); pbItems(vid).forEach(it=>{ const nm=(it.name||'').trim(); if(!nm)return; const key=nm.toLowerCase(); const price=+it.price||0; const cur=best[key];
+    if(price>0){ if(!cur||!(cur.cost>0)||price<cur.cost) best[key]={ name:nm, pn:it.pn||'', unit:it.unit||'', qty:+it.qty||0, scope:it.scope||'', desc:it.desc||'', cost:price, vendorId:vid, vendorName:v?v.name:'' }; }
+    else if(!cur){ best[key]={ name:nm, pn:it.pn||'', unit:it.unit||'', qty:+it.qty||0, scope:it.scope||'', desc:it.desc||'', cost:0, vendorId:'', vendorName:'' }; }
+  }); });
+  const items=Object.values(best).filter(x=>(x.name||'').trim());
+  if(!items.length){ toast('ยังไม่มีรายการ (เพิ่มรายการ+ราคาในเจ้า Vendor ก่อน)','error'); return; }
+  const rec=_findProcRec();
+  if(!rec){ toast('ไม่พบงานนี้ในระบบ','error'); return; }
+  rec.items=items; rec.projectItemsReady=true; rec.projectItemsAt=new Date().toISOString(); rec.itemsVersion=Date.now();   // เวอร์ชันรายการ — ให้ SalePro ตรวจว่ามีอัปเดต
+  try{ await putSetting('Procurements', JSON.stringify(procurements)); toast('บันทึกเป็นรายการโครงการแล้ว — Sale เปิดใบเสนอราคาได้','success'); renderStageBody(); }
+  catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
+}
+// ════════ โครงการ: กระดาน Vendor (แต่ละเจ้าเดิน 6 ขั้นอิสระ จบทีละเจ้า) ════════
+const PROJ_VSTEPS = [
+  { k:'rfq',     t:'ขอราคา' },
+  { k:'quoted',  t:'ได้ราคา' },
+  { k:'po',      t:'ออก PO' },
+  { k:'deliver', t:'ส่ง/รับของ' },
+  { k:'done',    t:'เสร็จ' },
+  { k:'paid',    t:'จ่ายเงิน' }
+];
+function _pb(){ const d=sd(); if(!Array.isArray(d.projVendors))d.projVendors=[]; if(!d.vStep||typeof d.vStep!=='object')d.vStep={}; if(!d.vMax||typeof d.vMax!=='object')d.vMax={}; if(!d.vClosed||typeof d.vClosed!=='object')d.vClosed={}; if(!d.vDone||typeof d.vDone!=='object')d.vDone={}; return d; }
+function pbMax(vid){ const d=_pb(); vid=String(vid); return Math.max(+(d.vMax[vid]||1), +(d.vStep[vid]||1)); }
+// ล็อก "ออก PO" ของโครงการ จนกว่า SalePro จะรับ PO ลูกค้า (หรือได้รับอนุมัติให้ข้าม PO)
+function _projPOLocked(){
+  if(!editingPO || editingPO.type!=='project') return (typeof poStagesLocked==='function'?poStagesLocked():false);
+  const rec=_findProcRec();
+  if(rec && rec.poWaiver && rec.poWaiver.status==='approved') return false;   // อนุมัติให้ข้ามแล้ว
+  if(!editingPO.quoteId) return true;                                         // ยังไม่ได้เปิดใบเสนอราคา → ล็อก
+  return !_quoteHasCustPO(editingPO.quoteId);
+}
+async function projRequestWaiver(){
+  const reason=(prompt('เหตุผลที่ต้องข้ามการรับ PO ลูกค้า (ส่งให้ Sale/ผู้อนุมัติพิจารณา):','')||'').trim();
+  if(!reason){ toast('กรุณาระบุเหตุผล','error'); return; }
+  const rec=_findProcRec(); if(!rec){ toast('ไม่พบงานนี้','error'); return; }
+  rec.poWaiver={ status:'pending', reason:reason, by:(currentUser&&(currentUser.displayName||currentUser.email))||'จัดซื้อ', at:new Date().toISOString() };
+  try{ _quietWrite=false; await putSetting('Procurements', JSON.stringify(procurements)); renderStageBody(); toast('ส่งคำขอข้ามการรับ PO แล้ว — รอ Sale/ผู้อนุมัติ','success'); }
+  catch(e){ toast('ไม่สำเร็จ: '+e.message,'error'); }
+}
+function _projWaiverCard(){
+  if(!editingPO || editingPO.type!=='project') return '';
+  const rec=_findProcRec(); const w=rec&&rec.poWaiver; const locked=_projPOLocked();
+  if(!locked && !(w&&w.status)) return '';
+  let inner;
+  if(w&&w.status==='approved') inner='<span style="color:var(--green)">✓ อนุมัติให้ข้ามการรับ PO แล้ว — ออก PO ได้</span>'+(w.approvedBy?' <span style="color:var(--muted);font-size:11px">โดย '+esc(w.approvedBy)+'</span>':'');
+  else if(w&&w.status==='pending') inner='<span style="color:var(--amber)">⏳ ขอข้ามการรับ PO — รอ Sale/ผู้อนุมัติ</span>'+(w.reason?'<div style="font-size:11px;color:var(--muted);margin-top:3px">เหตุผล: '+esc(w.reason)+'</div>':'');
+  else inner='<span style="color:var(--amber)">🔒 ออก PO ยังไม่ได้ — ต้องให้ SalePro รับ PO ลูกค้าก่อน'+(editingPO.quoteId?'':' (โครงการนี้ยังไม่ได้เปิดใบเสนอราคา)')+'</span> <button class="btn btn-sm" onclick="projRequestWaiver()" style="margin-left:6px;border:1px solid var(--amber);color:var(--amber)">ขอข้ามการรับ PO (ขออนุมัติ)</button>';
+  return '<div class="card" style="border:1px solid var(--amber);background:rgba(245,158,11,.07);margin-bottom:14px"><div style="padding:11px 13px;font-size:12px">'+inner+'</div></div>';
+}
+function pbStep(vid){ return +(_pb().vStep[String(vid)]||1); }
+function pbAddVendor(vid){ vid=String(vid||''); if(!vid){ toast('เลือก Vendor ก่อน','error'); return; } const d=_pb(); if(d.projVendors.includes(vid)){ toast('เพิ่ม Vendor นี้แล้ว','info'); return; } d.projVendors.push(vid); d.vStep[vid]=1; pbPullProjectItems(vid); }
+function pbRemoveVendor(vid){ vid=String(vid); if(!confirm('เอา Vendor นี้ออกจากโครงการ?'))return; const d=_pb(); const v=getVendorById(vid); const nm=v?v.name:'';
+  // ปลดล็อกรายการ master ที่เจ้านี้ถือไว้ (ให้ดึงไปใช้กับเจ้าอื่นได้)
+  (editingPO.items||[]).forEach(it=>{ if(it.locked && it.lockedByVid && String(it.lockedByVid)===vid){ it.locked=false; it.lockedBy=''; it.lockedByVid=''; } });
+  d.projVendors=d.projVendors.filter(x=>x!==vid); delete d.vStep[vid]; delete d.vClosed[vid]; if(d.vItems)delete d.vItems[vid];
+  renderStageBody(); savePurchase(); _saveProjItemsNow(); }
+function pbSetStep(vid,n){ vid=String(vid); n=Math.max(1,Math.min(6,+n||1)); const d=_pb();
+  // ล็อก "ออก PO" (ขั้น 3+) จนกว่า SalePro จะรับ PO ลูกค้า (เว้นงานซื้อใช้เอง)
+  if(n>=3 && _projPOLocked()){ toast('🔒 ออก PO ไม่ได้ — ต้องรับ PO ลูกค้า หรืออนุมัติคำขอข้าม PO ก่อน','error'); return; }
+  d.vStep[vid]=n; d.vMax[vid]=Math.max(+(d.vMax[vid]||1), n); if(n<6)d.vClosed[vid]=false; renderStageBody(); savePurchase(); }
+function pbCloseVendor(vid){ vid=String(vid); const d=_pb(); d.vStep[vid]=6; d.vMax[vid]=6; d.vClosed[vid]=true; renderStageBody(); savePurchase(); if(typeof renderFooter==='function')renderFooter(); if(_pbAllDone())toast('✓ ทุก Vendor เสร็จครบแล้ว — ปิดโครงการได้','success'); else toast('ปิดงาน Vendor นี้แล้ว','success'); }
+function pbReopenVendor(vid){ const d=_pb(); d.vClosed[String(vid)]=false; renderStageBody(); savePurchase(); if(typeof renderFooter==='function')renderFooter(); }
+function _pbAllDone(){ const d=_pb(); return d.projVendors.length>0 && d.projVendors.every(vid=>d.vClosed[String(vid)]); }
+function vDoneSet(vid,f,v){ const d=_pb(); vid=String(vid); d.vDone[vid]=d.vDone[vid]||{}; d.vDone[vid][f]=v; }
+// รายการขอราคา "ของแต่ละ Vendor" (ดึงจากรายการโครงการมาตั้งต้น + เพิ่มเองได้ · ราคาผูกกับรายการเจ้านั้นโดยตรง)
+function _pbItemsStore(){ const d=_pb(); if(!d.vItems||typeof d.vItems!=='object')d.vItems={}; return d.vItems; }
+function _pbSeedItem(it){ return { name:it.name||'', pn:it.pn||'', qty:(+it.qty||0), unit:it.unit||'', scope:it.scope||'', price:'', recvQty:'' }; }
+function pbItems(vid){ const s=_pbItemsStore(); vid=String(vid); if(!Array.isArray(s[vid])) s[vid]=[]; return s[vid]; }
+function pbPullProjectItems(vid){
+  const v=getVendorById(vid); const list=pbItems(vid);
+  const have=new Set(list.map(x=>(x.name||'').trim().toLowerCase()));
+  let n=0;
+  (editingPO.items||[]).forEach(it=>{ const k=(it.name||'').trim().toLowerCase();
+    if(!k) return;
+    if(it.locked){ return; }                 // ถูกดึงไปใช้แล้ว — ข้าม (กันซ้ำ)
+    if(have.has(k)) return;
+    list.push(_pbSeedItem(it));
+    it.locked=true; it.lockedByVid=vid; it.lockedBy=(v?v.name:'Vendor');   // ล็อกอัตโนมัติ + จำว่าเจ้าไหนดึงไป
+    n++;
+  });
+  if(!n) toast('ไม่มีรายการใหม่ให้ดึง (ที่เหลือถูกล็อก/มีแล้ว) — ปลดล็อกในรายการโครงการถ้าต้องการดึงซ้ำ','info');
+  else toast('ดึง '+n+' รายการเข้า '+(v?v.name:'')+' แล้ว (ล็อกกันซ้ำให้อัตโนมัติ)','success');
+  renderStageBody(); savePurchase(); _saveProjItemsNow();
+}
+function pbItemAdd(vid){ pbItems(vid).push({name:'',pn:'',qty:1,unit:'',scope:'',price:'',recvQty:''}); renderStageBody(); savePurchase(); }
+function pbItemDel(vid,i){ pbItems(vid).splice(i,1); renderStageBody(); savePurchase(); }
+let _pbItemT=null;
+function pbItemSet(vid,i,f,v){ const it=pbItems(vid)[i]; if(!it)return; it[f]=(f==='qty'||f==='price'||f==='recvQty')?(v===''?'':+v):v; if(f==='price'){ const el=document.getElementById('qtot-'+vid); if(el)el.textContent=fmt(pbVendorTotal(vid)); } clearTimeout(_pbItemT); _pbItemT=setTimeout(savePurchaseQuiet,500); }
+function pbVendorTotal(vid){ return pbItems(vid).reduce((s,it)=>s+(+it.qty||0)*(+it.price||0),0); }
+
+function renderProjectBoard(){
+  const d=_pb();
+  let h=_projBriefPanel()+_projWaiverCard()+_projItemsEditor();
+  h+='<div class="card" style="margin-bottom:14px"><div class="card-head">🏢 Vendor ในโครงการ — แต่ละเจ้าเดินงานแยกกัน จบทีละเจ้า</div><div style="padding:11px 13px">';
+  const ip='background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 9px;font-size:13px;color:var(--text)';
+  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><select id="pb-add-vendor" style="'+ip+';min-width:200px">'+vendorOptions('')+'</select>'
+    +'<button class="btn btn-sm btn-primary" onclick="pbAddVendor(document.getElementById(\'pb-add-vendor\').value)">+ เพิ่ม Vendor</button>'
+    +(_pbAllDone()?'<span style="margin-left:auto;color:var(--green);font-size:12px">✓ ทุก Vendor เสร็จครบ</span>':'<span style="margin-left:auto;color:var(--muted);font-size:12px">'+d.projVendors.filter(v=>d.vClosed[String(v)]).length+'/'+d.projVendors.length+' เจ้าเสร็จ</span>')
+    +'</div>';
+  h+= d.projVendors.length ? d.projVendors.map(renderVendorCard).join('') : '<div style="text-align:center;color:var(--muted);font-size:12px;padding:12px">— ยังไม่มี Vendor ในโครงการ กดเพิ่มด้านบน —</div>';
+  h+='</div></div>';
+  // บันทึกเป็นรายการโครงการ (ให้ Sale เปิดใบเสนอราคา) — เลือกเจ้าราคาต่ำสุดต่อรายการ
+  const rec=(typeof procurements!=='undefined'?procurements:[]).find(p=>String(p.id)===String(editingPO.id));
+  const ready=rec&&rec.projectItemsReady;
+  h+='<div class="card" style="border:1px solid #4f8ef7;background:rgba(79,142,247,0.06)"><div style="padding:12px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:200px;font-size:12px;color:var(--text)">🏗 เมื่อได้ราคาจาก Vendor แล้ว บันทึกเป็น <b>รายการโครงการ</b> (ระบบเลือกเจ้าราคาต่ำสุดต่อรายการ) ให้ Sale เปิดใบเสนอราคาต่อ'+(ready?' <span style="color:var(--green)">· บันทึกแล้ว ✓</span>':'')+'</div>'
+    +'<button class="btn btn-primary btn-sm" onclick="saveProjectItems()">💾 บันทึกเป็นรายการโครงการ</button></div></div>';
+  return h;
+}
+
+function renderVendorCard(vid){
+  vid=String(vid); const v=getVendorById(vid); const d=_pb(); const step=pbStep(vid); const closed=!!d.vClosed[vid];
+  const name=v?v.name:'(Vendor?)';
+  // mini stepper (สไตล์เดียวกับ Flow ปกติ: ปัจจุบันเน้น · ย้อนดูขั้นก่อน = กรอบประส้ม+👁 · ผ่านแล้ว = เขียว)
+  const mx=pbMax(vid); const reviewing = !closed && step<mx;
+  const chips=PROJ_VSTEPS.map((s,i)=>{ const n=i+1;
+    const isCur=(n===step)&&!closed; const isDone=closed||n<=mx;
+    let bg='var(--surface)',color='var(--muted)',extra='';
+    if(isCur){ if(reviewing){ bg='rgba(245,158,11,.12)'; color='#f59e0b'; extra='outline:2px dashed #f59e0b;outline-offset:1px;'; } else { bg='var(--accent)'; color='#fff'; } }
+    else if(isDone){ bg='rgba(52,211,153,.18)'; color='var(--green)'; }
+    const eye=(reviewing&&isCur)?' 👁':'';
+    return '<button onclick="pbSetStep(\''+vid+'\','+n+')" title="'+(reviewing&&isCur?'กำลังย้อนดู — ขั้นล่าสุดคือขั้น '+mx:'')+'" style="border:none;cursor:pointer;font-size:10.5px;padding:3px 8px;border-radius:12px;background:'+bg+';color:'+color+';'+extra+'">'+n+'. '+s.t+eye+'</button>'; }).join(' ');
+  const col=!!_projCollapse['v'+vid];
+  const body=closed?'<div style="padding:10px;color:var(--green);font-size:13px">✓ ปิดงาน Vendor นี้แล้ว'+((d.vDone[vid]&&d.vDone[vid].date)?(' · เสร็จ '+fmtDate(d.vDone[vid].date)):'')+' · จ่าย '+fmt((payFor(vid).amount||0))+' <button class="btn btn-sm" style="margin-left:8px" onclick="pbReopenVendor(\''+vid+'\')">เปิดกลับ</button></div>'
+    : _pbStepBody(vid,step);
+  const nav=closed?'':'<div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--border);padding-top:9px">'
+    +(step>1?'<button class="btn btn-sm" onclick="pbSetStep(\''+vid+'\','+(step-1)+')">◀ ย้อน</button>':'')
+    +(step<6?'<button class="btn btn-sm btn-primary" onclick="pbSetStep(\''+vid+'\','+(step+1)+')">ขั้นถัดไป ▶</button>':'<button class="btn btn-sm btn-success" onclick="pbCloseVendor(\''+vid+'\')">✓ ปิดงาน Vendor นี้</button>')
+    +'<span style="margin-left:auto;font-size:11px;color:var(--muted)">ขั้น '+step+'/6 · '+PROJ_VSTEPS[step-1].t+'</span></div>';
+  // สีพื้นหลัง/แถบซ้าย ต่างกันต่อเจ้า (ตามลำดับ) เพื่อแยกพื้นที่ทำงานแต่ละบริษัทให้ชัด
+  const _VPAL=[['rgba(79,142,247,.08)','#4f8ef7'],['rgba(52,211,153,.08)','#34d399'],['rgba(245,158,11,.09)','#f59e0b'],['rgba(167,139,250,.09)','#a78bfa'],['rgba(244,114,182,.09)','#f472b6'],['rgba(45,212,191,.09)','#2dd4bf'],['rgba(248,113,113,.09)','#f87171']];
+  const _vi=Math.max(0,(d.projVendors||[]).indexOf(vid)); const _pc=_VPAL[_vi%_VPAL.length];
+  return '<div style="border:1px solid '+(closed?'var(--green)':'var(--border2)')+';border-left:4px solid '+(closed?'var(--green)':_pc[1])+';border-radius:9px;background:'+_pc[0]+';padding:11px 13px;margin-bottom:10px">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:'+(col?'0':'8px')+'">'
+    +'<button onclick="projToggleCollapse(\'v'+vid+'\')" title="ย่อ/ขยาย" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:0">'+_colArrow('v'+vid)+'</button>'
+    +'<span style="font-size:14px;font-weight:600;color:var(--text)">🏢 '+esc(name)+'</span>'
+    +'<span class="badge" style="font-size:10px;'+(closed?'background:rgba(52,211,153,.18);color:var(--green)':'background:var(--surface);color:var(--muted)')+'">'+(closed?'✓ เสร็จ':('ขั้น '+step+'/6 · '+PROJ_VSTEPS[step-1].t)+'')+'</span>'
+    +(v&&v.email?'<span style="font-size:11px;color:var(--muted)">'+esc(v.email)+'</span>':'<span style="font-size:11px;color:var(--red)">⚠ ไม่มีอีเมล</span>')
+    +'<button onclick="pbRemoveVendor(\''+vid+'\')" title="เอาออก" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px">✕</button></div>'
+    +(col?'':('<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:9px">'+chips+'</div>'+body+nav))
+    +'</div>';
+}
+
+function _pbStepBody(vid, step){
+  const v=getVendorById(vid); const q=quoteFor(vid); const items=pbItems(vid);
+  const ip='background:var(--surface);border:1px solid var(--border2);border-radius:5px;padding:4px 7px;font-size:12px;color:var(--text)';
+  const scopes=(editingPO.scopes||[]).filter(s=>(s&&(s.name||'').trim()));
+  const scopeCell=(i)=>{ const cur=items[i].scope||''; return scopes.length?('<select onchange="pbItemSet(\''+vid+'\','+i+',\'scope\',this.value)" style="'+ip+';max-width:110px">'+'<option value="">—</option>'+scopes.map(s=>'<option '+(cur===s.name?'selected':'')+'>'+esc(s.name)+'</option>').join('')+'</select>'):('<input value="'+esc(cur)+'" oninput="pbItemSet(\''+vid+'\','+i+',\'scope\',this.value)" placeholder="สายงาน" style="'+ip+';max-width:100px">'); };
+  if(step===1){ // ขอราคา — รายการขอราคาของเจ้านี้ (ดึงจากโครงการ + เพิ่มเองได้) แล้วส่งขอราคา
+    const rows=items.map((it,i)=>'<tr>'
+      +'<td><input value="'+esc(it.name||'')+'" oninput="pbItemSet(\''+vid+'\','+i+',\'name\',this.value)" placeholder="ชื่อรายการ/งาน" style="'+ip+';width:100%"></td>'
+      +'<td><input value="'+esc(it.pn||'')+'" oninput="pbItemSet(\''+vid+'\','+i+',\'pn\',this.value)" placeholder="รหัส/PN" style="'+ip+';max-width:90px"></td>'
+      +'<td><input type="number" min="0" value="'+(it.qty!=null?it.qty:'')+'" oninput="pbItemSet(\''+vid+'\','+i+',\'qty\',this.value)" placeholder="จำนวน" style="'+ip+';text-align:center;max-width:60px"></td>'
+      +'<td><input value="'+esc(it.unit||'')+'" oninput="pbItemSet(\''+vid+'\','+i+',\'unit\',this.value)" placeholder="หน่วย" style="'+ip+';max-width:60px"></td>'
+      +'<td>'+scopeCell(i)+'</td>'
+      +'<td style="text-align:center"><button class="btn btn-sm" onclick="pbItemDel(\''+vid+'\','+i+')" style="color:var(--red);padding:3px 7px">✕</button></td></tr>').join('');
+    const mail=v&&v.email?('mailto:'+v.email+'?subject='+encodeURIComponent('ขอใบเสนอราคา — '+(editingPO.quoteTitle||''))+'&body='+encodeURIComponent('เรียน '+(v.name||'')+'\n\nขอความอนุเคราะห์เสนอราคารายการดังนี้\n'+items.map((it,i)=>(i+1)+'. '+(it.name||'')+' '+(it.qty||'')+' '+(it.unit||'')).join('\n')+'\n\nขอบคุณครับ')):'';
+    const _q=quoteFor(vid); const sentTxt=_q.rfqSentAt?('<div style="margin-top:6px;font-size:11px;color:var(--green)">✓ ส่งขอราคาแล้ว '+fmtDate((_q.rfqSentAt+'').split('T')[0])+(_q.rfqSentTo?(' → '+esc(_q.rfqSentTo)):'')+'</div>'):'';
+    return '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">รายการที่จะขอราคาจาก <b>'+esc(v?v.name:'')+'</b> (ดึงจากรายการโครงการ + เพิ่มเองได้)</div>'
+      +'<table style="width:100%"><thead><tr><th style="text-align:left">รายการ</th><th>รหัส/PN</th><th>จำนวน</th><th>หน่วย</th><th>สายงาน</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan=6 style="color:var(--muted);padding:8px">— ยังไม่มีรายการ —</td></tr>')+'</tbody></table>'
+      +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'
+      +'<button class="btn btn-sm" onclick="pbItemAdd(\''+vid+'\')" style="border:1px dashed var(--accent2);background:none;color:var(--accent2)">+ เพิ่มรายการ</button>'
+      +'<button class="btn btn-sm" onclick="pbPullProjectItems(\''+vid+'\')" style="border:1px dashed var(--green);background:none;color:var(--green)">⟲ ดึงจากรายการโครงการ</button>'
+      +(mail?'<a class="btn btn-sm" href="'+mail+'" target="_blank" data-ro="keep" title="เปิดร่างในโปรแกรมเมลเอง">✉ ร่างเมลเอง</a>':'')
+      +'<button class="btn btn-sm btn-primary" onclick="pbSendRFQ(\''+vid+'\')" style="margin-left:auto">📧 ส่งอีเมลขอราคา</button>'
+      +'<button class="btn btn-sm" onclick="pbSetStep(\''+vid+'\',2)">ข้ามไปกรอกราคา →</button>'
+      +'</div>'+sentTxt;
+  }
+  if(step===2){ // ได้ราคา — กรอกราคา + รายละเอียดเพิ่มเติม (Serial/Warranty ฯลฯ) ต่อรายการ
+    const rows=items.map((it,i)=>
+      '<tr style="border-top:1px solid var(--border)"><td style="font-size:12px;padding-top:6px">'+esc(it.name||'')+'</td><td style="text-align:center;font-size:12px;padding-top:6px">'+(it.qty||'')+' '+esc(it.unit||'')+'</td>'
+      +'<td style="text-align:right;padding-top:6px"><input type="number" min="0" value="'+(it.price!=null?it.price:'')+'" placeholder="0.00" oninput="pbItemSet(\''+vid+'\','+i+',\'price\',this.value)" style="'+ip+';text-align:right;max-width:110px"></td>'
+      +'<td style="text-align:right;font-size:12px;font-family:var(--mono);color:var(--muted);padding-top:6px">'+fmt((+it.qty||0)*(+it.price||0))+'</td></tr>'
+      +'<tr><td colspan="4" style="padding:2px 0 6px"><textarea oninput="pbItemSet(\''+vid+'\','+i+',\'desc\',this.value)" placeholder="รายละเอียดเพิ่มเติม เช่น Serial No. (ทีละตัว), Warranty 3 ปี/ตัว, รุ่น/สเปก ฯลฯ" style="width:100%;min-height:34px;line-height:1.5;'+ip+'">'+esc(it.desc||'')+'</textarea></td></tr>'
+      ).join('');
+    return '<table style="width:100%"><thead><tr><th style="text-align:left">รายการ</th><th style="text-align:center">จำนวน</th><th style="text-align:right">ราคา/หน่วย</th><th style="text-align:right">รวม</th></tr></thead><tbody>'+(rows||'<tr><td colspan=4 style="color:var(--muted);padding:8px">— ยังไม่มีรายการ (กลับไปขั้นขอราคา) —</td></tr>')+'</tbody></table>'
+      +'<div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px">รวมราคาเจ้านี้: <b id="qtot-'+vid+'" style="font-family:var(--mono)">'+fmt(pbVendorTotal(vid))+'</b></span>'
+      +'<label class="btn btn-sm" style="cursor:pointer">📎 แนบใบเสนอราคา<input type="file" style="display:none" onchange="pbUploadQuote(\''+vid+'\',this)"></label>'+(q.fileUrl?docThumb(q.fileUrl,q.fileName||'ใบเสนอราคา',{small:true}):'')+'</div>';
+  }
+  if(step===3){ // ออก PO
+    if(_projPOLocked()) return '<div style="font-size:12px;color:var(--amber);padding:8px">🔒 ออก PO ไม่ได้ — ต้องให้ SalePro รับ PO ลูกค้า หรืออนุมัติคำขอข้าม PO ก่อน (ดูการ์ดด้านบน)</div>';
+    const vd=poVendorDocs(vid);
+    return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px">เลขที่ PO</span>'
+      +'<input value="'+esc(vd.poNo||'')+'" oninput="setPONo(\''+vid+'\',this.value)" placeholder="PO..." style="'+ip+';max-width:150px">'
+      +'<button class="btn btn-sm" onclick="genPONo(\''+vid+'\')">ออกเลขอัตโนมัติ</button>'
+      +'<button class="btn btn-sm btn-primary" onclick="printPO(\''+vid+'\')">🖨 พิมพ์ PO</button>'
+      +'<label class="btn btn-sm" style="cursor:pointer">📎 แนบ PO ลงนาม<input type="file" style="display:none" onchange="uploadPODoc(\''+vid+'\',\'signed\',this)"></label>'+(vd.signedUrl?docThumb(vd.signedUrl,vd.signedName||'PO ลงนาม',{small:true}):'')
+      +(typeof sendBackVendor==='function'?'<button class="btn btn-sm" onclick="sendBackVendor(\''+vid+'\')" title="ส่ง PO ที่ลงนามกลับให้ Vendor ทางอีเมล">📧 ส่งกลับ Vendor</button>':'')
+      +(vd.sentAt?'<span style="font-size:11px;color:var(--green)">✓ ส่งกลับแล้ว '+fmtDate((vd.sentAt+'').split('T')[0])+'</span>':'')
+      +'</div>';
+  }
+  if(step===4){ // ส่ง/รับของ — รับจริงต่อรายการของเจ้านี้
+    const sp=shipFor(vid), rc=recvFor(vid);
+    const recvRows=items.map((it,i)=>{ const ord=+it.qty||0, got=(it.recvQty==null||it.recvQty===''?'':+it.recvQty), out=ord-(+got||0);
+      return '<tr><td style="font-size:12px">'+esc(it.name||'')+'</td><td style="text-align:center;font-size:12px">'+ord+'</td>'
+        +'<td style="text-align:center"><input type="number" min="0" value="'+got+'" placeholder="'+ord+'" oninput="pbItemSet(\''+vid+'\','+i+',\'recvQty\',this.value);pbRecvOut(\''+vid+'\','+i+')" style="'+ip+';text-align:center;max-width:64px"></td>'
+        +'<td id="recv-out-'+vid+'-'+i+'" style="text-align:center;color:'+_recvOutColor(out)+'">'+_recvOutTxt(out)+'</td></tr>'; }).join('');
+    const shipDocs=(sp.docs||[]).map(dc=>stageDocsRow('ship',vid,dc)).join('');
+    const recvDocs=(rc.docs||[]).map(dc=>stageDocsRow('recv',vid,dc)).join('');
+    return '<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">📦 การส่ง</div>'
+      +'<div class="form-grid" style="margin-bottom:8px">'
+      +'<div class="form-group"><label>วันที่ส่ง/นัดส่ง</label><input type="date" value="'+(sp.date||'')+'" oninput="shipInput(\''+vid+'\',\'date\',this.value)" onchange="savePurchase()"></div>'
+      +'<div class="form-group"><label>🔔 แจ้งเตือนวันส่ง</label><input type="date" value="'+(sp.remindDate||'')+'" oninput="shipInput(\''+vid+'\',\'remindDate\',this.value)" onchange="savePurchase()"></div>'
+      +'<div class="form-group"><label>เลขพัสดุ/Tracking</label><input value="'+esc(sp.tracking||'')+'" oninput="shipInput(\''+vid+'\',\'tracking\',this.value)" onchange="savePurchase()"></div>'
+      +'<div class="form-group"><label>หมายเหตุการส่ง</label><input value="'+esc(sp.note||'')+'" oninput="shipInput(\''+vid+'\',\'note\',this.value)" onchange="savePurchase()"></div>'
+      +'</div>'
+      +'<div style="margin-bottom:10px;border-top:1px solid var(--border);padding-top:8px"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">เอกสารส่งของ</div>'+shipDocs+'<button class="btn btn-sm" onclick="addStageDoc(\'ship\',\''+vid+'\')">+ เพิ่มเอกสาร</button></div>'
+      +'<div style="font-size:12px;font-weight:600;color:var(--text);margin:8px 0 4px">📥 การรับของ</div>'
+      +'<div class="form-grid" style="margin-bottom:8px">'
+      +'<div class="form-group"><label>วันที่รับของ</label><input type="date" value="'+(rc.date||'')+'" oninput="recvInput(\''+vid+'\',\'date\',this.value)" onchange="savePurchase()"></div>'
+      +'<div class="form-group"><label>หมายเหตุ/QC</label><input value="'+esc(rc.note||'')+'" oninput="recvInput(\''+vid+'\',\'note\',this.value)" onchange="savePurchase()"></div>'
+      +'</div>'
+      +'<table style="width:100%"><thead><tr><th style="text-align:left">รายการ</th><th style="text-align:center">สั่ง</th><th style="text-align:center">รับจริง</th><th style="text-align:center">คงเหลือ</th></tr></thead><tbody>'+(recvRows||'<tr><td colspan=4 style="color:var(--muted);padding:8px">—</td></tr>')+'</tbody></table>'
+      +'<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">เอกสารรับของ (ใบรับของ/QC ฯลฯ)</div>'+recvDocs+'<button class="btn btn-sm" onclick="addStageDoc(\'recv\',\''+vid+'\')">+ เพิ่มเอกสาร</button></div>';
+  }
+  if(step===5){ // เสร็จ
+    const vdn=(_pb().vDone[vid]||{});
+    return '<div class="form-grid"><div class="form-group"><label>วันที่งานเสร็จ/ส่งมอบ</label><input type="date" value="'+(vdn.date||'')+'" onchange="vDoneSet(\''+vid+'\',\'date\',this.value);savePurchase()"></div>'
+      +'<div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ/ผลงาน</label><input value="'+esc(vdn.note||'')+'" oninput="vDoneSet(\''+vid+'\',\'note\',this.value)" onchange="savePurchase()"></div></div>'
+      +'<div style="font-size:11px;color:var(--muted)">ยืนยันว่างานของ Vendor นี้เสร็จเรียบร้อย แล้วไปขั้นจ่ายเงิน</div>';
+  }
+  // step 6 จ่ายเงิน — ใช้การ์ดเดียวกับ Flow ปกติ (ช่องครบ: INV, วางบิล, เครดิต, ครบกำหนด, WHT, สลิป, หนังสือรับรอง, แจ้งเตือน, เอกสารอื่น)
+  return _payVendorCard(vid,{noHead:true})
+    +'<div style="font-size:11px;color:var(--muted);margin-top:6px">จ่ายเงินครบแล้ว กด “✓ ปิดงาน Vendor นี้” ด้านล่าง</div>';
+}
+async function pbUploadQuote(vid,input){ try{ const r=await uploadFile(input,'PurchaseDocs','quote'); if(r){ const q=quoteFor(vid); q.fileUrl=r.fileUrl; q.fileName=r.fileName; renderStageBody(); savePurchase(); } }catch(e){ alert('อัปโหลดไม่สำเร็จ: '+e.message); } }
+// ส่งอีเมลขอราคาต่อ Vendor (ใช้กลไกเดียวกับ Flow ปกติ: _sendMailGraph + buildRFQBody) แล้วไปขั้นกรอกราคา
+async function pbSendRFQ(vid){
+  vid=String(vid); const v=getVendorById(vid);
+  if(!v||!v.email){ toast('Vendor นี้ไม่มีอีเมล — เพิ่มอีเมลในทะเบียน Vendor ก่อน','error'); return; }
+  const items=pbItems(vid).filter(x=>(x.name||'').trim());
+  if(!items.length){ toast('ยังไม่มีรายการขอราคา — เพิ่ม/ดึงรายการก่อน','error'); return; }
+  const subject=(typeof getMailSubject==='function' && getMailSubject()) ? getMailSubject() : ('ขอใบเสนอราคา — '+(editingPO.quoteTitle||editingPO.projectName||''));
+  toast('กำลังส่งอีเมลขอราคา...','info');
+  try{
+    await _sendMailGraph(v.email, subject, buildRFQBody(v, items, (quoteFor(vid).note||'')));
+    const q=quoteFor(vid); q.rfqSentAt=new Date().toISOString(); q.rfqSentTo=v.email;
+    _pb().vStep[vid]=2;
+    await savePurchase();
+    renderStageBody();
+    toast('ส่งอีเมลขอราคาถึง '+v.name+' แล้ว → กรอกราคา','success');
+  }catch(e){ toast('ส่งไม่สำเร็จ: '+e.message,'error'); }
+}
+function pbRecvOut(vid,i){ const it=pbItems(vid)[i]; if(!it)return; const out=(+it.qty||0)-(+it.recvQty||0); const cell=document.getElementById('recv-out-'+vid+'-'+i); if(cell){ cell.textContent=_recvOutTxt(out); cell.style.color=_recvOutColor(out); } }
+
+
+function _payVendorCard(vid, opt){ opt=opt||{}; const v=getVendorById(vid), p=payFor(vid);
+    const docs=p.docs.map(dc=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+        <input placeholder="ชื่อเอกสาร เช่น ใบเสร็จ, ใบกำกับภาษี" value="${esc(dc.label||'')}" oninput="updatePayDocLabel('${vid}','${dc.id}',this.value)" style="max-width:220px">
+        <input type="file" onchange="attachPayDocFile('${vid}','${dc.id}',this)">
+        ${dc.url?docThumb(dc.url,dc.name||'ไฟล์',{small:true}):''}
+        <button class="btn btn-sm" onclick="removePayDoc('${vid}','${dc.id}')" style="color:var(--red)">✕</button></div>`).join('');
+    const amt=+p.amount||0, whtPct=+p.whtPct||0, whtAmt=+(amt*whtPct/100).toFixed(2), net=+(amt-whtAmt).toFixed(2);
+    const due=payDueDate(p);
+    const head = opt.noHead ? '' : `<div class="card-head">🏢 ${esc(v?v.name:'?')}</div>`;
+    const wrapOpen = opt.noHead ? '<div>' : '<div class="card" style="margin-bottom:14px">';
+    return `${wrapOpen}${head}
+      <div style="padding:${opt.noHead?'4px 0':'12px 14px'}">
+        <div class="form-grid">
+          <div class="form-group"><label>เลขที่ใบแจ้งหนี้ Vendor (INV)</label><div style="display:flex;gap:6px;align-items:center"><input value="${esc(p.invNo||'')}" placeholder="เลขที่บิล" oninput="payInput('${vid}','invNo',this.value)" style="max-width:140px"><input type="file" onchange="attachPayInv('${vid}',this)">${p.invUrl?docThumb(p.invUrl,p.invName||'ใบแจ้งหนี้',{small:true}):''}</div></div>
+          <div class="form-group"><label>วันรับวางบิล (เริ่มนับเครดิต)</label><input type="date" value="${p.termStart||''}" oninput="payTermChange('${vid}','termStart',this.value)"></div>
+          <div class="form-group"><label>เทอมเครดิต (วัน)</label><input type="number" min="0" value="${p.termDays||''}" placeholder="เช่น 30" oninput="payTermChange('${vid}','termDays',this.value)"></div>
+          <div class="form-group"><label>ครบกำหนดจ่าย</label><input value="${due?fmtDate(due):'—'}" readonly style="opacity:0.8;background:var(--surface)"></div>
+          <div class="form-group"><label>จำนวนเงิน (ก่อนหัก)</label><input type="number" value="${p.amount||''}" oninput="payInput('${vid}','amount',this.value)"></div>
+          <div class="form-group"><label>หัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><input type="number" min="0" max="100" step="0.5" value="${p.whtPct||''}" placeholder="0" oninput="payInput('${vid}','whtPct',this.value)" style="max-width:70px"><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',1);renderStageBody()" title="ค่าขนส่ง/เช่า 1%">1%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',3);renderStageBody()" title="ค่าบริการ 3%">3%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',7);renderStageBody()" title="7%">7%</button></div></div>
+          <div class="form-group" style="grid-column:1/-1"><div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:12px;display:flex;gap:18px;flex-wrap:wrap"><span>หัก ณ ที่จ่าย: <b style="font-family:var(--mono)">${fmt(whtAmt)}</b></span><span>ยอดจ่ายสุทธิ: <b style="font-family:var(--mono);color:var(--accent2)">${fmt(net)}</b></span></div></div>
+          <div class="form-group"><label>วันที่จ่ายจริง</label><input type="date" value="${p.date||''}" oninput="payInput('${vid}','date',this.value)"></div>
+          <div class="form-group"><label>วิธีจ่าย</label><select onchange="payInput('${vid}','method',this.value)">${['เงินโอน','เงินสด','เช็ค','เครดิต'].map(m=>`<option ${p.method===m?'selected':''}>${m}</option>`).join('')}</select></div>
+          <div class="form-group"><label>หลักฐานการจ่าย (สลิป)</label><div style="display:flex;gap:6px;align-items:center"><input type="file" onchange="attachPaySlip('${vid}',this)">${p.slipUrl?docThumb(p.slipUrl,p.slipName||'สลิป',{small:true}):''}</div></div>
+          <div class="form-group"><label>หนังสือรับรองหัก ณ ที่จ่าย</label><div style="display:flex;gap:6px;align-items:center"><input type="file" onchange="attachPayWht('${vid}',this)">${p.whtUrl?docThumb(p.whtUrl,p.whtName||'หัก ณ ที่จ่าย',{small:true}):''}</div></div>
+          <div class="form-group" style="grid-column:1/-1"><label>🔔 แจ้งเตือนวันจ่าย (ตั้งอัตโนมัติจากวันครบกำหนด แก้ได้)</label><input type="date" value="${p.remindDate||''}" oninput="payInput('${vid}','remindDate',this.value)"></div>
+        </div>
+        <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">เอกสารอื่น (เพิ่มได้ไม่จำกัด)</div>${docs||''}<button class="btn btn-sm" onclick="addPayDoc('${vid}')">+ เพิ่มเอกสาร</button></div>
+      </div></div>`;
+}
+async function savePurchaseQuiet(){ try{ _quietWrite=true; return await savePurchase(); } finally{ _quietWrite=false; } }
+
 function renderStageBody(){
   const st=editingPO.stage, d=sd();
+  if(editingPO.type==='project'){ document.getElementById('pom-stagebody').innerHTML=renderProjectBoard(); if(_poReadonly)applyReadonly(); return; }
   const items=(editingPO.items||[]).map((it,i)=>`<tr><td>${i+1}</td><td>${esc(it.name)}</td><td style="text-align:center">${it.qty}</td><td style="text-align:right;font-family:var(--mono)">${fmt(it.cost)}</td><td style="text-align:right;font-family:var(--mono)">${fmt(it.total)}</td></tr>`).join('');
   const itemsTable=`<div class="card" style="margin-bottom:14px"><table><thead><tr><th>#</th><th>รายการ</th><th>จำนวน</th><th>ต้นทุน/หน่วย</th><th>รวม</th></tr></thead><tbody>${items}</tbody></table></div>`;
   let body='';
@@ -1859,7 +2216,7 @@ async function savePurchase(){
     try{ await publishItemCosts(); }catch(e){ console.warn('publishItemCosts',e.message); }
     purchaseExt[String(editingPO.id)]={stage:editingPO.stage,closed:!!editingPO.closed,assetType:editingPO.assetType||'sale',assetCategory:editingPO.assetCategory||'',stageData:editingPO.stageData,history:editingPO.history};
     renderDash(); renderPurchases();
-    toast('บันทึกแล้ว','success');
+    if(!_quietWrite) toast('บันทึกแล้ว','success');
   }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
 }
 

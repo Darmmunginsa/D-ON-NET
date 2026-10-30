@@ -49,8 +49,9 @@ function _saveEnd(ok) {
   _saveEndT = setTimeout(() => { if (_saveN === 0) { _finishSaving(!_saveHadErr); _saveHadErr = false; } }, 130);
 }
 
+var _quietWrite = false;   // true = บันทึกเงียบ (ไม่โชว์ save bar) — ใช้กับ auto-save ตอนพิมพ์
 async function _call(payload) {
-  const write = payload && payload.action && !['list','multiList','get'].includes(payload.action);
+  const write = payload && payload.action && !['list','multiList','get'].includes(payload.action) && !_quietWrite;
   if (write) _saveStart();
   let ok = false;
   try { const r = await GatewayClient.call(CONFIG.appsScriptUrl, payload); ok = true; return r; }
