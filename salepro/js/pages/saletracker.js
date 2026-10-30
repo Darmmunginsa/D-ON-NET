@@ -1728,9 +1728,9 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   // ── หัวบริษัท Fix ตายตัว (ยกเว้นโลโก้ดึงจาก Company Settings) ──
   const CO_NAME_TH = 'บริษัท ไอที เซอร์วิสเซส จำกัด';
   const CO_NAME_EN = 'IT SERVICES CO.,LTD.';
-  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = '168/8 ถนนพัฒนาชนบท 3 แขวงคลองสองต้นนุ่น เขตลาดกระบัง กรุงเทพมหานคร 10520';
-  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = '168/8 Patthana Chonabot 3 Rd, Khlong Song Ton Nun Sub District, Lat Krabang District, Bangkok 10520';
-  const CO_TEL = '02-108-6113', CO_FAX = '02-108-6113', CO_TAXID = '0105559006113';
+  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = 'เลขที่ 78 หมู่ 11 ตำบล ผาเลือด อำเภอ ท่าปลา จังหวัด อุตรดิตถ์ 53190';
+  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = 'No. 78, Moo 11, Pha Lueat Subdistrict, Tha Pla District, Uttaradit Province';
+  const CO_TEL = '065-262-9886', CO_TAXID = '0105559006113';
   const F_TH = "'Sarabun','Segoe UI',sans-serif";                        // ฟอนต์เดิมทั้งเอกสาร (Sarabun)
   const F_EN = "'Sarabun','Segoe UI',sans-serif";
   const F_NUM = "'Sarabun','Segoe UI',sans-serif";
@@ -1962,7 +1962,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
     +'<tr><td style="font-size:17px;color:#222;white-space:nowrap;vertical-align:top;line-height:1.1">'+CO_ADDR_TH_L+'</td><td style="font-size:17px;color:#222;vertical-align:top;padding:0 5px;line-height:1.1">:</td><td style="font-size:17px;color:#222;white-space:nowrap;vertical-align:top;line-height:1.1">'+CO_ADDR_TH_V+'</td></tr>'
     +'<tr><td style="font-size:17px;color:#333;white-space:nowrap;vertical-align:top;line-height:1.1">'+CO_ADDR_EN_L+'</td><td style="font-size:17px;color:#333;vertical-align:top;padding:0 5px;line-height:1.1">:</td><td style="font-size:17px;color:#333;white-space:nowrap;vertical-align:top;line-height:1.1">'+CO_ADDR_EN_V+'</td></tr>'
     +'</tbody></table>'
-    +'<div style="font-family:'+F_ADDR+';font-size:17px;color:#333;margin-top:2px">TEL. '+CO_TEL+' &nbsp;&nbsp; FAX. '+CO_FAX+'</div>'
+    +'<div style="font-family:'+F_ADDR+';font-size:17px;color:#333;margin-top:2px">TEL. '+CO_TEL+'</div>'
     +'</div>'
     +'<div style="position:absolute;top:0;right:0">'+copyBox+'</div></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin:8px 0 10px">'
