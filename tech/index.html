@@ -590,7 +590,7 @@ function buildDeliveryHTML(kind, q, items, co) {
     <div style="text-align:center;margin:10px 0 16px"><button onclick="window.print()" style="padding:8px 18px;background:${ORANGE};color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer">🖨️ พิมพ์ / บันทึก PDF</button></div>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid ${ORANGE};padding-bottom:10px">
       <div>${co.LogoURL?`<img src="${co.LogoURL}" style="max-height:54px;margin-bottom:6px">`:''}
-        <div style="font-size:17px;font-weight:700;color:${ORANGE}">${esc(co.CompanyName||'iT Services')}</div>
+        <div style="font-size:17px;font-weight:700;color:${ORANGE}">${esc(co.CompanyName||'บริษัท ดี ออน เน็ต จำกัด')}</div>
         <div style="font-size:11px;color:#555;white-space:pre-line;margin-top:3px">${esc(co.Address||'')}</div>
         <div style="font-size:11px;color:#555">${co.Phone?'โทร '+esc(co.Phone):''}${co.TaxID?'  ·  เลขภาษี '+esc(co.TaxID):''}</div></div>
       <div style="text-align:right"><div style="font-size:20px;font-weight:700;color:${ORANGE}">${titleTh}</div>

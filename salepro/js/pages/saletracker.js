@@ -1726,8 +1726,8 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const DOC_CLIENT = ((typeof customerThaiNameByAny === 'function' && customerThaiNameByAny(q.ClientName, q.CustomerTaxID)) || q.ClientName || '');
   const DOC_ADDR   = (q.CustomerAddress || '');   // ADDRESS = ภาษาไทยเสมอ
   // ── หัวบริษัท Fix ตายตัว (ยกเว้นโลโก้ดึงจาก Company Settings) ──
-  const CO_NAME_TH = 'บริษัท ไอที เซอร์วิสเซส จำกัด';
-  const CO_NAME_EN = 'IT SERVICES CO.,LTD.';
+  const CO_NAME_TH = 'บริษัท ดี ออน เน็ต จำกัด';
+  const CO_NAME_EN = 'D ON NET.,CO.LTD';
   const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = 'เลขที่ 78 หมู่ 11 ตำบล ผาเลือด อำเภอ ท่าปลา จังหวัด อุตรดิตถ์ 53190';
   const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = 'No. 78, Moo 11, Pha Lueat Subdistrict, Tha Pla District, Uttaradit Province';
   const CO_TEL = '065-262-9886', CO_TAXID = '0105559006113';
