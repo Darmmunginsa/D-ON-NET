@@ -861,9 +861,8 @@
       <h3 id="st-title">ติดตามการขาย</h3>
       <span id="st-status-badge" style="margin-left:4px"></span>
       <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-        <button id="st-followup-btn" class="btn btn-sm" onclick="openFollowUpModal()" title="ตั้งการติดตาม / แจ้งเตือนต่อสัญญา">
-          🔔 <span id="st-followup-label">ตั้งติดตาม</span>
-        </button>
+        <label class="btn btn-sm" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="st-contract-track" onchange="importTrackerContract(this)" style="width:15px;height:15px">ติดตามในเมนูสัญญา</label>
+        <button id="st-contract-edit" class="btn btn-sm" onclick="editTrackerContract()" hidden>แก้ไขสัญญา</button>
         <button id="st-close-deal-btn" class="btn btn-sm btn-success" onclick="confirmCloseDeal()" style="display:none">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
           ปิดการขาย
@@ -1437,14 +1436,14 @@
 <script src="js/pages/signature.js?v=admin1"></script>
 <script src="js/pages/company.js?v=admin1"></script>
 <script src="js/pages/pdf.js?v=admin1"></script>
-<script src="js/pages/saletracker.js?v=service1"></script>
+<script src="js/pages/saletracker.js?v=tracker2"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>
 <script src="js/pages/belowcost.js?v=admin1"></script>
 <script src="js/pages/procurement.js?v=admin1"></script>
 <script src="js/pages/projects.js?v=g1"></script>
 <script src="js/pages/expiry.js?v=g1"></script>
-<script src="js/pages/contracts.js?v=service1"></script>
+<script src="js/pages/contracts.js?v=tracker2"></script>
 <script src="js/app.js?v=admin1"></script>
 <script src="js/tour.js?v=admin1"></script>
 <datalist id="doc-type-list">

@@ -127,19 +127,11 @@ async function removeFollowUp() {
   toast('ลบการติดตามแล้ว', 'success');
 }
 function updateFollowUpBtn() {
-  const btn = document.getElementById('st-followup-btn');
-  const label = document.getElementById('st-followup-label');
-  if (!btn || !label) return;
-  const fu = stDealData.followUp;
-  if (fu && fu.date) {
-    label.textContent = fu.sentAt ? 'แจ้งแล้ว ' + fu.date : 'ติดตาม ' + fu.date;
-    btn.style.borderColor = fu.sentAt ? 'rgba(52,211,153,0.4)' : 'rgba(251,191,36,0.45)';
-    btn.style.color = fu.sentAt ? 'var(--green)' : 'var(--amber)';
-  } else {
-    label.textContent = 'ตั้งติดตาม';
-    btn.style.borderColor = '';
-    btn.style.color = '';
-  }
+  const cb=document.getElementById('st-contract-track'),edit=document.getElementById('st-contract-edit');if(!cb)return;
+  const c=typeof trackerContractForQuote==='function'?trackerContractForQuote(stQuoteId):null;
+  cb.checked=!!c;cb.disabled=!!c;
+  cb.title=c?'นำเข้าแล้ว แก้ไขหรือลบได้จากเมนูสัญญา':'นำข้อมูลงานเข้าเมนูสัญญา';
+  if(edit)edit.hidden=!c;
 }
 // ตรวจการติดตามที่ถึงกำหนด — เรียกหลัง sync (ครั้งเดียวต่อ session)
 let _fuChecked = false;
@@ -152,7 +144,7 @@ async function checkFollowUpsDue() {
     try {
       const ds = parseDealStatus(q.DealStatus);
       const fu = ds.followUp;
-      if (!fu || fu.sentAt || !fu.date || fu.date > today) continue;
+      if (!fu || fu.contractManaged || fu.sentAt || !fu.date || fu.date > today) continue;
       const subject = '[SalePro] 🔔 ' + (fu.subject||'แจ้งเตือนติดตาม') + ' — ' + (q.Title||'') + ' (' + (q.ClientName||'') + ')';
       const body = 'แจ้งเตือนการติดตามใบเสนอราคา\n────────────────────────\n'
         + 'ใบเสนอราคา: ' + (q.Title||'') + '\nลูกค้า: ' + (q.ClientName||'') + '\nมูลค่า: ' + fmt(q.TotalAmount||0)

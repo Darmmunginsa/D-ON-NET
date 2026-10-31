@@ -9,11 +9,72 @@ async function loadContracts() {
   try {
     const items = await getListItems(CONFIG.lists.contracts);
     contractsData = items.map(it => { let o={}; try{ o=JSON.parse(it.Value||'{}')||{}; }catch(e){} return { ...o, spId: it.id }; });
-  } catch(e) { contractsData = []; }
+  } catch(e) { toast('โหลดสัญญาไม่สำเร็จ: '+e.message,'error'); return contractsData; }
+  try { await importLegacyFollowUpContracts(); } catch(e) { toast('ดึงรายการติดตามไม่ครบ: '+e.message,'error'); }
   // เตรียม paymentsCache ไว้คำนวณยอดเบิกจ่ายจากการชำระ
   try { if (typeof paymentsCache !== 'undefined' && !paymentsCache) paymentsCache = await getListItems(CONFIG.lists.payments); } catch(e) {}
   return contractsData;
 }
+
+
+// Import once per quotation. Existing contracts are never overwritten.
+const trackerContractImports = new Map();
+function trackerContractForQuote(id) {
+  return contractsData.find(c => contractQuoteIds(c).includes(String(id)));
+}
+function contractFromTracker(q, ds) {
+  const fu=ds.followUp||{}, date=v=>String(v||'').slice(0,10);
+  const assets=(ds.expiries||[]).filter(e=>e.serial&&e.name).map(e=>({model:e.name,serial:e.serial}));
+  return {id:'CT-QUOTE-'+q.id,sourceQuoteId:String(q.id),quoteId:String(q.id),party:q.ClientName||'',
+    name:fu.subject||q.Title||'สัญญาบริการ',vendorTax:q.CustomerTaxID||'',
+    poRef:(ds.custPOs||[]).map(p=>p.poNumber).filter(Boolean).join(', '),
+    start:date(q.ContractStartDate),end:date(q.ContractEndDate)||date(fu.date),
+    value:Math.round((+q.SubTotal||0)*(1-(+q.DiscountPct||0)/100)*100)/100,
+    coordinator:q.ContactPerson||'',billing:'รายปี',alertDays:30,
+    alertEmails:ServicePlan.teamEmails(fu.emails||[]).join(', '),note:fu.note||'',
+    serviceAgreement:{version:1,type:'',customerAddress:q.CustomerAddress||'',assets,visits:[],terms:'',
+      teamEmails:ServicePlan.teamEmails(fu.emails||[]),remindDays:30,documentDraft:true}};
+}
+async function ensureTrackerContract(q, ds) {
+  const key=String(q.id),existing=trackerContractForQuote(key);if(existing)return existing;
+  if(trackerContractImports.has(key))return trackerContractImports.get(key);
+  const pending=(async()=>{
+    const c=contractFromTracker(q,ds);
+    const row=await createListItem(CONFIG.lists.contracts,{Title:c.party||c.name,Value:JSON.stringify(c)});
+    if(!row||row.id==null)throw Error('ระบบไม่ยืนยันการบันทึกสัญญา');
+    c.spId=row.id;contractsData.push(c);return c;
+  })();
+  trackerContractImports.set(key,pending);
+  try{return await pending;}finally{trackerContractImports.delete(key);}
+}
+async function importLegacyFollowUpContracts(){
+  for(const q of (typeof quotesData!=='undefined'?quotesData:[])){
+    const ds=parseDealStatus(getStoredDealStatus(q.id)||q.DealStatus);
+    if(ds.followUp && !ds.contractImportDismissed){
+      await ensureTrackerContract(q,ds);
+      if(!ds.followUp.contractManaged){ds.followUp.contractManaged=true;const raw=serializeDealStatus(ds);await putStoredDealStatus(q.id,raw);q.DealStatus=raw;if(typeof stQuoteId!=='undefined'&&String(stQuoteId)===String(q.id)&&stDealData.followUp)stDealData.followUp.contractManaged=true;}
+    }
+  }
+}
+async function importTrackerContract(checkbox){
+  if(!checkbox.checked)return;
+  const quoteId=stQuoteId,q=quotesData.find(x=>String(x.id)===String(quoteId));if(!q)return;
+  const ds=JSON.parse(JSON.stringify(stDealData));checkbox.disabled=true;
+  try{
+    // Refresh first so contracts created in another screen are reused.
+    const rows=await getListItems(CONFIG.lists.contracts);
+    contractsData=rows.map(it=>({...JSON.parse(it.Value||'{}'),spId:it.id}));
+    const c=await ensureTrackerContract(q,ds);
+    if(ds.contractImportDismissed || (ds.followUp&&!ds.followUp.contractManaged)){
+      delete ds.contractImportDismissed;if(ds.followUp)ds.followUp.contractManaged=true;
+      const raw=serializeDealStatus(ds);await putStoredDealStatus(quoteId,raw);q.DealStatus=raw;
+      if(String(stQuoteId)===String(quoteId)){delete stDealData.contractImportDismissed;if(stDealData.followUp)stDealData.followUp.contractManaged=true;}
+    }
+    if(String(stQuoteId)===String(quoteId))updateFollowUpBtn();
+    renderContracts();toast('นำเข้าเมนูสัญญาแล้ว เปิดปรับรายละเอียดได้เลย','success');
+  }catch(e){checkbox.checked=false;checkbox.disabled=false;toast('นำเข้าไม่สำเร็จ: '+e.message,'error');}
+}
+function editTrackerContract(){const c=trackerContractForQuote(stQuoteId);if(c)editContract(c.spId);}
 
 // ── คำนวณ ──
 function _ctToday() { const d = new Date(); d.setHours(0,0,0,0); return d; }
@@ -182,6 +243,7 @@ async function saveContract() {
   if(obj.alertEmails && ServicePlan.teamEmails(obj.alertEmails).length!==obj.alertEmails.split(/[,;\s]+/).filter(Boolean).length){toast('อีเมลแจ้งเตือนต้องเป็นทีมงานที่อนุญาตเท่านั้น','error');return;}
   // เก็บ remindSentFor เดิมไว้ (กันเมลซ้ำ) — รีเซ็ตถ้าวันสิ้นสุดเปลี่ยน
   const old = editingContractId ? contractsData.find(x=>String(x.spId)===String(editingContractId)) : null;
+  if(old?.sourceQuoteId)obj.sourceQuoteId=old.sourceQuoteId;
   obj.remindSentFor = (old && old.remindSentFor === obj.end) ? old.remindSentFor : '';
   obj.ackFor = document.getElementById('ct-acked')?.checked ? obj.end : '';   // รับทราบ = ผูกกับวันสิ้นสุดรอบนี้
   try{obj.serviceAgreement=collectServiceAgreement(obj.start,obj.end);}catch(e){toast(e.message,'error');return;}
@@ -200,7 +262,14 @@ async function deleteContract() {
   const c = contractsData.find(x=>String(x.spId)===String(editingContractId));
   if (!confirm('ลบสัญญา "'+(c?.party||c?.name||'')+'" ?')) return;
   try {
+    for(const qid of contractQuoteIds(c)){
+      const q=quotesData.find(x=>String(x.id)===qid);if(!q)continue;
+      const ds=parseDealStatus(getStoredDealStatus(qid)||q.DealStatus);ds.contractImportDismissed=true;
+      const raw=serializeDealStatus(ds);await putStoredDealStatus(qid,raw);q.DealStatus=raw;
+      if(String(stQuoteId)===qid)stDealData.contractImportDismissed=true;
+    }
     await deleteListItem(CONFIG.lists.contracts, editingContractId);
+    if(typeof updateFollowUpBtn==='function')updateFollowUpBtn();
     closeModal('contract-modal');
     await loadContracts(); renderContracts();
     toast('ลบสัญญาแล้ว','success');
