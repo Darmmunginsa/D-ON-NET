@@ -7,6 +7,8 @@ let editingContractId = null;  // spId ที่กำลังแก้
 
 async function loadContracts() {
   try {
+    await requireContractNumbering();
+    await _callRaw({action:'ensureContractNumbers'});
     const items = await getListItems(CONFIG.lists.contracts);
     contractsData = items.map(it => { let o={}; try{ o=JSON.parse(it.Value||'{}')||{}; }catch(e){} return { ...o, spId: it.id }; });
   } catch(e) { toast('โหลดสัญญาไม่สำเร็จ: '+e.message,'error'); return contractsData; }
@@ -19,6 +21,7 @@ async function loadContracts() {
 
 // Import once per quotation. Existing contracts are never overwritten.
 const trackerContractImports = new Map();
+async function requireContractNumbering(){const cap=await _callRaw({action:'serviceCapabilities'});if(!cap.contractNumbering)throw Error('ต้องอัปเดต Apps Script เพื่อเปิดการออกเลขสัญญาอัตโนมัติก่อน');}
 function trackerContractForQuote(id) {
   return contractsData.find(c => contractQuoteIds(c).includes(String(id)));
 }
@@ -39,10 +42,11 @@ async function ensureTrackerContract(q, ds) {
   const key=String(q.id),existing=trackerContractForQuote(key);if(existing)return existing;
   if(trackerContractImports.has(key))return trackerContractImports.get(key);
   const pending=(async()=>{
+    await requireContractNumbering();
     const c=contractFromTracker(q,ds);
     const row=await createListItem(CONFIG.lists.contracts,{Title:c.party||c.name,Value:JSON.stringify(c)});
     if(!row||row.id==null)throw Error('ระบบไม่ยืนยันการบันทึกสัญญา');
-    c.spId=row.id;contractsData.push(c);return c;
+    const saved=row.Value?JSON.parse(row.Value):c;saved.spId=row.id;contractsData.push(saved);return saved;
   })();
   trackerContractImports.set(key,pending);
   try{return await pending;}finally{trackerContractImports.delete(key);}
@@ -126,7 +130,7 @@ function renderContracts() {
   const q = (document.getElementById('ct-search')?.value || '').toLowerCase();
   const sf = document.getElementById('ct-filter-status')?.value || '';
   let list = contractsData.filter(c =>
-    !q || (c.party||'').toLowerCase().includes(q) || (c.name||'').toLowerCase().includes(q) || (c.poRef||'').toLowerCase().includes(q) || (c.invNo||'').toLowerCase().includes(q));
+    !q || (c.contractNo||'').toLowerCase().includes(q) || (c.party||'').toLowerCase().includes(q) || (c.name||'').toLowerCase().includes(q) || (c.poRef||'').toLowerCase().includes(q) || (c.invNo||'').toLowerCase().includes(q));
   if (sf) list = list.filter(c => contractStatus(c).key === sf);
   // เรียง: ใกล้หมด/หมดอายุ ขึ้นก่อน (ตามวันคงเหลือน้อยสุด)
   list = list.slice().sort((a,b) => { const da=contractDaysRemaining(a), db=contractDaysRemaining(b); return (da===null?1e9:da) - (db===null?1e9:db); });
@@ -135,6 +139,7 @@ function renderContracts() {
     const d = contractDaysRemaining(c), st = contractStatus(c);
     const pctColor = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--amber)' : 'var(--green)';
     return `<tr>
+      <td style="font-family:var(--mono);font-size:11px;font-weight:600">${escHtml(c.contractNo||'รอออกเลข')}</td>
       <td style="font-family:var(--mono);font-size:11px">${escHtml(c.invNo||'—')}</td>
       <td style="font-weight:500">${escHtml(c.party||'')}</td>
       <td>${escHtml(c.name||'')}</td>
@@ -153,7 +158,7 @@ function renderContracts() {
       <td style="text-align:center;font-family:var(--mono);color:${pctColor}">${pct.toFixed(0)}%</td>
       <td style="white-space:nowrap"><button class="action-btn" onclick="editContract('${c.spId}')" title="แก้ไข"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
     </tr>`;
-  }).join('') : '<tr><td colspan="17" style="text-align:center;padding:32px;color:var(--muted)">ยังไม่มีสัญญา — กด "เพิ่มสัญญา"</td></tr>';
+  }).join('') : '<tr><td colspan="18" style="text-align:center;padding:32px;color:var(--muted)">ยังไม่มีสัญญา — กด "เพิ่มสัญญา"</td></tr>';
 }
 
 // การ์ดเตือนสัญญาใกล้หมด (บนหน้าสัญญา)
@@ -204,7 +209,7 @@ function _fillContractQuoteOptions(selIds) {
 function openAddContract() {
   editingContractId = null;
   document.getElementById('ctm-title').textContent = 'เพิ่มสัญญา';
-  ['ct-invno','ct-party','ct-name','ct-vendortax','ct-poref','ct-start','ct-end','ct-value','ct-coordinator','ct-alertemails','ct-manualdisbursed','ct-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['ct-number','ct-invno','ct-party','ct-name','ct-vendortax','ct-poref','ct-start','ct-end','ct-value','ct-coordinator','ct-alertemails','ct-manualdisbursed','ct-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('ct-alertdays').value = 30;
   document.getElementById('ct-billing').value = 'รายปี';
   _fillContractQuoteOptions('');
@@ -218,7 +223,7 @@ function editContract(spId) {
   editingContractId = spId;
   document.getElementById('ctm-title').textContent = 'แก้ไขสัญญา';
   const _s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v==null?'':v;};
-  _s('ct-invno',c.invNo); _s('ct-party',c.party); _s('ct-name',c.name); _s('ct-vendortax',c.vendorTax);
+  _s('ct-number',c.contractNo); _s('ct-invno',c.invNo); _s('ct-party',c.party); _s('ct-name',c.name); _s('ct-vendortax',c.vendorTax);
   _s('ct-poref',c.poRef); _s('ct-start',c.start); _s('ct-end',c.end); _s('ct-value',c.value);
   _s('ct-coordinator',c.coordinator); _s('ct-alertdays',c.alertDays||30); _s('ct-alertemails',c.alertEmails);
   _s('ct-manualdisbursed',c.manualDisbursed); _s('ct-note',c.note);
@@ -234,7 +239,7 @@ async function saveContract() {
   if (!g('ct-party').trim() && !g('ct-name').trim()) { toast('กรุณาระบุคู่สัญญา หรือชื่อสัญญา','error'); return; }
   const obj = {
     id: editingContractId ? (contractsData.find(x=>String(x.spId)===String(editingContractId))?.id || 'CT'+Date.now()) : 'CT'+Date.now(),
-    invNo:g('ct-invno').trim(), party:g('ct-party').trim(), name:g('ct-name').trim(), vendorTax:g('ct-vendortax').trim(),
+    contractNo:g('ct-number').trim(), invNo:g('ct-invno').trim(), party:g('ct-party').trim(), name:g('ct-name').trim(), vendorTax:g('ct-vendortax').trim(),
     poRef:g('ct-poref').trim(), start:g('ct-start'), end:g('ct-end'), billing:g('ct-billing'),
     value:+g('ct-value')||0, coordinator:g('ct-coordinator').trim(), alertDays:+g('ct-alertdays')||30,
     alertEmails:g('ct-alertemails').trim(), quoteId:[...document.querySelectorAll('#ct-quote-list .ct-quote-cb:checked')].map(cb=>cb.value).filter(Boolean).join(','), manualDisbursed:+g('ct-manualdisbursed')||0,
@@ -249,6 +254,7 @@ async function saveContract() {
   try{obj.serviceAgreement=collectServiceAgreement(obj.start,obj.end);}catch(e){toast(e.message,'error');return;}
   const value = JSON.stringify(obj);
   try {
+    await requireContractNumbering();
     toast('กำลังบันทึก...','info');
     if (editingContractId) { await updateListItem(CONFIG.lists.contracts, editingContractId, { Title: obj.party||obj.name, Value: value }); }
     else { await createListItem(CONFIG.lists.contracts, { Title: obj.party||obj.name, Value: value }); }
@@ -331,7 +337,7 @@ async function confirmContractImport() {
   let ok = 0, fail = 0;
   toast('กำลังนำเข้า '+_ctImportRows.length+' สัญญา...','info');
   for (const o of _ctImportRows) {
-    try { await createListItem(CONFIG.lists.contracts, { Title: o.party||o.name, Value: JSON.stringify(o) }); ok++; }
+    try { await requireContractNumbering(); await createListItem(CONFIG.lists.contracts, { Title: o.party||o.name, Value: JSON.stringify(o) }); ok++; }
     catch(e) { fail++; console.warn('import contract fail', e.message); }
   }
   closeModal('contract-import-modal');

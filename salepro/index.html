@@ -560,7 +560,7 @@
       <div class="page" id="page-contracts">
         <div id="ct-reminders"></div>
         <div class="filter-row" style="flex-wrap:wrap;gap:8px">
-          <input id="ct-search" placeholder="ค้นหา คู่สัญญา/ชื่อสัญญา/PO..." oninput="renderContracts()" style="flex:1;max-width:280px">
+          <input id="ct-search" placeholder="ค้นหา เลขสัญญา/คู่สัญญา/PO..." oninput="renderContracts()" style="flex:1;max-width:280px">
           <select id="ct-filter-status" onchange="renderContracts()"><option value="">ทุกสถานะ</option><option value="active">ปกติ</option><option value="expiring">ใกล้หมดอายุ</option><option value="expired">หมดอายุ</option></select>
           <div class="spacer"></div>
           <button class="btn btn-sm" onclick="openContractImport()">📥 นำเข้าจาก Excel</button>
@@ -571,7 +571,7 @@
         </div>
         <div class="card" style="overflow-x:auto"><table style="min-width:1100px">
           <thead><tr>
-            <th>เลขที่ INV</th><th>คู่สัญญา/ผู้ขาย</th><th>ชื่อสัญญา/บริการ</th><th>PO อ้างอิง</th><th>ใบเสนอราคา</th>
+            <th>เลขที่สัญญา</th><th>เลขที่ INV</th><th>คู่สัญญา/ผู้ขาย</th><th>ชื่อสัญญา/บริการ</th><th>PO อ้างอิง</th><th>ใบเสนอราคา</th>
             <th>เริ่ม</th><th>สิ้นสุด</th><th>รูปแบบเก็บเงิน</th><th style="text-align:right">มูลค่า(ก่อน VAT)</th>
             <th>ผู้ประสานงาน</th><th style="text-align:center">เตือนล่วงหน้า</th><th style="text-align:center">คงเหลือ(วัน)</th>
             <th>สถานะ</th><th style="text-align:right">เบิกจ่ายสะสม</th><th style="text-align:right">คงเหลือวงเงิน</th><th style="text-align:center">%ใช้ไป</th><th></th>
@@ -1304,6 +1304,7 @@
     <div class="modal-header"><h3 id="ctm-title">เพิ่มสัญญา</h3><button class="btn btn-sm" onclick="closeModal('contract-modal')">✕</button></div>
     <div class="modal-body">
       <div class="form-grid">
+        <div class="form-group"><label for="ct-number">เลขที่สัญญา (ระบบออกให้อัตโนมัติ)</label><input id="ct-number" readonly placeholder="ออกเลขเมื่อบันทึกสัญญา"><small>เลขเดิมคงอยู่เมื่อแก้ไขสัญญา</small></div>
         <div class="form-group"><label>เลขที่ INV</label><input id="ct-invno" placeholder="เช่น IV-2026-001"></div>
         <div class="form-group"><label>คู่สัญญา / ผู้ขาย</label><input id="ct-party" placeholder="บริษัท ... จำกัด"></div>
         <div class="form-group" style="grid-column:1/-1"><label>ชื่อสัญญา / บริการ</label><input id="ct-name" placeholder="เช่น Microsoft 365 Business Premium (Annual)"></div>
@@ -1443,7 +1444,7 @@
 <script src="js/pages/procurement.js?v=admin1"></script>
 <script src="js/pages/projects.js?v=g1"></script>
 <script src="js/pages/expiry.js?v=g1"></script>
-<script src="js/pages/contracts.js?v=tracker2"></script>
+<script src="js/pages/contracts.js?v=contractno1"></script>
 <script src="js/app.js?v=admin1"></script>
 <script src="js/tour.js?v=admin1"></script>
 <datalist id="doc-type-list">
@@ -1454,5 +1455,5 @@
   <option value="ใบส่งของ">
   <option value="เอกสารอื่น">
 </datalist>
-<script src="js/pages/service-agreements.js?v=terms1"></script></body>
+<script src="js/pages/service-agreements.js?v=contractno1"></script></body>
 </html>

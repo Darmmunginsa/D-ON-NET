@@ -73,7 +73,7 @@ function createRow(name, fields) {
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var sh = _sheet(name);
-    fields = fields || {};
+    fields = prepareContractNumberFields(name,fields||{},null);
     var keys = Object.keys(fields);
     var hdr = _ensureCols(sh, [ID_COL].concat(keys));
     var id = _uuid();
@@ -104,7 +104,7 @@ function batchCreate(name, rows) {
     var hdr = _ensureCols(sh, [ID_COL].concat(Object.keys(keySet)));
     var matrix = [];
     rows.forEach(function (f) {
-      f = f || {};
+      f = prepareContractNumberFields(name,f||{},null);
       var id = _uuid();
       matrix.push(hdr.map(function (h) {
         if (h === ID_COL) return id;
@@ -139,6 +139,7 @@ function updateRow(name, id, fields) {
     var hdr = _ensureCols(sh, Object.keys(fields));
     var rowIdx = _findRowIndex(sh, id);
     if (rowIdx < 0) throw new Error('ไม่พบรายการ id=' + id + ' ใน ' + name);
+    if(name==='Contracts'){var oldRow=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];fields=prepareContractNumberFields(name,fields,oldRow);}
     var rng = sh.getRange(rowIdx, 1, 1, hdr.length);
     var cur = rng.getValues()[0].map(function (v) { return (v === null || v === undefined) ? '' : String(v); });
     for (var k in fields) {
@@ -209,7 +210,8 @@ function uploadFile(req) {
 
 function handle(req) {
   var a = req.action;
-  if(a==='serviceCapabilities')return {ok:true,serviceAutomationVersion:1,privateVisitUploads:true};
+  if(a==='serviceCapabilities')return {ok:true,serviceAutomationVersion:1,privateVisitUploads:true,contractNumbering:true};
+  if(a==='ensureContractNumbers')return ensureContractNumbers();
   if (a === 'list')        return { ok: true, items: listRows(req.list) };
   if (a === 'multiList')   { var _o = {}; (req.lists || []).forEach(function (n) { _o[n] = listRows(n); }); return { ok: true, lists: _o }; }   // อ่านหลายแท็บในครั้งเดียว
   if (a === 'batchCreate') return { ok: true, items: batchCreate(req.list, req.rows || []) };                                                   // เขียนหลายแถวในครั้งเดียว
