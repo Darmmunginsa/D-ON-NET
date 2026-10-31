@@ -1306,9 +1306,10 @@
       <div class="form-grid">
         <div class="form-group"><label for="ct-number">เลขที่สัญญา (ระบบออกให้อัตโนมัติ)</label><input id="ct-number" readonly placeholder="ออกเลขเมื่อบันทึกสัญญา"><small>เลขเดิมคงอยู่เมื่อแก้ไขสัญญา</small></div>
         <div class="form-group"><label>เลขที่ INV</label><input id="ct-invno" placeholder="เช่น IV-2026-001"></div>
+        <div class="form-group" style="grid-column:1/-1"><label for="ct-customer-profile">Customer Profile ของคู่สัญญา</label><select id="ct-customer-profile" onchange="chooseContractCustomer(this.value)"></select><button type="button" class="btn btn-sm" onclick="refreshContractCustomer()">ดึงข้อมูลล่าสุดจาก Profile</button><small style="display:block">เติมอัตโนมัติจากลูกค้าในใบเสนอราคา ข้อมูลที่บันทึกในสัญญาแล้วไม่เปลี่ยนตาม Profile โดยอัตโนมัติ</small></div>
         <div class="form-group"><label>คู่สัญญา / ผู้ขาย</label><input id="ct-party" placeholder="บริษัท ... จำกัด"></div>
         <div class="form-group" style="grid-column:1/-1"><label>ชื่อสัญญา / บริการ</label><input id="ct-name" placeholder="เช่น Microsoft 365 Business Premium (Annual)"></div>
-        <div class="form-group"><label>เลขผู้เสียภาษีผู้ขาย</label><input id="ct-vendortax" placeholder="0000000000000"></div>
+        <div class="form-group"><label>เลขผู้เสียภาษีคู่สัญญา</label><input id="ct-vendortax" placeholder="0000000000000"></div>
         <div class="form-group"><label>เลขที่อ้างอิง PO</label><input id="ct-poref" placeholder="เช่น A808-04-2026"></div>
         <div class="form-group"><label>วันเริ่มสัญญา</label><input id="ct-start" type="date"></div>
         <div class="form-group"><label>วันสิ้นสุดสัญญา</label><input id="ct-end" type="date"></div>
@@ -1444,7 +1445,7 @@
 <script src="js/pages/procurement.js?v=admin1"></script>
 <script src="js/pages/projects.js?v=g1"></script>
 <script src="js/pages/expiry.js?v=g1"></script>
-<script src="js/pages/contracts.js?v=contractno1"></script>
+<script src="js/pages/contracts.js?v=customerprofile1"></script>
 <script src="js/app.js?v=admin1"></script>
 <script src="js/tour.js?v=admin1"></script>
 <datalist id="doc-type-list">
@@ -1455,5 +1456,5 @@
   <option value="ใบส่งของ">
   <option value="เอกสารอื่น">
 </datalist>
-<script src="js/pages/service-agreements.js?v=contractno1"></script></body>
+<script src="js/pages/service-agreements.js?v=customerprofile1"></script></body>
 </html>

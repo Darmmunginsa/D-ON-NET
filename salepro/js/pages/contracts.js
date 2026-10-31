@@ -12,6 +12,7 @@ async function loadContracts() {
     const items = await getListItems(CONFIG.lists.contracts);
     contractsData = items.map(it => { let o={}; try{ o=JSON.parse(it.Value||'{}')||{}; }catch(e){} return { ...o, spId: it.id }; });
   } catch(e) { toast('โหลดสัญญาไม่สำเร็จ: '+e.message,'error'); return contractsData; }
+  await loadContractCustomerProfiles();
   try { await importLegacyFollowUpContracts(); } catch(e) { toast('ดึงรายการติดตามไม่ครบ: '+e.message,'error'); }
   // เตรียม paymentsCache ไว้คำนวณยอดเบิกจ่ายจากการชำระ
   try { if (typeof paymentsCache !== 'undefined' && !paymentsCache) paymentsCache = await getListItems(CONFIG.lists.payments); } catch(e) {}
@@ -19,6 +20,55 @@ async function loadContracts() {
 }
 
 
+// Customer identity uses unique exact matches; never guess between branches.
+let contractCustomerId='';
+let contractCustomerProfiles=[];
+function contractCustomerForQuote(q){
+  const rows=contractCustomerProfiles.length?contractCustomerProfiles:(typeof customersData!=='undefined'?customersData:[]);
+  const norm=s=>String(s||'').replace(/\s+/g,'').toLowerCase(),tax=s=>String(s||'').replace(/\D/g,'');
+  if(q.CustomerID){const match=rows.find(c=>String(c.id)===String(q.CustomerID));if(match)return match;}
+  const matches=q.CustomerTaxID?rows.filter(c=>tax(c.TaxID)&&tax(c.TaxID)===tax(q.CustomerTaxID)):[];
+  if(matches.length===1)return matches[0];
+  const names=(matches.length?matches:rows).filter(c=>norm(c.Title)&&norm(c.Title)===norm(q.ClientName));
+  if(names.length!==1)return null;
+  if(q.CustomerTaxID&&names[0].TaxID&&tax(q.CustomerTaxID)!==tax(names[0].TaxID))return null;
+  return names[0];
+}
+async function loadContractCustomerProfiles(){
+  try{if(typeof CONFIG!=='undefined'&&CONFIG.lists.customers)contractCustomerProfiles=await getListItems(CONFIG.lists.customers);}catch(e){toast('โหลด Customer Profile ไม่สำเร็จ ใช้ข้อมูลในใบเสนอราคาไปก่อน','error');}
+}
+function renderContractCustomerOptions(){
+ const el=document.getElementById('ct-customer-profile');if(!el)return;
+ const rows=contractCustomerProfiles.length?contractCustomerProfiles:(typeof customersData!=='undefined'?customersData:[]);
+ el.innerHTML='<option value="">เลือก Customer Profile / กรอกเอง</option>'+rows.map((c,i)=>'<option value="'+i+'" '+(String(c.id)===String(contractCustomerId)?'selected':'')+'>'+escHtml(c.Title||'')+(c.TaxID?' — '+escHtml(c.TaxID):'')+'</option>').join('');
+}
+function applyContractCustomer(c,replace){
+ if(!c)return;
+ const set=(id,value)=>{const el=document.getElementById(id);if(el&&(replace||!el.value.trim()))el.value=value||'';};
+ set('ct-party',c.Title);set('ct-vendortax',c.TaxID);set('ct-coordinator',c.ContactPerson);set('sa-address',c.Address);
+ contractCustomerId=String(c.id);renderContractCustomerOptions();
+}
+function chooseContractCustomer(index){
+ const rows=contractCustomerProfiles.length?contractCustomerProfiles:(typeof customersData!=='undefined'?customersData:[]),c=rows[Number(index)];
+ if(index===''){contractCustomerId='';return;}
+ if(!c)return;
+ if(!confirm('ดึงชื่อ ที่อยู่ เลขผู้เสียภาษี และผู้ติดต่อจาก Customer Profile มาแทนข้อมูลในร่างสัญญานี้?')){renderContractCustomerOptions();return;}
+ applyContractCustomer(c,true);
+}
+function contractQuoteCustomerChanged(){
+ const ids=[...document.querySelectorAll('#ct-quote-list .ct-quote-cb:checked')].map(c=>c.value);
+ const quotes=(typeof quotesData!=='undefined'?quotesData:[]).filter(q=>ids.includes(String(q.id)));
+ const matches=quotes.map(contractCustomerForQuote);
+ if(!quotes.length)return;
+ if(matches.some(c=>!c)||new Set(matches.map(c=>String(c.id))).size!==1){toast('ไม่พบ Customer Profile ที่ตรงกันเพียงรายเดียว กรุณาเลือกคู่สัญญาเอง','info');return;}
+ applyContractCustomer(matches[0],false);
+}
+function refreshContractCustomer(){
+ const rows=contractCustomerProfiles.length?contractCustomerProfiles:(typeof customersData!=='undefined'?customersData:[]);
+ const c=rows.find(c=>String(c.id)===String(contractCustomerId));
+ if(!c)return toast('เลือก Customer Profile ก่อนดึงข้อมูลล่าสุด','info');
+ if(confirm('แทนชื่อ ที่อยู่ เลขผู้เสียภาษี และผู้ติดต่อในร่างนี้ด้วย Customer Profile ล่าสุด?'))applyContractCustomer(c,true);
+}
 // Import once per quotation. Existing contracts are never overwritten.
 const trackerContractImports = new Map();
 async function requireContractNumbering(){const cap=await _callRaw({action:'serviceCapabilities'});if(!cap.contractNumbering)throw Error('ต้องอัปเดต Apps Script เพื่อเปิดการออกเลขสัญญาอัตโนมัติก่อน');}
@@ -26,16 +76,17 @@ function trackerContractForQuote(id) {
   return contractsData.find(c => contractQuoteIds(c).includes(String(id)));
 }
 function contractFromTracker(q, ds) {
+  const customer=contractCustomerForQuote(q);
   const fu=ds.followUp||{}, date=v=>String(v||'').slice(0,10);
   const assets=(ds.expiries||[]).filter(e=>e.serial&&e.name).map(e=>({model:e.name,serial:e.serial}));
-  return {id:'CT-QUOTE-'+q.id,sourceQuoteId:String(q.id),quoteId:String(q.id),party:q.ClientName||'',
-    name:fu.subject||q.Title||'สัญญาบริการ',vendorTax:q.CustomerTaxID||'',
+  return {id:'CT-QUOTE-'+q.id,sourceQuoteId:String(q.id),quoteId:String(q.id),customerId:customer?String(customer.id):'',party:customer?.Title||q.ClientName||'',
+    name:fu.subject||q.Title||'สัญญาบริการ',vendorTax:customer?.TaxID||q.CustomerTaxID||'',
     poRef:(ds.custPOs||[]).map(p=>p.poNumber).filter(Boolean).join(', '),
     start:date(q.ContractStartDate),end:date(q.ContractEndDate)||date(fu.date),
     value:Math.round((+q.SubTotal||0)*(1-(+q.DiscountPct||0)/100)*100)/100,
-    coordinator:q.ContactPerson||'',billing:'รายปี',alertDays:30,
+    coordinator:customer?.ContactPerson||q.ContactPerson||'',billing:'รายปี',alertDays:30,
     alertEmails:ServicePlan.teamEmails(fu.emails||[]).join(', '),note:fu.note||'',
-    serviceAgreement:{version:1,type:'',customerAddress:q.CustomerAddress||'',assets,visits:[],terms:'',
+    serviceAgreement:{version:1,type:'',customerAddress:customer?.Address||q.CustomerAddress||'',assets,visits:[],terms:'',
       teamEmails:ServicePlan.teamEmails(fu.emails||[]),remindDays:30,documentDraft:true}};
 }
 async function ensureTrackerContract(q, ds) {
@@ -43,6 +94,7 @@ async function ensureTrackerContract(q, ds) {
   if(trackerContractImports.has(key))return trackerContractImports.get(key);
   const pending=(async()=>{
     await requireContractNumbering();
+    await loadContractCustomerProfiles();
     const c=contractFromTracker(q,ds);
     const row=await createListItem(CONFIG.lists.contracts,{Title:c.party||c.name,Value:JSON.stringify(c)});
     if(!row||row.id==null)throw Error('ระบบไม่ยืนยันการบันทึกสัญญา');
@@ -203,11 +255,11 @@ function _fillContractQuoteOptions(selIds) {
       return _isQuotePOReceived(qq);                 // เหลือเฉพาะที่ได้รับ PO แล้ว
     })
     .sort((a,b)=>String(b.Title||'').localeCompare(String(a.Title||'')))
-    .map(qq => `<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;cursor:pointer;border-bottom:1px solid var(--border2,#eee)"><input type="checkbox" class="ct-quote-cb" value="${escHtml(String(qq.id))}"${chosen.indexOf(String(qq.id))!==-1?' checked':''} style="width:15px;height:15px;flex-shrink:0"><span><b style="font-family:var(--mono)">${escHtml(qq.Title||'')}</b> — ${escHtml(qq.ClientName||'')}</span></label>`).join('');
+    .map(qq => `<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;cursor:pointer;border-bottom:1px solid var(--border2,#eee)"><input type="checkbox" class="ct-quote-cb" onchange="contractQuoteCustomerChanged()" value="${escHtml(String(qq.id))}"${chosen.indexOf(String(qq.id))!==-1?' checked':''} style="width:15px;height:15px;flex-shrink:0"><span><b style="font-family:var(--mono)">${escHtml(qq.Title||'')}</b> — ${escHtml(qq.ClientName||'')}</span></label>`).join('');
   box.innerHTML = rows || '<div style="color:var(--muted);padding:6px">— ไม่มีใบเสนอราคาที่ได้รับ PO ให้เลือก —</div>';
 }
 function openAddContract() {
-  editingContractId = null;
+  editingContractId = null;contractCustomerId='';
   document.getElementById('ctm-title').textContent = 'เพิ่มสัญญา';
   ['ct-number','ct-invno','ct-party','ct-name','ct-vendortax','ct-poref','ct-start','ct-end','ct-value','ct-coordinator','ct-alertemails','ct-manualdisbursed','ct-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('ct-alertdays').value = 30;
@@ -216,11 +268,12 @@ function openAddContract() {
   const _ak=document.getElementById('ct-acked'); if(_ak) _ak.checked=false;
   document.getElementById('ct-delete-btn').style.display = 'none';
   openServiceAgreementFields(null);
+  renderContractCustomerOptions();
   openModal('contract-modal');
 }
 function editContract(spId) {
   const c = contractsData.find(x => String(x.spId) === String(spId)); if (!c) return;
-  editingContractId = spId;
+  editingContractId = spId;contractCustomerId=c.customerId||'';
   document.getElementById('ctm-title').textContent = 'แก้ไขสัญญา';
   const _s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v==null?'':v;};
   _s('ct-number',c.contractNo); _s('ct-invno',c.invNo); _s('ct-party',c.party); _s('ct-name',c.name); _s('ct-vendortax',c.vendorTax);
@@ -232,6 +285,8 @@ function editContract(spId) {
   const _ak=document.getElementById('ct-acked'); if(_ak) _ak.checked=contractAcked(c);
   document.getElementById('ct-delete-btn').style.display = '';
   openServiceAgreementFields(c);
+  renderContractCustomerOptions();
+  if(contractCustomerId){const customer=contractCustomerProfiles.find(x=>String(x.id)===String(contractCustomerId));applyContractCustomer(customer,false);}else contractQuoteCustomerChanged();
   openModal('contract-modal');
 }
 async function saveContract() {
@@ -239,7 +294,7 @@ async function saveContract() {
   if (!g('ct-party').trim() && !g('ct-name').trim()) { toast('กรุณาระบุคู่สัญญา หรือชื่อสัญญา','error'); return; }
   const obj = {
     id: editingContractId ? (contractsData.find(x=>String(x.spId)===String(editingContractId))?.id || 'CT'+Date.now()) : 'CT'+Date.now(),
-    contractNo:g('ct-number').trim(), invNo:g('ct-invno').trim(), party:g('ct-party').trim(), name:g('ct-name').trim(), vendorTax:g('ct-vendortax').trim(),
+    customerId:contractCustomerId,contractNo:g('ct-number').trim(), invNo:g('ct-invno').trim(), party:g('ct-party').trim(), name:g('ct-name').trim(), vendorTax:g('ct-vendortax').trim(),
     poRef:g('ct-poref').trim(), start:g('ct-start'), end:g('ct-end'), billing:g('ct-billing'),
     value:+g('ct-value')||0, coordinator:g('ct-coordinator').trim(), alertDays:+g('ct-alertdays')||30,
     alertEmails:g('ct-alertemails').trim(), quoteId:[...document.querySelectorAll('#ct-quote-list .ct-quote-cb:checked')].map(cb=>cb.value).filter(Boolean).join(','), manualDisbursed:+g('ct-manualdisbursed')||0,
