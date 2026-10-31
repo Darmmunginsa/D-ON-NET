@@ -209,7 +209,7 @@
         <div class="form-group"><label>เบอร์โทร</label><input id="vd-phone"></div>
         <div class="form-group" style="grid-column:1/-1"><label>อีเมล</label><input id="vd-email"></div>
         <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่</label><textarea id="vd-address" style="min-height:48px"></textarea></div>
-        <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="vd-note" style="min-height:48px"></textarea></div>
+        <div class="form-group"><label for="vd-bank-name">ธนาคาร</label><input id="vd-bank-name" maxlength="120"></div><div class="form-group"><label for="vd-bank-account-name">ชื่อบัญชี</label><input id="vd-bank-account-name" maxlength="200"></div><div class="form-group" style="grid-column:1/-1"><label for="vd-bank-account-number">เลขบัญชีธนาคาร</label><input id="vd-bank-account-number" type="text" inputmode="numeric" maxlength="60" autocomplete="off"><small>เก็บเป็นข้อความเพื่อรักษาเลข 0 นำหน้า</small></div><div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="vd-note" style="min-height:48px"></textarea></div>
         <div class="form-group" style="grid-column:1/-1"><label>เอกสารสัญญา <span id="vd-file-status" style="color:var(--muted)"></span></label>
           <label class="btn btn-sm" style="cursor:pointer;display:inline-block;margin-bottom:6px">+ แนบสัญญา<input type="file" onchange="uploadVendorContract(this)" style="display:none"></label>
           <div id="vd-contracts"></div>
@@ -364,11 +364,12 @@
 
 <script src="../shared/basket-persistence.js?v=admin1"></script>
 <script src="../shared/gateway-client.js?v=admin1"></script>
+<script src="../shared/bank-details.js?v=bank1"></script>
 <script src="js/config.js?v=admin1"></script>
 <script src="js/api.js?v=q3"></script>
 <script src="js/auth.js?v=admin1"></script>
-<script src="js/app.js?v=company4-images2"></script>
-<script src="js/manage.js?v=admin1"></script>
+<script src="js/app.js?v=bank1"></script>
+<script src="js/manage.js?v=bank1"></script>
 <script src="js/tour.js?v=admin1"></script>
 </body>
 </html>

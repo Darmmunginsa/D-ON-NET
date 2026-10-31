@@ -2057,6 +2057,7 @@ function renderPayStage(){
     const due=payDueDate(p);
     return `<div class="card" style="margin-bottom:14px"><div class="card-head">🏢 ${esc(v?v.name:'?')}</div>
       <div style="padding:12px 14px">
+        <div style="margin-bottom:14px">${BankDetails.html(v,esc)}</div>
         <div class="form-grid">
           <div class="form-group"><label>เลขที่ใบแจ้งหนี้ Vendor (INV)</label><div style="display:flex;gap:6px;align-items:center"><input value="${esc(p.invNo||'')}" placeholder="เลขที่บิล" oninput="payInput('${vid}','invNo',this.value)" style="max-width:140px"><input type="file" onchange="attachPayInv('${vid}',this)">${p.invUrl?docThumb(p.invUrl,p.invName||'ใบแจ้งหนี้',{small:true}):''}</div></div>
           <div class="form-group"><label>วันรับวางบิล (เริ่มนับเครดิต)</label><input type="date" value="${p.termStart||''}" oninput="payTermChange('${vid}','termStart',this.value)"></div>

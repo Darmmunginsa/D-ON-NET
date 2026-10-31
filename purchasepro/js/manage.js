@@ -113,7 +113,7 @@ function renderVendors(){
     const st=(typeof vendorStats==='function')?vendorStats(v.id):{jobs:0,spend:0,onTimePct:null};
     const stTxt=st.jobs?`${st.jobs} งาน · ${fmt(st.spend)}${st.onTimePct!=null?` · ตรงเวลา ${st.onTimePct}%`:''}`:'<span style="color:var(--muted)">—</span>';
     return `
-    <tr><td style="font-weight:500">${esc(v.name)}</td><td>${esc(v.contact||'')}</td><td>${esc(v.phone||'')}</td><td>${esc(v.email||'')}</td>
+    <tr><td style="font-weight:500">${esc(v.name)}${BankDetails.html(v,esc)}</td><td>${esc(v.contact||'')}</td><td>${esc(v.phone||'')}</td><td>${esc(v.email||'')}</td>
     <td style="font-size:11px;color:${st.jobs?'var(--accent2)':'var(--muted)'}">${stTxt}</td>
     <td>${(v.contracts||[]).length?(v.contracts||[]).map(d=>`<a href="${d.url}" target="_blank">📄 ${esc(d.name)}</a>`).join(' '):'<span style="color:var(--muted)">—</span>'}</td>
     <td style="white-space:nowrap"><button class="btn btn-sm" onclick="editVendor('${v.id}')">แก้</button> <button class="btn btn-sm" onclick="deleteVendor('${v.id}')" style="color:var(--red)">ลบ</button></td></tr>`;
@@ -133,7 +133,7 @@ function removeVendorContract(cid){ _vdContracts=_vdContracts.filter(d=>d.id!==c
 function openAddVendor(){
   editingVendorId=null; _vdContracts=[];
   document.getElementById('vm-title').textContent='เพิ่ม Vendor';
-  ['vd-name','vd-contact','vd-phone','vd-email','vd-note','vd-address'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['vd-name','vd-contact','vd-phone','vd-email','vd-note','vd-address','vd-bank-name','vd-bank-account-name','vd-bank-account-number'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('vd-file-status').textContent=''; renderVendorContracts(); openModal('vendor-modal');
 }
 function editVendor(id){
@@ -143,15 +143,16 @@ function editVendor(id){
   document.getElementById('vd-name').value=v.name||''; document.getElementById('vd-contact').value=v.contact||'';
   document.getElementById('vd-phone').value=v.phone||''; document.getElementById('vd-email').value=v.email||''; document.getElementById('vd-note').value=v.note||'';
   {const a=document.getElementById('vd-address');if(a)a.value=v.address||'';}
+  const bank=BankDetails.read(v);document.getElementById('vd-bank-name').value=bank.bankName;document.getElementById('vd-bank-account-name').value=bank.bankAccountName;document.getElementById('vd-bank-account-number').value=bank.bankAccountNumber;
   document.getElementById('vd-file-status').textContent=''; renderVendorContracts(); openModal('vendor-modal');
 }
 async function saveVendor(){
   const name=document.getElementById('vd-name').value.trim();
   if(!name){ toast('กรุณาระบุชื่อ Vendor','error'); return; }
-  const obj={name,contact:document.getElementById('vd-contact').value.trim(),phone:document.getElementById('vd-phone').value.trim(),email:document.getElementById('vd-email').value.trim(),address:(document.getElementById('vd-address')?.value||'').trim(),note:document.getElementById('vd-note').value.trim(),contracts:[..._vdContracts]};
-  if(editingVendorId){ const v=vendorsData.find(x=>String(x.id)===String(editingVendorId)); if(v)Object.assign(v,obj); }
-  else{ vendorsData.push({id:Date.now(),...obj}); }
-  try{ await saveVendorsStore(); renderVendors(); closeModal('vendor-modal'); toast('บันทึก Vendor สำเร็จ','success'); }
+  let bank;try{bank=BankDetails.validate({bankName:document.getElementById('vd-bank-name').value,bankAccountName:document.getElementById('vd-bank-account-name').value,bankAccountNumber:document.getElementById('vd-bank-account-number').value});}catch(e){toast(e.message,'error');return;}
+  const obj={...bank,name,contact:document.getElementById('vd-contact').value.trim(),phone:document.getElementById('vd-phone').value.trim(),email:document.getElementById('vd-email').value.trim(),address:(document.getElementById('vd-address')?.value||'').trim(),note:document.getElementById('vd-note').value.trim(),contracts:[..._vdContracts]};
+  const next=editingVendorId?vendorsData.map(v=>String(v.id)===String(editingVendorId)?{...v,...obj}:v):[...vendorsData,{id:Date.now(),...obj}];
+  try{ await putSetting('Vendors',JSON.stringify(next)); vendorsData=next; renderVendors(); closeModal('vendor-modal'); toast('บันทึก Vendor สำเร็จ','success'); }
   catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
 }
 async function deleteVendor(id){

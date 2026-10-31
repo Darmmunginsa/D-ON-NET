@@ -75,7 +75,7 @@ async function loadAll(){
         const vs=(ext.stageData&&ext.stageData.payment&&ext.stageData.payment.vendors)||{};
         Object.keys(vs).forEach(vid=>{ const p=vs[vid]; const amt=+p.amount||0; if(amt<=0)return;
           const wht=+(amt*(+p.whtPct||0)/100); const net=+(amt-wht).toFixed(2);
-          impExpense.push({ date:(p.date||'').slice(0,10), type:'expense', category:'ค่าซื้อสินค้า/วัตถุดิบ',
+          impExpense.push({ ...BankDetails.read(vendors.find(v=>String(v.id)===String(vid))), bankFromDirectory:true,date:(p.date||'').slice(0,10), type:'expense', category:'ค่าซื้อสินค้า/วัตถุดิบ',
             amount:net, party:vName(vid), method:p.method||'', note:(p.invNo?'INV '+p.invNo:'')+(ext.quoteTitle?' · '+ext.quoteTitle:''),
             docUrl:p.slipUrl||p.invUrl||'', docName:'หลักฐานจ่าย', source:'PurchasePro' });
         });
@@ -88,7 +88,7 @@ function catNames(kind){ const fromSheet=finCat.filter(c=>(c.Kind||'')===kind).m
 
 // รวมทุกแหล่งเป็น ledger เดียว
 function allEntries(){
-  const manual = finTx.map(t=>({ _id:t._id||t.id, date:(t.Date||'').slice(0,10), type:t.TxType||'expense', category:t.Category||'', amount:+t.Amount||0, party:t.Party||'', method:t.Method||'', note:t.Note||'', docUrl:t.DocURL||'', docName:t.DocName||'', source:'Manual', taxKnown:t.TaxVersion==='1', editable:true }));
+  const manual = finTx.map(t=>({ _id:t._id||t.id, date:(t.Date||'').slice(0,10), type:t.TxType||'expense', category:t.Category||'', amount:+t.Amount||0, party:t.Party||'', method:t.Method||'', note:t.Note||'', docUrl:t.DocURL||'', docName:t.DocName||'', ...BankDetails.read(t),source:'Manual', taxKnown:t.TaxVersion==='1', editable:true }));
   const reqPaid = finReq.filter(r=>r.Status==='Paid').map(r=>({ date:(r.PaidDate||r.ApprovedAt||r.Date||'').slice(0,10), type:'expense', category:r.Category||'เบิกจ่าย', amount:+r.Amount||0, party:r.Requester||'', method:r.PaidMethod||'', note:'ใบเบิก '+(r.ReqNo||'')+(r.Reason?' · '+r.Reason:''), docUrl:r.DocURL||'', docName:r.DocName||'', source:'เบิกจ่าย' }));
   return manual.concat(reqPaid, impIncome, impExpense).filter(e=>e.date);
 }
@@ -176,7 +176,7 @@ function renderLedger(){
     <td>${fmtDate(e.date)}</td>
     <td>${e.type==='income'?'<span style="color:var(--green)">▲ รับ</span>':'<span style="color:var(--red)">▼ จ่าย</span>'}</td>
     <td>${esc(e.category)}</td>
-    <td>${esc(e.party)}<div style="font-size:10px;color:var(--muted)">${esc(e.note)}</div></td>
+    <td>${esc(e.party)}${e.bankAccountNumber?`<div>${e.bankFromDirectory?'<small>บัญชีปัจจุบันจากทะเบียน Vendor</small>':''}${BankDetails.html(e,esc)}</div>`:''}<div style="font-size:10px;color:var(--muted)">${esc(e.note)}</div></td>
     <td style="text-align:right;font-family:var(--mono);color:${e.type==='income'?'var(--green)':'var(--red)'}">${e.type==='income'?'+':'-'}${fmt0(e.amount)}</td>
     <td>${srcBadge(e.source)}</td>
     <td>${docChip(e.docUrl,e.docName)}</td>
@@ -208,6 +208,7 @@ function openTx(type,row){ _editTxId=row?row._id:null; _txDoc=row?{url:row.docUr
     <div class="fg"><label>ผู้จ่าย/ลูกค้า / ผู้รับ/ผู้ขาย</label><input id="tx-party" value="${esc(r.party||'')}"></div>
     <div class="fg"><label>เลขผู้เสียภาษีคู่ค้า</label><input id="tx-party-tax" value="${esc(r.partyTax||'')}"></div>
     <div class="fg"><label>สาขาคู่ค้า</label><input id="tx-party-branch" value="${esc(r.partyBranch||'')}"></div>
+    <div class="fg"><label for="tx-bank-name">ธนาคาร</label><input id="tx-bank-name" value="${esc(r.bankName||'')}"></div><div class="fg"><label for="tx-bank-account-name">ชื่อบัญชี</label><input id="tx-bank-account-name" value="${esc(r.bankAccountName||'')}"></div><div class="fg"><label for="tx-bank-account-number">เลขบัญชีธนาคาร</label><input type="text" inputmode="numeric" autocomplete="off" id="tx-bank-account-number" value="${esc(r.bankAccountNumber||'')}"></div>
     ${txTaxForm(r,type)}
     <div class="fg"><label>วิธีชำระ</label><select id="tx-method">${['เงินโอน','เงินสด','เช็ค','บัตรเครดิต','อื่น ๆ'].map(m=>`<option ${r.method===m?'selected':''}>${m}</option>`).join('')}</select></div>
     <div class="fg"><label>หมายเหตุ</label><input id="tx-note" value="${esc(r.note||'')}"></div>
@@ -215,13 +216,14 @@ function openTx(type,row){ _editTxId=row?row._id:null; _txDoc=row?{url:row.docUr
   `,`<button class="btn btn-primary" onclick="saveTx()">บันทึก</button>`);
   updateTxTax();
 }
-function editTx(id){ const t=finTx.find(x=>String(x._id||x.id)===String(id)); if(!t)return; openTx(t.TxType||'expense',{_id:t._id||t.id,date:(t.Date||'').slice(0,10),category:t.Category,amount:t.TaxVersion==='1'?+t.InputAmount:+t.Amount||0,taxMode:t.TaxMode,vatRate:t.VatRate,whtRate:t.WhtRate,taxDoc:t.TaxDoc,taxDate:t.TaxDate,vatEligible:t.VatEligible==='true',partyId:t.PartyID,partyTax:t.PartyTaxID,partyBranch:t.PartyBranch,party:t.Party,method:t.Method,note:t.Note,docUrl:t.DocURL,docName:t.DocName}); }
+function editTx(id){ const t=finTx.find(x=>String(x._id||x.id)===String(id)); if(!t)return; openTx(t.TxType||'expense',{_id:t._id||t.id,date:(t.Date||'').slice(0,10),category:t.Category,amount:t.TaxVersion==='1'?+t.InputAmount:+t.Amount||0,taxMode:t.TaxMode,vatRate:t.VatRate,whtRate:t.WhtRate,taxDoc:t.TaxDoc,taxDate:t.TaxDate,vatEligible:t.VatEligible==='true',partyId:t.PartyID,partyTax:t.PartyTaxID,partyBranch:t.PartyBranch,bankName:t.BankName,bankAccountName:t.BankAccountName,bankAccountNumber:t.BankAccountNumber,party:t.Party,method:t.Method,note:t.Note,docUrl:t.DocURL,docName:t.DocName}); }
 async function _txUpload(input){ const el=document.getElementById('tx-doc'); if(el)el.textContent='⏳...'; try{ _txDoc=await uploadDoc(input); if(el)el.innerHTML=_txDoc?docChip(_txDoc.url,_txDoc.name):''; }catch(e){ if(el)el.textContent='อัปโหลดไม่สำเร็จ'; } }
 async function saveTx(){
   const type=document.getElementById('tx-type').value;
   const amt=+document.getElementById('tx-amt').value||0; if(amt<=0){ toast('กรอกจำนวนเงิน','error'); return; }
   let tax;try{tax=readTxTax();}catch(e){toast(e.message,'error');return;}
-  const fields={ TaxVersion:'1', InputAmount:String(amt), TaxMode:document.getElementById('tx-tax-mode').value, VatRate:document.getElementById('tx-vat').value, WhtRate:document.getElementById('tx-wht').value, BaseAmount:String(tax.base), VatAmount:String(tax.vat), WhtAmount:String(tax.wht), GrossAmount:String(tax.gross), TaxDoc:document.getElementById('tx-tax-doc').value.trim(), TaxDate:document.getElementById('tx-tax-date').value, VatEligible:String(document.getElementById('tx-vat-eligible').checked), PartyID:document.getElementById('tx-party-id').value, PartyTaxID:document.getElementById('tx-party-tax').value.trim(), PartyBranch:document.getElementById('tx-party-branch').value.trim(), Date:document.getElementById('tx-date').value, TxType:type, Category:document.getElementById('tx-cat').value,
+  let bank;try{bank=BankDetails.validate({bankName:document.getElementById('tx-bank-name').value,bankAccountName:document.getElementById('tx-bank-account-name').value,bankAccountNumber:document.getElementById('tx-bank-account-number').value});}catch(e){toast(e.message,'error');return;}
+  const fields={ BankName:bank.bankName,BankAccountName:bank.bankAccountName,BankAccountNumber:bank.bankAccountNumber,TaxVersion:'1', InputAmount:String(amt), TaxMode:document.getElementById('tx-tax-mode').value, VatRate:document.getElementById('tx-vat').value, WhtRate:document.getElementById('tx-wht').value, BaseAmount:String(tax.base), VatAmount:String(tax.vat), WhtAmount:String(tax.wht), GrossAmount:String(tax.gross), TaxDoc:document.getElementById('tx-tax-doc').value.trim(), TaxDate:document.getElementById('tx-tax-date').value, VatEligible:String(document.getElementById('tx-vat-eligible').checked), PartyID:document.getElementById('tx-party-id').value, PartyTaxID:document.getElementById('tx-party-tax').value.trim(), PartyBranch:document.getElementById('tx-party-branch').value.trim(), Date:document.getElementById('tx-date').value, TxType:type, Category:document.getElementById('tx-cat').value,
     Amount:String(tax.net), Method:document.getElementById('tx-method').value, Party:document.getElementById('tx-party').value,
     Note:document.getElementById('tx-note').value, DocURL:_txDoc?_txDoc.url:'', DocName:_txDoc?_txDoc.name:'', CreatedBy:currentUser.email };
   if(!fields.Date || !fields.TaxDate){toast('กรอกวันที่รับ/จ่ายและวันที่เอกสาร','error');return;}
