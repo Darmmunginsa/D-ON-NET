@@ -1323,6 +1323,7 @@
         <div class="form-group" style="grid-column:1/-1"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ct-acked" style="width:auto"> 🔕 รับทราบแล้ว — ปิดแจ้งเตือนสัญญานี้ (รอบปัจจุบัน)</label></div>
       </div>
     </div>
+    <div id="ct-service-agreement" style="padding:18px;border-top:1px solid var(--border);max-height:55vh;overflow:auto"></div>
     <div class="modal-footer">
       <button class="btn btn-sm btn-danger" id="ct-delete-btn" onclick="deleteContract()" style="display:none;margin-right:auto">ลบสัญญา</button>
       <button class="btn" onclick="closeModal('contract-modal')">ยกเลิก</button>
@@ -1420,6 +1421,7 @@
 
 <script src="../shared/basket-persistence.js?v=admin1"></script>
 <script src="../shared/gateway-client.js?v=admin1"></script>
+<script src="../shared/service-plan.js?v=service1"></script>
 <script src="js/config.js?v=admin1"></script>
 <script src="js/auth.js?v=admin1"></script>
 <script src="js/api.js?v=g2"></script>
@@ -1435,14 +1437,14 @@
 <script src="js/pages/signature.js?v=admin1"></script>
 <script src="js/pages/company.js?v=admin1"></script>
 <script src="js/pages/pdf.js?v=admin1"></script>
-<script src="js/pages/saletracker.js?v=donnet-header-20261030"></script>
+<script src="js/pages/saletracker.js?v=service1"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>
 <script src="js/pages/belowcost.js?v=admin1"></script>
 <script src="js/pages/procurement.js?v=admin1"></script>
 <script src="js/pages/projects.js?v=g1"></script>
 <script src="js/pages/expiry.js?v=g1"></script>
-<script src="js/pages/contracts.js?v=admin1"></script>
+<script src="js/pages/contracts.js?v=service1"></script>
 <script src="js/app.js?v=admin1"></script>
 <script src="js/tour.js?v=admin1"></script>
 <datalist id="doc-type-list">
@@ -1453,5 +1455,5 @@
   <option value="ใบส่งของ">
   <option value="เอกสารอื่น">
 </datalist>
-</body>
+<script src="js/pages/service-agreements.js?v=service1"></script></body>
 </html>

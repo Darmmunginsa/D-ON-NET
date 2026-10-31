@@ -149,6 +149,7 @@ function openAddContract() {
   _fillContractQuoteOptions('');
   const _ak=document.getElementById('ct-acked'); if(_ak) _ak.checked=false;
   document.getElementById('ct-delete-btn').style.display = 'none';
+  openServiceAgreementFields(null);
   openModal('contract-modal');
 }
 function editContract(spId) {
@@ -164,6 +165,7 @@ function editContract(spId) {
   _fillContractQuoteOptions(c.quoteId||'');
   const _ak=document.getElementById('ct-acked'); if(_ak) _ak.checked=contractAcked(c);
   document.getElementById('ct-delete-btn').style.display = '';
+  openServiceAgreementFields(c);
   openModal('contract-modal');
 }
 async function saveContract() {
@@ -177,10 +179,12 @@ async function saveContract() {
     alertEmails:g('ct-alertemails').trim(), quoteId:[...document.querySelectorAll('#ct-quote-list .ct-quote-cb:checked')].map(cb=>cb.value).filter(Boolean).join(','), manualDisbursed:+g('ct-manualdisbursed')||0,
     note:g('ct-note').trim()
   };
+  if(obj.alertEmails && ServicePlan.teamEmails(obj.alertEmails).length!==obj.alertEmails.split(/[,;\s]+/).filter(Boolean).length){toast('อีเมลแจ้งเตือนต้องเป็นทีมงานที่อนุญาตเท่านั้น','error');return;}
   // เก็บ remindSentFor เดิมไว้ (กันเมลซ้ำ) — รีเซ็ตถ้าวันสิ้นสุดเปลี่ยน
   const old = editingContractId ? contractsData.find(x=>String(x.spId)===String(editingContractId)) : null;
   obj.remindSentFor = (old && old.remindSentFor === obj.end) ? old.remindSentFor : '';
   obj.ackFor = document.getElementById('ct-acked')?.checked ? obj.end : '';   // รับทราบ = ผูกกับวันสิ้นสุดรอบนี้
+  try{obj.serviceAgreement=collectServiceAgreement(obj.start,obj.end);}catch(e){toast(e.message,'error');return;}
   const value = JSON.stringify(obj);
   try {
     toast('กำลังบันทึก...','info');
@@ -268,6 +272,7 @@ async function confirmContractImport() {
 
 // ── แจ้งเตือนอัตโนมัติตอน sync — ส่งเมลครั้งเดียวต่อรอบสิ้นสุดสัญญา ──
 async function checkContractsDue() {
+  if (typeof getSettingValue==='function' && getSettingValue('ServiceReminderMode')==='server') return;
   try {
     if (!contractsData.length) { try { await loadContracts(); } catch(e) { return; } }
     for (const c of contractsData) {
@@ -277,7 +282,7 @@ async function checkContractsDue() {
       if (d > alert) continue;                       // ยังไม่ถึงช่วงเตือน
       if (contractAcked(c)) continue;                // รับทราบแล้ว → ไม่ส่ง
       if (c.remindSentFor === c.end) continue;       // ส่งไปแล้วสำหรับรอบนี้
-      const emails = (c.alertEmails||'').split(/[,\n;]+/).map(s=>s.trim()).filter(s=>s.includes('@'));
+      const emails = ServicePlan.teamEmails(c.alertEmails||'');
       if (!emails.length) continue;
       const subject = `[แจ้งเตือนสัญญา] ${c.party||c.name} ${d<0?'หมดอายุแล้ว':'ใกล้หมดอายุ ('+d+' วัน)'}`;
       const body = `<div style="font-family:sans-serif;font-size:14px;color:#222">

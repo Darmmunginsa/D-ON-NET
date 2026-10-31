@@ -241,7 +241,8 @@ function renderExpiryTab() {
       + '<label style="font-size:11px;color:var(--muted)">เตือนล่วงหน้า <input type="number" min="0" value="' + (e.remindDays!=null?e.remindDays:30) + '" oninput="updateExpiry(\'' + e.id + '\',\'remindDays\',this.value)" style="font-size:11px;max-width:54px;margin-left:3px"> วัน</label>'
       + '</div>'
       + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">'
-      + '<label style="font-size:11px;color:var(--muted);flex:1;min-width:160px">แจ้งเตือนถึงอีเมล <input value="' + escHtml((e.emails||[]).join(', ')) + '" oninput="updateExpiryEmails(\'' + e.id + '\',this.value)" placeholder="a@x.com, b@y.com" style="font-size:11px;width:100%;margin-top:2px"></label>'
+      + '<label style="font-size:11px;color:var(--muted);flex:1;min-width:160px">แจ้งเตือนเฉพาะทีมงาน <input value="' + escHtml((e.emails||[]).join(', ')) + '" oninput="updateExpiryEmails(\'' + e.id + '\',this.value)" placeholder="a@x.com, b@y.com" style="font-size:11px;width:100%;margin-top:2px"></label>'
+      + '<label style="font-size:11px"><input type="checkbox" '+(e.publicLookup?'checked':'')+' onchange="setExpiryPublic(\''+e.id+'\',this.checked)"> ให้ลูกค้าค้นประกันบนเว็บไซต์ (หนึ่ง Serial ต่อเครื่อง)</label>'
       + '<input value="' + escHtml(e.note||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'note\',this.value)" placeholder="หมายเหตุ" style="font-size:11px;flex:1;min-width:140px">'
       + (e.renewed
           ? '<button class="btn btn-sm" onclick="updateExpiry(\'' + e.id + '\',\'renewed\',false)" style="font-size:11px">ยกเลิกต่ออายุ</button>'
@@ -288,6 +289,7 @@ async function pullExpiryFromQuote() {
 }
 // ส่งอีเมลแจ้งเตือนหมดอายุที่ถึงกำหนด (เรียกตอน sync — ล้อ checkFollowUpsDue)
 async function checkExpiriesDue() {
+  if (getSettingValue('ServiceReminderMode')==='server') return;
   if (_expChecked || !currentUser) return;
   _expChecked = true;
   const today = new Date().toISOString().split('T')[0];
@@ -301,7 +303,7 @@ async function checkExpiriesDue() {
         if (e.renewed || e.remindSentAt || !e.expiryDate) continue;
         const remindDate = _addDaysStr(e.expiryDate, -(+e.remindDays||30));
         if (remindDate > today) continue;   // ยังไม่ถึงวันเตือน
-        const emails = (e.emails||[]).filter(Boolean);
+        const emails = ServicePlan.teamEmails(e.emails||[]);
         if (!emails.length) continue;
         const stx = expiryStatus(e.expiryDate, false);
         const subject = '[SalePro] ⏰ ใกล้หมดอายุ: ' + (e.type||'') + ' ' + (e.name||'') + ' — ' + (q.ClientName||'');
@@ -2945,3 +2947,5 @@ async function confirmCloseDeal() {
   toast('✓ ปิดการขายสำเร็จ', 'success');
 }
 
+
+function setExpiryPublic(id,enabled){const e=_stExpiries().find(x=>x.id===id);if(!e)return;const candidate={...e,publicLookup:enabled};if(enabled&&!ServicePlan.publicRecord(candidate)){toast('ระบุประเภทอุปกรณ์/Warranty รุ่น Serial วันเริ่ม วันหมดประกัน และจำนวน 1 เครื่องก่อนเปิดค้นหาบนเว็บ','error');renderExpiryTab();return;}e.publicLookup=enabled;if(enabled)e.qty=1;renderExpiryTab();saveSTDealData();}

@@ -69,6 +69,7 @@ function listRows(name) {
   return out;
 }
 function createRow(name, fields) {
+  validateServiceFields(name,fields);
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var sh = _sheet(name);
@@ -130,6 +131,7 @@ function _findRowIndex(sh, id) {
   return -1;
 }
 function updateRow(name, id, fields) {
+  validateServiceFields(name,fields);
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var sh = _sheet(name);
@@ -201,12 +203,13 @@ function uploadFile(req) {
   var bytes = Utilities.base64Decode(req.base64 || req.base64Data || '');
   var blob = Utilities.newBlob(bytes, req.mimeType || 'application/octet-stream', req.fileName || ('file_' + Date.now()));
   var file = folder.createFile(blob);
-  try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}
+  if(req.privateFile!==true){try { file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW); } catch (e) {}}
   return { fileUrl: file.getUrl(), id: file.getId() };
 }
 
 function handle(req) {
   var a = req.action;
+  if(a==='serviceCapabilities')return {ok:true,serviceAutomationVersion:1,privateVisitUploads:true};
   if (a === 'list')        return { ok: true, items: listRows(req.list) };
   if (a === 'multiList')   { var _o = {}; (req.lists || []).forEach(function (n) { _o[n] = listRows(n); }); return { ok: true, lists: _o }; }   // อ่านหลายแท็บในครั้งเดียว
   if (a === 'batchCreate') return { ok: true, items: batchCreate(req.list, req.rows || []) };                                                   // เขียนหลายแถวในครั้งเดียว
@@ -225,6 +228,7 @@ function _json(obj) {
 function doPost(e) {
   try {
     var req = JSON.parse(e.postData.contents || '{}');
+    if(req.action==='publicWarrantyLookup')return _json(lookupPublicWarranty(req));
     _authorizeGateway(req);
     return _json(handle(req));
   } catch (err) {
