@@ -1,0 +1,48 @@
+/* Shared screen theme. Printed business documents retain their own styling. */
+@media screen {
+ :root {
+  color-scheme:dark;
+  --bg:#060b16;--surface:#0c1628;--surface2:#112039;--card:#0c1628;--card2:#112039;
+  --border:#203b55;--border2:#365876;--ink:#e8f5ff;--text:#e8f5ff;
+  --muted:#a1b6cd;--muted2:#b5c8db;--accent:#26cfee;--accent2:#72eaff;
+  --accent-soft:rgba(38,207,238,.12);--navy:#72eaff;
+  --sale:#42ddf5;--purchase:#70e9b0;--tech:#bc9cff;--board:#ffcf78;
+ }
+ body {
+  background-color:var(--bg);
+  background-image:radial-gradient(ellipse at 15% 0%,#123b5860,transparent 55%),radial-gradient(ellipse at 95% 30%,#34215a50,transparent 55%),linear-gradient(#51d9ff06 1px,transparent 1px),linear-gradient(90deg,#51d9ff06 1px,transparent 1px);
+  background-size:auto,auto,40px 40px,40px 40px;
+ }
+ ::selection{background:#23cce64d;color:#fff}
+ :focus-visible{outline:2px solid #72eaff;outline-offset:4px}
+ .don-brand-logo{filter:drop-shadow(0 0 12px #36d9ff30)}
+ .cyber-portal{padding:48px 24px;min-height:100vh}
+ .cyber-portal .head{position:relative;margin-bottom:38px}
+ .cyber-portal .head::before{content:'D ON NET / SYSTEM ACCESS';display:block;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.16em;color:#72eaff;margin-bottom:20px}
+ .cyber-portal h1{font-size:clamp(26px,4vw,38px);letter-spacing:-.02em;color:#f1faff;text-shadow:0 0 28px #45d5fa25}
+ .cyber-portal .sub{color:#a1b6cd;line-height:1.8}
+ .cyber-portal .grid{max-width:1040px;gap:20px;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .cyber-portal a.app{position:relative;overflow:hidden;min-height:205px;padding:26px;border:1px solid #28445f;border-top:2px solid var(--ac);border-radius:6px;background:linear-gradient(135deg,#102039ed,#0b1426f2);box-shadow:inset 0 1px 0 #ffffff08,0 10px 35px #0002;transition:transform .18s,border-color .18s,box-shadow .18s}
+ .cyber-portal a.app::after{content:'↗';position:absolute;right:22px;top:22px;color:var(--ac);font-size:22px}
+ .cyber-portal a.app::before{content:'';position:absolute;right:0;bottom:0;width:46px;height:3px;background:var(--ac);box-shadow:0 0 15px var(--ac)}
+ .cyber-portal a.app:hover{transform:translateY(-3px);border-color:var(--ac);box-shadow:0 0 25px #30cced12,0 14px 40px #0004}
+ .cyber-portal .app .ico{display:grid;place-items:center;width:48px;height:48px;border:1px solid #ffffff15;background:#ffffff05;border-radius:10px;font-size:26px;margin-bottom:16px}
+ .cyber-portal .app h3{font-size:21px;margin-bottom:8px}
+ .cyber-portal .app p{color:#b0c3d8;font-size:13px;line-height:1.8;max-width:90%}
+ .cyber-portal .go{margin-top:18px;letter-spacing:.02em}
+ .cyber-portal .foot{color:#92abc3;border-top:1px solid #203b55;padding-top:20px;width:min(1040px,100%)}
+ .cyber-app .login-wrap,.cyber-app .login-screen,.cyber-app #login-screen{background:transparent}
+ .cyber-app .login-card{background:linear-gradient(145deg,#11223a,#0b1426);border:1px solid #31546f;border-top:2px solid #48def6;border-radius:14px;box-shadow:0 24px 80px #0007,0 0 35px #32cfe910;color:#e8f5ff}
+ .cyber-app .login-card h1,.cyber-app .login-title{color:#edfaff}
+ .cyber-app .login-card p,.cyber-app .login-sub{color:#a1b6cd}
+ .cyber-app .sidebar{background:linear-gradient(180deg,#0c182b,#081120);border-right-color:#203b55}
+ .cyber-app .topbar{background:#0b1729;border-bottom:1px solid #29445e}
+ .cyber-app .nav-item:hover{background:#22cfea0b}
+ .cyber-app .nav-item.active{background:linear-gradient(90deg,#22cfea22,#22cfea08);color:#7decff;border-color:#26cfee}
+ .cyber-app .card,.cyber-app .stat-card,.cyber-app .modal-content{border-color:#29445e;box-shadow:0 4px 20px #0002}
+ .cyber-app input:focus,.cyber-app select:focus,.cyber-app textarea:focus{border-color:#48def6;box-shadow:0 0 0 3px #26cfee18}
+ .cyber-app .btn-primary,.cyber-app .btn-ms{background:linear-gradient(120deg,#137ea6,#1668b0)!important;color:#fff!important;border:1px solid #3ccee6!important;box-shadow:0 0 18px #26cfee15}
+ .cyber-app .btn-primary:hover,.cyber-app .btn-ms:hover{filter:brightness(1.15)}
+ @media(max-width:600px){.cyber-portal{padding:28px 18px}.cyber-portal .grid{grid-template-columns:1fr}.cyber-portal a.app{padding:22px;min-height:190px}.cyber-portal .head::before{font-size:10px;letter-spacing:.1em}.cyber-portal .sub{font-size:13px}}
+ @media(prefers-reduced-motion:reduce){.cyber-portal a.app{transition:none}.cyber-portal a.app:hover{transform:none}}
+}

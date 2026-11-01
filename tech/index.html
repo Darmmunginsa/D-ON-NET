@@ -138,8 +138,8 @@ select.form-control option{background:var(--card)}
   .job-meta{gap:6px}
 }
 </style>
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"></head>
-<body>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"></head>
+<body class="cyber-app">
 
 <!-- LOGIN -->
 <div id="login-screen">
@@ -586,7 +586,7 @@ function buildDeliveryHTML(kind, q, items, co) {
   .doc{max-width:760px;margin:0 auto}table{border-collapse:collapse;width:100%}
   .items{border:1px solid ${ORANGE};border-radius:6px;overflow:hidden;margin-top:12px}
   .items thead{background:${ORANGE};color:#fff;font-size:12px}.items tbody tr{border-bottom:1px solid #f0d8c2}
-  @media print{button{display:none}}</style></head><body><div class="doc">
+  @media print{button{display:none}}</style><link rel="stylesheet" href="../shared/cyber.css?v=20261101"></head><body class="cyber-app"><div class="doc">
     <div style="text-align:center;margin:10px 0 16px"><button onclick="window.print()" style="padding:8px 18px;background:${ORANGE};color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer">🖨️ พิมพ์ / บันทึก PDF</button></div>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid ${ORANGE};padding-bottom:10px">
       <div>${co.LogoURL?`<img src="${co.LogoURL}" style="max-height:54px;margin-bottom:6px">`:''}
