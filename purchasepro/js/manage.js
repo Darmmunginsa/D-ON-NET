@@ -18,7 +18,7 @@ async function loadCatalogData(){
   catalogExtra=(it&&it.Value)?(JSON.parse(it.Value)||{}):{};
 }
 async function saveCatalogExtra(){ await putSetting('CatalogExtra', JSON.stringify(catalogExtra)); }
-function catExtra(id){ return catalogExtra[id]||{}; }
+function catExtra(id){ return CatalogPolicy.extra(catalogData.find(p=>p.id===id),catalogExtra[id]); }
 async function saveVendorsStore(){ await putSetting('Vendors', JSON.stringify(vendorsData)); }
 
 // ════════ CATALOG ════════
@@ -34,8 +34,8 @@ function renderCatalog(){
       <td style="font-weight:500">${esc(p.Title||'')}${ex.pdoc?` <a href="${ex.pdoc.url}" target="_blank" title="เอกสารซื้อ">📄</a>`:''}</td>
       <td>${esc(p.Category||'')}</td>
       <td style="text-align:right;font-family:var(--mono)">${fmt(cost)}</td>
-      <td style="text-align:right;font-family:var(--mono)">${fmt(p.Price||0)}</td>
-      <td style="text-align:right;font-family:var(--mono);color:${margin>=0?'var(--green)':'var(--red)'}">${fmt(margin)}</td>
+      <td style="text-align:right;font-family:var(--mono)">${CatalogPolicy.sellable(p)?fmt(p.Price):'Draft · ยังไม่มีราคา'}</td>
+      <td style="text-align:right;font-family:var(--mono);color:${margin>=0?'var(--green)':'var(--red)'}">${CatalogPolicy.sellable(p)?fmt(margin):'—'}</td>
       <td>${vd?esc(vd.name):'<span style="color:var(--muted)">—</span>'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm" onclick="editProduct('${p.id}')">แก้</button>
@@ -86,8 +86,8 @@ function editProduct(id){
 }
 async function saveProduct(){
   const name=document.getElementById('np-name').value, price=+document.getElementById('np-price').value;
-  if(!name||!price){ toast('กรอกชื่อสินค้าและราคาขาย','error'); return; }
-  const fields={Title:name,SKU:document.getElementById('np-sku').value,Price:price,Unit:document.getElementById('np-unit').value,Category:document.getElementById('np-cat').value,Description:document.getElementById('np-desc').value};
+  const priceText=document.getElementById('np-price').value.trim();if(!name.trim()||(priceText!==''&&(!Number.isFinite(price)||price<=0))){toast('กรอกชื่อสินค้า และราคาขายต้องมากกว่า 0 หรือเว้นว่างเป็น Draft','error');return;}
+  const fields={Title:name,SKU:document.getElementById('np-sku').value,Price:priceText===''?'':price,CatalogStatus:priceText===''?'Draft':'Active',Unit:document.getElementById('np-unit').value,Category:document.getElementById('np-cat').value,Description:document.getElementById('np-desc').value};
   const extra={cost:+document.getElementById('np-cost').value||0,vendorId:document.getElementById('np-vendor').value||'',pn:document.getElementById('np-pn').value||'',pdoc:_npPDoc||null};
   try{
     toast('กำลังบันทึก...','info'); let pid=editingProductId;

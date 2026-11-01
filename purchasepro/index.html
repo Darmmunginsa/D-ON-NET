@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link href="assets/style.css?v=g3" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"></head>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script></head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -89,7 +89,7 @@
       <div class="page" id="page-catalog">
         <div style="display:flex;gap:10px;margin-bottom:16px">
           <input id="cat-search" placeholder="ค้นหาสินค้า / Part No...." oninput="renderCatalog()" style="max-width:300px">
-          <button class="btn btn-primary" onclick="openAddProduct()" style="margin-left:auto">+ เพิ่มสินค้า</button>
+          <label class="btn" style="display:flex;gap:8px;align-items:center">นำเข้า Draft JSON<input id="draft-import-file" type="file" accept=".json,application/json" style="max-width:190px"></label><button class="btn btn-primary" onclick="openAddProduct()" style="margin-left:auto">+ เพิ่มสินค้า</button>
         </div>
         <div class="card">
           <table><thead><tr><th>Part No.</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ทุน</th><th>ขาย</th><th>กำไร</th><th>Vendor</th><th></th></tr></thead>
@@ -97,6 +97,7 @@
         </div>
       </div>
 
+<section id="draft-import-panel" hidden style="padding:20px;margin:20px;border:1px solid var(--border);border-radius:8px;background:var(--surface)"><h3>ตรวจรายการ Draft ก่อนนำเข้า</h3><p style="color:var(--muted)">ราคาทุนไม่รวม VAT · ราคาขายเว้นว่าง · เลือกขายใน SalePro ได้เมื่อกำหนดราคาขายแล้ว · ไฟล์นี้ส่งเฉพาะฐานข้อมูลบริษัท ไม่เผยแพร่บนเว็บไซต์สาธารณะ</p><p id="draft-import-status" role="status" aria-live="polite" style="white-space:pre-wrap;margin:12px 0"></p><div id="draft-import-preview" style="max-height:360px;overflow:auto"></div><button type="button" class="btn btn-primary" id="draft-import-confirm" disabled>ยืนยันนำเข้า Draft</button> <button type="button" class="btn" id="draft-import-cancel">ปิด</button></section>
       <!-- VENDORS -->
       <div class="page" id="page-vendors">
         <div style="display:flex;gap:10px;margin-bottom:16px">
@@ -369,7 +370,7 @@
 <script src="js/api.js?v=q3"></script>
 <script src="js/auth.js?v=admin1"></script>
 <script src="js/app.js?v=brand20261101"></script>
-<script src="js/manage.js?v=bank1"></script>
+<script src="js/manage.js?v=draft20261101"></script>
 <script src="js/tour.js?v=admin1"></script>
-</body>
+<script src="js/catalog-draft-import.js?v=20261101"></script></body>
 </html>

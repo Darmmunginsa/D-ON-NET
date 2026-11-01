@@ -18,7 +18,7 @@ async function loadCatalogExtra() {
 async function saveCatalogExtra() {
   await saveSettingItem('CatalogExtra', JSON.stringify(catalogExtra));   // → ProcurementData list
 }
-function catExtra(id) { return catalogExtra[id] || {}; }
+function catExtra(id) { return CatalogPolicy.extra(catalogData.find(p=>p.id===id),catalogExtra[id]); }
 
 function renderCatalog() {
   const q = (document.getElementById('cat-search')?.value || '').toLowerCase();
@@ -36,8 +36,8 @@ function renderCatalog() {
     <div class="cat-card">
       <div class="name">${escHtml(p.Title||'')}</div>
       <div class="sku">${escHtml(ex.pn||p.SKU||'')}</div>
-      <div class="price">${fmt(p.Price||0)} <span style="font-size:11px;color:var(--muted);font-weight:400">/${p.Unit||''}</span></div>
-      ${cost>0?`<div style="font-size:11px;color:var(--muted);margin-top:2px">ทุน ${fmt(cost)} · กำไร <span style="color:${margin>=0?'var(--green)':'var(--red)'}">${fmt(margin)}</span></div>`:''}
+      <div class="price">${CatalogPolicy.sellable(p)?fmt(p.Price):'Draft · ยังไม่มีราคาขาย'} <span style="font-size:11px;color:var(--muted);font-weight:400">/${p.Unit||''}</span></div>
+      ${cost>0&&CatalogPolicy.sellable(p)?`<div style="font-size:11px;color:var(--muted);margin-top:2px">ทุน ${fmt(cost)} · กำไร <span style="color:${margin>=0?'var(--green)':'var(--red)'}">${fmt(margin)}</span></div>`:''}
       ${vd?`<div style="font-size:11px;color:var(--accent2);margin-top:2px">🏢 ${escHtml(vd.name)}</div>`:''}
       ${ex.pdoc?`<div style="margin-top:4px">${docThumb(ex.pdoc.url, ex.pdoc.name||'เอกสารซื้อ', {small:true})}</div>`:''}
       <div style="display:flex;align-items:center;margin-top:8px;gap:6px">
@@ -48,7 +48,7 @@ function renderCatalog() {
 
 function renderModalCatalog() {
   const q = (document.getElementById('cat-modal-search')?.value || '').toLowerCase();
-  const filtered = catalogData.filter(p => (p.Title||'').toLowerCase().includes(q) || (p.SKU||'').toLowerCase().includes(q));
+  const filtered = catalogData.filter(p=>CatalogPolicy.sellable(p)).filter(p => (p.Title||'').toLowerCase().includes(q) || (p.SKU||'').toLowerCase().includes(q));
   document.getElementById('cat-modal-grid').innerHTML = filtered.map(p => `
     <div class="cat-card" onclick="addFromCatalog('${p.id}')">
       <div class="name">${escHtml(p.Title||'')}</div>
@@ -149,7 +149,7 @@ async function saveProduct() {
   if (!name || !price) { toast('กรุณากรอกชื่อสินค้าและราคาขาย', 'error'); return; }
   const fields = {
     Title: name, SKU: document.getElementById('np-sku').value,
-    Price: price, Unit: document.getElementById('np-unit').value,
+    Price: price, CatalogStatus:'Active', Unit: document.getElementById('np-unit').value,
     Category: document.getElementById('np-cat').value,
     Description: document.getElementById('np-desc').value
   };
