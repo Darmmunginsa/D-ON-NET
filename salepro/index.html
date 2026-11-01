@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="stylesheet" href="assets/style.css?v=g12">
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"></head>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"></head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -86,6 +86,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
           Catalog สินค้า
         </div>
+<div class="nav-item nav-admin-only" onclick="showPage('prospects',this)" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg>เป้าหมายลูกค้า</div>
         <div class="nav-item" onclick="showPage('customers',this)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
           ลูกค้า (CRM)
@@ -477,6 +478,16 @@
         <div class="cat-grid" id="cat-grid"></div>
       </div>
 
+<div class="page" id="page-prospects">
+<button type="button" class="btn prospect-mobile-menu" onclick="showPage('dashboard')">← เมนู SalePro</button><h2>เป้าหมายลูกค้า</h2><p class="prospect-help">นำเข้ารายชื่อ → บันทึกผลโทร → เก็บ Draft → เพิ่มเข้า CRM เมื่อพร้อม · หมายเหตุส่วนลดไม่ถูกใช้กับใบเสนอราคาอัตโนมัติ</p>
+<div class="prospect-toolbar"><button type="button" class="btn btn-primary" id="prospect-new">+ เพิ่มเป้าหมาย</button><button type="button" class="btn" id="prospect-seed">นำเข้ารายชื่อเริ่มต้น 15 ราย</button><label class="btn">นำเข้า CSV<input type="file" id="prospect-import-file" accept=".csv,text/csv" style="max-width:190px"></label><button type="button" class="btn" id="prospect-template">ไฟล์ CSV ตัวอย่าง</button><button type="button" class="btn" id="prospect-reload">โหลดใหม่</button></div>
+<div id="prospect-message" role="status" aria-live="polite"></div>
+<section id="prospect-import-panel" class="prospect-import" hidden><h3>ตรวจรายชื่อก่อนนำเข้า</h3><p class="prospect-help">เบอร์จากข้อมูลสาธารณะ ยังไม่ยืนยันว่ามี UPS หรือต้องการบริการ รายชื่อซ้ำจะถูกข้าม</p><pre id="prospect-import-preview" style="white-space:pre-wrap;max-height:300px;overflow:auto"></pre><button type="button" class="btn btn-primary" id="prospect-import-confirm">ยืนยันนำเข้า</button> <button type="button" class="btn" id="prospect-import-cancel">ยกเลิก</button></section>
+<div class="prospect-stats" id="prospect-stats"></div><div class="prospect-toolbar"><input id="prospect-search" aria-label="ค้นหาเป้าหมาย" placeholder="ค้นหาบริษัท เบอร์ ผู้ติดต่อ พื้นที่"><select id="prospect-filter" aria-label="กรองสถานะ"></select><label style="display:flex;align-items:center;gap:8px"><input id="prospect-due" type="checkbox" style="width:auto">ถึงวันติดตาม</label></div>
+<div class="prospect-layout"><div id="prospect-list" class="prospect-list"></div><section class="prospect-detail"><h3 id="prospect-edit-title">เพิ่มเป้าหมายใหม่</h3><div id="prospect-links" class="prospect-contact"></div><form id="prospect-form"><div class="prospect-fields">
+<label>ชื่อบริษัท / สำนักงาน *<input id="prospect-name" type="text" maxlength="300" required></label><label>เบอร์โทร *<input id="prospect-phone" type="tel" maxlength="1000" required></label><label>เขต / พื้นที่<input id="prospect-area" type="text" maxlength="1000" ></label><label>กลุ่มธุรกิจ / พันธมิตร<input id="prospect-category" type="text" maxlength="1000" ></label><label>ผู้ติดต่อ / ฝ่าย<input id="prospect-contact" type="text" maxlength="1000" ></label><label>ผู้รับผิดชอบโทร<input id="prospect-owner" type="text" maxlength="1000" ></label><label>ลิงก์แหล่งข้อมูล<input id="prospect-source" type="url" maxlength="1000" ></label><label>สถานะ<select id="prospect-stage"></select></label><label>วันติดตาม<input id="prospect-followUp" type="date" maxlength="1000" ></label>
+<label class="prospect-wide">ข้อมูล UPS / ความต้องการ<textarea id="prospect-note" rows="3" maxlength="3000"></textarea></label><label class="prospect-wide">หมายเหตุส่วนลด (ยังไม่อนุมัติ / ไม่ใช้คำนวณอัตโนมัติ)<textarea id="prospect-discountNote" rows="2" maxlength="3000" placeholder="เช่น เสนอพิจารณาส่วนลดเมื่อเรียกใช้บริการจริง"></textarea></label><label class="prospect-wide">ผลการโทรครั้งนี้ / บันทึกเพิ่มเติม<textarea id="prospect-callNote" rows="3" maxlength="3000" placeholder="บันทึกทุกครั้งลงประวัติ พร้อมชื่อผู้บันทึกและเวลา"></textarea></label></div>
+<div class="prospect-toolbar" style="margin-top:16px"><button type="submit" class="btn btn-primary">บันทึกข้อมูล / ผลโทร</button><button type="button" class="btn" id="prospect-save-draft">บันทึกเป็น Draft ลูกค้า</button><button type="button" class="btn" id="prospect-promote" disabled>เพิ่มเข้า CRM</button></div></form><p class="prospect-help">Draft เก็บแยกจากทะเบียนลูกค้าจริง หากผู้ติดต่อไม่ประสงค์ให้โทรอีก ให้เลือก “ไม่ให้ติดต่ออีก” · ข้อมูลแก้ไขในฟอร์มต้องบันทึกก่อนเพิ่มเข้า CRM</p><h3>ประวัติการติดตาม</h3><ul id="prospect-history" class="prospect-history"></ul></section></div></div>
       <!-- CUSTOMERS -->
       <div class="page" id="page-customers">
         <div class="filter-row">
@@ -1427,7 +1438,7 @@
 <script src="js/auth.js?v=admin1"></script>
 <script src="js/api.js?v=g2"></script>
 <script src="js/sync.js?v=admin2"></script>
-<script src="js/pages/ui.js?v=admin2"></script>
+<script src="js/pages/ui.js?v=prospects20261101"></script>
 <script src="js/pages/dashboard.js?v=admin1"></script>
 <script src="js/pages/quotes.js?v=admin2"></script>
 <script src="js/pages/approve.js?v=admin1"></script>
@@ -1456,5 +1467,5 @@
   <option value="ใบส่งของ">
   <option value="เอกสารอื่น">
 </datalist>
-<script src="js/pages/service-agreements.js?v=customerprofile1"></script></body>
+<script src="js/pages/service-agreements.js?v=customerprofile1"></script><script src="js/pages/prospects-core.js?v=20261101"></script><script src="js/pages/prospects.js?v=20261101"></script></body>
 </html>
