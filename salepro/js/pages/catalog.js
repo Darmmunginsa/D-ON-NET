@@ -21,9 +21,10 @@ async function saveCatalogExtra() {
 function catExtra(id) { return CatalogPolicy.extra(catalogData.find(p=>p.id===id),catalogExtra[id]); }
 
 function renderCatalog() {
+  CatalogBaskets.toolbar();
   const q = (document.getElementById('cat-search')?.value || '').toLowerCase();
   const cat = document.getElementById('cat-filter')?.value || '';
-  const filtered = catalogData.filter(p =>
+  const filtered = CatalogBaskets.filter(catalogData).filter(p =>
     (p.Title||'').toLowerCase().includes(q) || (p.SKU||'').toLowerCase().includes(q)
   ).filter(p => !cat || p.Category === cat);
 
@@ -33,7 +34,7 @@ function renderCatalog() {
     const vd = (typeof getVendorById === 'function' && ex.vendorId) ? getVendorById(ex.vendorId) : null;
     const margin = (p.Price||0) - cost;
     return `
-    <div class="cat-card">
+    <div class="cat-card" draggable="true" data-catalog-product="${escHtml(p.id)}">
       <div class="name">${escHtml(p.Title||'')}</div>
       <div class="sku">${escHtml(ex.pn||p.SKU||'')}</div>
       <div class="price">${CatalogPolicy.sellable(p)?fmt(p.Price):'Draft · ยังไม่มีราคาขาย'} <span style="font-size:11px;color:var(--muted);font-weight:400">/${p.Unit||''}</span></div>
@@ -43,6 +44,7 @@ function renderCatalog() {
       <div style="display:flex;align-items:center;margin-top:8px;gap:6px">
         <span class="cat-tag">${p.Category||''}</span>
       </div>
+      <div style="margin-top:10px">${CatalogBaskets.control(String(p.id))}</div>
     </div>`; }).join('') : '<div class="empty" style="grid-column:1/-1">ไม่พบสินค้า</div>';
 }
 

@@ -24,12 +24,13 @@ async function saveVendorsStore(){ await putSetting('Vendors', JSON.stringify(ve
 // ════════ CATALOG ════════
 async function loadCatalogAndRender(){ await loadCatalogData(); renderCatalog(); }
 function renderCatalog(){
+  CatalogBaskets.toolbar();
   const body=document.getElementById('catalog-body'); if(!body)return;
   const q=(document.getElementById('cat-search')?.value||'').toLowerCase();
-  const list=catalogData.filter(p=>!q||(p.Title||'').toLowerCase().includes(q)||(p.SKU||'').toLowerCase().includes(q));
+  const list=CatalogBaskets.filter(catalogData).filter(p=>!q||(p.Title||'').toLowerCase().includes(q)||(p.SKU||'').toLowerCase().includes(q));
   body.innerHTML = list.length ? list.map(p=>{
     const ex=catExtra(p.id), cost=+ex.cost||0, margin=(+p.Price||0)-cost, vd=ex.vendorId?getVendorById(ex.vendorId):null;
-    return `<tr>
+    return `<tr draggable="true" data-catalog-product="${esc(p.id)}">
       <td style="font-family:var(--mono);font-size:11px">${esc(ex.pn||p.SKU||'')}</td>
       <td style="font-weight:500">${esc(p.Title||'')}${ex.pdoc?` <a href="${ex.pdoc.url}" target="_blank" title="เอกสารซื้อ">📄</a>`:''}</td>
       <td>${esc(p.Category||'')}</td>
@@ -37,11 +38,11 @@ function renderCatalog(){
       <td style="text-align:right;font-family:var(--mono)">${CatalogPolicy.sellable(p)?fmt(p.Price):'Draft · ยังไม่มีราคา'}</td>
       <td style="text-align:right;font-family:var(--mono);color:${margin>=0?'var(--green)':'var(--red)'}">${CatalogPolicy.sellable(p)?fmt(margin):'—'}</td>
       <td>${vd?esc(vd.name):'<span style="color:var(--muted)">—</span>'}</td>
-      <td style="white-space:nowrap">
+      <td>${CatalogBaskets.control(String(p.id))}</td><td style="white-space:nowrap">
         <button class="btn btn-sm" onclick="editProduct('${p.id}')">แก้</button>
         <button class="btn btn-sm" onclick="deleteProduct('${p.id}')" style="color:var(--red)">ลบ</button>
       </td></tr>`;
-  }).join('') : '<tr><td colspan=8 style="text-align:center;padding:28px;color:var(--muted)">ยังไม่มีสินค้า — กด "เพิ่มสินค้า"</td></tr>';
+  }).join('') : '<tr><td colspan=9 style="text-align:center;padding:28px;color:var(--muted)">ยังไม่มีสินค้า — กด "เพิ่มสินค้า"</td></tr>';
 }
 function updateProductMargin(){
   const cost=+document.getElementById('np-cost')?.value||0, price=+document.getElementById('np-price')?.value||0;

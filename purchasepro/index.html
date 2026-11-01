@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link href="assets/style.css?v=g3" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script></head>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"></head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -92,7 +92,7 @@
           <label class="btn" style="display:flex;gap:8px;align-items:center">นำเข้า Draft JSON<input id="draft-import-file" type="file" accept=".json,application/json" style="max-width:190px"></label><button class="btn btn-primary" onclick="openAddProduct()" style="margin-left:auto">+ เพิ่มสินค้า</button>
         </div>
         <div class="card">
-          <table><thead><tr><th>Part No.</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ทุน</th><th>ขาย</th><th>กำไร</th><th>Vendor</th><th></th></tr></thead>
+          <table><thead><tr><th>Part No.</th><th>ชื่อสินค้า</th><th>หมวด</th><th>ทุน</th><th>ขาย</th><th>กำไร</th><th>Vendor</th><th>ตะกร้า</th><th></th></tr></thead>
           <tbody id="catalog-body"></tbody></table>
         </div>
       </div>
@@ -363,14 +363,14 @@
 
 <div id="toasts"></div>
 
-<script src="../shared/basket-persistence.js?v=admin1"></script>
+<script src="../shared/basket-persistence.js?v=admin1"></script><script src="../shared/catalog-baskets-core.js?v=20261101"></script><script src="../shared/catalog-baskets.js?v=20261101"></script>
 <script src="../shared/gateway-client.js?v=admin1"></script>
 <script src="../shared/bank-details.js?v=bank1"></script>
 <script src="js/config.js?v=admin1"></script>
 <script src="js/api.js?v=q3"></script>
 <script src="js/auth.js?v=admin1"></script>
 <script src="js/app.js?v=brand20261101"></script>
-<script src="js/manage.js?v=draft20261101"></script>
+<script src="js/manage.js?v=baskets20261101"></script>
 <script src="js/tour.js?v=admin1"></script>
 <script src="js/catalog-draft-import.js?v=20261101"></script></body>
 </html>
