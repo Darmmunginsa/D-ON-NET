@@ -2517,7 +2517,7 @@ function buildCancelEmailHTML(q, reason) {
     + '<div style="background:#7c1d1d;padding:24px 28px;text-align:center">'
     + '<div style="font-size:32px;margin-bottom:8px">🚫</div>'
     + '<div style="color:#fff;font-size:18px;font-weight:600">ใบเสนอราคาถูกยกเลิก</div>'
-    + '<div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:4px">SalePro · D On Net Co., Ltd.</div>'
+    + '<div style="color:rgba(255,255,255,0.6);font-size:12px;margin-top:4px">SalePro · D On Net Co.,Ltd.</div>'
     + '</div>'
     + '<div style="padding:24px 28px">'
     + '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px">'
@@ -2534,7 +2534,7 @@ function buildCancelEmailHTML(q, reason) {
     + '<a href="https://darmmunginsa.github.io/D-ON-NET/salepro/index.html" style="display:inline-block;background:#1a3a5c;color:#fff;text-decoration:none;padding:11px 28px;border-radius:8px;font-size:13px;font-weight:600">เข้าระบบ SalePro →</a>'
     + '</div></div>'
     + '<div style="padding:14px 28px;text-align:center;border-top:1px solid #e5e7eb;background:#f9fafb">'
-    + '<div style="font-size:11px;color:#9ca3af">D On Net Co., Ltd. · อีเมลนี้ส่งอัตโนมัติจาก SalePro</div>'
+    + '<div style="font-size:11px;color:#9ca3af">D On Net Co.,Ltd. · อีเมลนี้ส่งอัตโนมัติจาก SalePro</div>'
     + '</div></div>';
 }
 

@@ -179,7 +179,7 @@ function renderPDFHTML(d) {
     <div style="display:flex;align-items:stretch;justify-content:space-between;margin-bottom:6px;padding-bottom:8px;border-bottom:2px solid ${primaryColor}">
       <div style="flex:1;max-width:50%;word-break:break-word">
         ${(s.LogoBase64||s.LogoURL) ? `<img src="${s.LogoBase64||s.LogoURL}" style="max-height:81px;max-width:225px;object-fit:contain;margin-bottom:5px;display:block">` : ''}
-        <div style="font-size:${hbName};font-weight:700;color:${primaryColor};line-height:1.15">${s.CompanyNameEn||'D ON NET CO.,LTD.'}</div>
+        <div style="font-size:${hbName};font-weight:700;color:${primaryColor};line-height:1.15">${s.CompanyNameEn||'D On Net Co.,Ltd.'}</div>
         <div style="font-size:${hbLine};font-weight:700;color:${primaryColor};line-height:1.2;margin-top:1px">${s.CompanyName||'บริษัท ดี ออน เน็ต จำกัด'}</div>
         <div style="font-size:${hbLine};color:#666;line-height:1.5;margin-top:3px">
           ${(s.AddressEn||s.Address) ? (s.AddressEn||s.Address)+'<br>' : ''}

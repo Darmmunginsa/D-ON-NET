@@ -1431,7 +1431,7 @@ function renderPOStage(){
   return head+cards;
 }
 // ── #4 พิมพ์ใบสั่งซื้อ (PO) ส่ง Vendor ──
-let COMPANY = { name:'บริษัท ดี ออน เน็ต จำกัด', nameEn:'D ON NET CO.,LTD.', address:'สำนักงานใหญ่ : เลขที่ 78 หมู่ที่ 11 ตำบลผาเลือด อำเภอท่าปลา จังหวัดอุตรดิตถ์ 53190', taxId:'535569001005', phone:'091-5192945', fax:'-', logo:'', stamp:'', approverSign:'' };
+let COMPANY = { name:'บริษัท ดี ออน เน็ต จำกัด', nameEn:'D On Net Co.,Ltd.', address:'สำนักงานใหญ่ : เลขที่ 78 หมู่ที่ 11 ตำบลผาเลือด อำเภอท่าปลา จังหวัดอุตรดิตถ์ 53190', taxId:'535569001005', phone:'091-5192945', fax:'-', logo:'', stamp:'', approverSign:'' };
 // โหลด/บันทึกตั้งค่าบริษัท (เก็บใน Settings JSON คีย์ POCompany — รูป base64)
 function decodePOCompany(value,settings){
   const company=JSON.parse(value)||{};

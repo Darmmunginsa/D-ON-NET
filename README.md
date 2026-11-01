@@ -1,4 +1,4 @@
-# D-ON-NET — iT Services Internal Systems (Google Edition)
+# D-ON-NET — D On Net Co.,Ltd. Internal Systems (Google Edition)
 
 ชุดเว็บแอปภายใน ใช้ **Google Sheets + Drive + Gmail** ผ่าน **Google Apps Script** และล็อกอินด้วย **Google**
 
