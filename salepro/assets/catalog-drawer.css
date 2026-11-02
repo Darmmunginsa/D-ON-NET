@@ -1,0 +1,20 @@
+.catalog-drawer-tab{position:fixed;left:0;top:46%;z-index:140;writing-mode:vertical-rl;padding:16px 10px;border:1px solid var(--accent2);border-radius:0 10px 10px 0;background:var(--surface);color:var(--accent2);font:600 12px var(--font);cursor:pointer;box-shadow:0 4px 20px #0005}
+.quote-catalog-drawer{position:fixed;inset:0 auto 0 0;z-index:170;width:340px;max-width:calc(100vw - 24px);box-sizing:border-box;display:flex;flex-direction:column;gap:10px;padding:18px;background:var(--surface);color:var(--text);border-right:1px solid var(--accent2);box-shadow:10px 0 30px #0005}
+.quote-catalog-drawer[hidden]{display:none}
+.catalog-drawer-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.catalog-drawer-heading h3{margin:0;font-size:16px}
+.catalog-drawer-hint{font-size:12px;color:var(--muted);line-height:1.6;margin:0}
+.quote-catalog-drawer label{font-size:11px;color:var(--muted)}
+.quote-catalog-drawer input,.quote-catalog-drawer select{width:100%;min-height:36px;box-sizing:border-box;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:8px;color:var(--text);font:12px var(--font)}
+.catalog-drawer-summary{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted)}
+#cat-drawer-feedback{color:var(--green)}
+.catalog-drawer-results{overflow:auto;min-height:0;flex:1;display:flex;flex-direction:column;gap:10px;padding:2px 4px 12px 0}
+.catalog-drawer-results .cat-card{flex:none;cursor:default;padding:14px;overflow-wrap:anywhere}
+.catalog-drawer-results .price{font-size:15px;margin-top:8px}
+.catalog-reference-cost,.catalog-reference-description{font-size:12px;line-height:1.6;margin:6px 0;color:var(--muted)}
+.catalog-drawer-results button{margin-top:10px;white-space:normal;min-height:34px}
+.catalog-drawer-results button:disabled{opacity:.55;cursor:not-allowed}
+.catalog-reference-empty{padding:20px 0;font-size:12px;color:var(--muted)}
+.quote-catalog-open .catalog-drawer-tab{visibility:hidden}
+@media(min-width:1200px){.quote-catalog-open .main{margin-left:120px;min-width:0}}
+@media print{.catalog-drawer-tab,.quote-catalog-drawer{display:none!important}.quote-catalog-open .main{margin-left:0!important}}

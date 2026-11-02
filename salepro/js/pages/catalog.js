@@ -18,7 +18,7 @@ async function loadCatalogExtra() {
 async function saveCatalogExtra() {
   await saveSettingItem('CatalogExtra', JSON.stringify(catalogExtra));   // → ProcurementData list
 }
-function catExtra(id) { return CatalogPolicy.extra(catalogData.find(p=>p.id===id),catalogExtra[id]); }
+function catExtra(id) { return CatalogPolicy.extra(catalogData.find(p=>String(p.id)===String(id)),catalogExtra[id]); }
 
 function renderCatalog() {
   CatalogBaskets.toolbar();
@@ -46,29 +46,55 @@ function renderCatalog() {
       </div>
       <div style="margin-top:10px">${CatalogBaskets.control(String(p.id))}</div>
     </div>`; }).join('') : '<div class="empty" style="grid-column:1/-1">ไม่พบสินค้า</div>';
+  if(document.getElementById('catalog-modal')?.hidden===false)renderModalCatalog();
 }
 
 function renderModalCatalog() {
   const q = (document.getElementById('cat-modal-search')?.value || '').toLowerCase();
-  const filtered = catalogData.filter(p=>CatalogPolicy.sellable(p)).filter(p => (p.Title||'').toLowerCase().includes(q) || (p.SKU||'').toLowerCase().includes(q));
-  document.getElementById('cat-modal-grid').innerHTML = filtered.map(p => `
-    <div class="cat-card" onclick="addFromCatalog('${p.id}')">
+  const category = document.getElementById('cat-drawer-category')?.value || '';
+  const filtered = catalogData.filter(p => [p.Title,p.SKU,catExtra(p.id).pn,p.Description].some(v=>String(v||'').toLowerCase().includes(q))).filter(p=>!category||p.Category===category);
+  document.getElementById('cat-modal-grid').innerHTML = filtered.map(p => {
+    const ex=catExtra(p.id),sellable=CatalogPolicy.sellable(p),cost=Number(ex.cost);
+    return `<article class="cat-card">
       <div class="name">${escHtml(p.Title||'')}</div>
-      <div class="sku">${p.SKU||''}</div>
-      <div class="price">${fmt(p.Price||0)} <span style="font-size:11px;color:var(--muted)">/${p.Unit||''}</span></div>
-      <span class="cat-tag">${p.Category||''}</span>
-    </div>`).join('') || '<div style="text-align:center;color:var(--muted);padding:20px;grid-column:1/-1">ไม่พบสินค้า</div>';
+      <div class="sku">${escHtml(ex.pn||p.SKU||'')}</div>
+      <div class="price">${sellable?'ราคาขาย '+fmt(p.Price)+' บาท':'Draft · ยังไม่มีราคาขาย'}</div>
+      <p class="catalog-reference-cost">ต้นทุน ${Number.isFinite(cost)&&cost>0?fmt(cost)+' บาท':'ยังไม่ระบุ'} / ${escHtml(p.Unit||'หน่วย')}</p>
+      <span class="cat-tag">${escHtml(p.Category||'')}</span>
+      ${p.Description?`<p class="catalog-reference-description">${escHtml(p.Description)}</p>`:''}
+      <button type="button" class="btn btn-sm" data-catalog-add="${escHtml(String(p.id))}" ${sellable?'':'disabled'}>${sellable?'＋ เพิ่มเข้าใบเสนอราคา':'ยังเพิ่มไม่ได้ · รอกำหนดราคาขาย'}</button>
+    </article>`;
+  }).join('') || '<p class="catalog-reference-empty">ไม่พบสินค้า ลองเปลี่ยนคำค้นหรือหมวดหมู่</p>';
+  document.getElementById('cat-drawer-count').textContent=filtered.length+' / '+catalogData.length+' รายการ';
 }
 
-function openCatalogPicker() { renderModalCatalog(); openModal('catalog-modal'); }
+let _catalogDrawerReturnFocus=null;
+async function openCatalogPicker() {
+  _catalogDrawerReturnFocus=document.activeElement;
+  document.body.classList.add('quote-catalog-open');
+  const drawer=document.getElementById('catalog-modal');drawer.hidden=false;
+  document.getElementById('catalog-drawer-tab').setAttribute('aria-expanded','true');
+  document.getElementById('cat-drawer-feedback').textContent='';
+  renderModalCatalog();document.getElementById('cat-modal-search').focus();
+  await loadCatalogExtra();
+  if(!drawer.hidden)renderModalCatalog();
+}
+function closeCatalogDrawer(restoreFocus=true) {
+  document.body.classList.remove('quote-catalog-open');
+  const drawer=document.getElementById('catalog-modal');if(drawer)drawer.hidden=true;
+  document.getElementById('catalog-drawer-tab')?.setAttribute('aria-expanded','false');
+  if(restoreFocus&&_catalogDrawerReturnFocus?.isConnected)_catalogDrawerReturnFocus.focus();
+}
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!document.getElementById('catalog-modal')?.hidden){closeCatalogDrawer();}});
+document.addEventListener('click',event=>{const button=event.target.closest('[data-catalog-add]');if(button)addFromCatalog(button.dataset.catalogAdd);});
 
 function addFromCatalog(id) {
-  const p = catalogData.find(c => c.id === id);
-  if (!p) return;
+  const p = catalogData.find(c => String(c.id) === String(id));
+  if (!p || !CatalogPolicy.sellable(p)) return;
   const ex = catExtra(id);
   // แนบข้อมูลเสริมไปกับ item ในใบเสนอราคา (ต้นทุน/Part No. — สำหรับเฟส 3 ยาม "ลดต่ำกว่าทุน")
   addItem({ ...p, PartNumber: ex.pn || p.SKU || '', Cost: +ex.cost || 0, VendorId: ex.vendorId || '' });
-  closeModal('catalog-modal');
+  document.getElementById('cat-drawer-feedback').textContent='เพิ่ม '+p.Title+' เข้าใบเสนอราคาแล้ว';
 }
 
 function updateProductMargin() {

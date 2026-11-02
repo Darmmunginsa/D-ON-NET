@@ -6,6 +6,7 @@ const pageTitles = {dashboard:'Dashboard',quotes:'ใบเสนอราคา
 function showPage(id, el) {
   if(id==='prospects'&&!currentUser?.email){toast('กรุณาเข้าสู่ระบบ SalePro ก่อน','error');return;}
   if(id==='prospects')loadProspectsPage();
+  if(id!=='newquote'&&typeof closeCatalogDrawer==='function')closeCatalogDrawer(false);
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));

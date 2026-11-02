@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="stylesheet" href="assets/style.css?v=g12">
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"></head>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="assets/catalog-drawer.css?v=20261102"></head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -194,6 +194,16 @@
 
       <!-- NEW QUOTE -->
       <div class="page" id="page-newquote">
+        <button type="button" id="catalog-drawer-tab" class="catalog-drawer-tab" onclick="openCatalogPicker()" aria-controls="catalog-modal" aria-expanded="false">Catalog · ดูราคา</button>
+        <aside id="catalog-modal" class="quote-catalog-drawer" aria-labelledby="catalog-drawer-title" hidden>
+          <div class="catalog-drawer-heading"><h3 id="catalog-drawer-title">Catalog อ้างอิงราคา</h3><button type="button" class="btn btn-sm" onclick="closeCatalogDrawer()" aria-label="ปิด Catalog">✕</button></div>
+          <p class="catalog-drawer-hint">ดูราคาได้โดยไม่เพิ่มรายการ กดเพิ่มเฉพาะสินค้าที่ต้องการใช้ในใบเสนอราคา</p>
+          <label for="cat-modal-search">ค้นหาชื่อ / SKU / Part No.</label>
+          <input id="cat-modal-search" type="search" placeholder="เช่น แบตเตอรี่ หรือรุ่นสินค้า" oninput="renderModalCatalog()">
+          <label for="cat-drawer-category">หมวดหมู่</label><select id="cat-drawer-category" onchange="renderModalCatalog()"><option value="">ทุกหมวดหมู่</option><option>Hardware</option><option>Software</option><option>Service</option><option>Consumable</option></select>
+          <div class="catalog-drawer-summary"><span id="cat-drawer-count"></span><span id="cat-drawer-feedback" role="status" aria-live="polite"></span></div>
+          <div id="cat-modal-grid" class="catalog-drawer-results"></div>
+        </aside>
         <div class="card" id="nq-zone-info">
           <div id="edit-banner" style="display:none;align-items:center;gap:10px;padding:10px 16px;background:rgba(251,191,36,0.1);border-bottom:1px solid rgba(251,191,36,0.2);font-size:13px;color:var(--amber)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -339,7 +349,7 @@
             </button>
             <button class="btn btn-sm" onclick="openCatalogPicker()">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
-              เลือกจาก Catalog
+              เปิด Catalog / ดูราคา
             </button>
             <button class="btn btn-sm" onclick="openProjectItemPicker()">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
@@ -1174,16 +1184,6 @@
 </div>
 
 <!-- Modals -->
-<div class="overlay" id="catalog-modal">
-  <div class="modal">
-    <div class="modal-header"><h3>เลือกสินค้าจาก Catalog</h3><button class="btn btn-sm" onclick="closeModal('catalog-modal')">✕</button></div>
-    <div class="modal-body">
-      <input id="cat-modal-search" placeholder="ค้นหา..." oninput="renderModalCatalog()" style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font-size:13px;color:var(--text);margin-bottom:12px;outline:none;font-family:var(--font)">
-      <div class="cat-grid" id="cat-modal-grid" style="grid-template-columns:repeat(2,1fr)"></div>
-    </div>
-  </div>
-</div>
-
 <div class="overlay" id="product-modal">
   <div class="modal">
     <div class="modal-header"><h3 id="pm-title">เพิ่มสินค้าใหม่</h3><button class="btn btn-sm" onclick="closeModal('product-modal')">✕</button></div>
@@ -1438,12 +1438,12 @@
 <script src="js/auth.js?v=approval20261102"></script>
 <script src="js/api.js?v=g2"></script>
 <script src="js/sync.js?v=approval20261102"></script>
-<script src="js/pages/ui.js?v=teamprospects20261102"></script>
+<script src="js/pages/ui.js?v=drawer20261102"></script>
 <script src="js/pages/dashboard.js?v=approval20261102"></script>
 <script src="js/pages/quotes.js?v=admin2"></script>
 <script src="js/pages/approve.js?v=approval20261102"></script>
 <script src="js/pages/payment.js?v=admin1"></script>
-<script src="js/pages/catalog.js?v=baskets20261101"></script>
+<script src="js/pages/catalog.js?v=drawer20261102"></script>
 <script src="js/pages/settings.js?v=approval20261102"></script>
 <script src="js/pages/customers.js?v=admin1"></script>
 <script src="js/pages/signature.js?v=admin1"></script>
