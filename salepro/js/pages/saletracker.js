@@ -2319,7 +2319,7 @@ async function cancelQuote(id) {
       quotesData = quotesData.filter(x => x.id !== id);
       toast('ลบใบเสนอราคา ' + q.Title + ' แล้ว', 'success');
       if (editingQuoteId === id) { editingQuoteId = null; const eb=document.getElementById('edit-banner'); if(eb)eb.style.display='none'; }
-      renderDash(); renderQuotes(); updateBadge();
+      renderDash(); renderQuotes(); renderPayment(); updateBadge();
     } catch(e) { toast('ลบไม่สำเร็จ: ' + e.message, 'error'); }
     return;
   }
@@ -2336,7 +2336,7 @@ async function cancelQuote(id) {
       if (lq) { lq.Status = 'Cancelled'; lq.CancelReason = _r; }
       toast('ยกเลิก ' + q.Title + ' แล้ว', 'success');
       if (editingQuoteId === id) { editingQuoteId = null; const eb=document.getElementById('edit-banner'); if(eb)eb.style.display='none'; }
-      renderDash(); renderQuotes(); updateBadge();
+      renderDash(); renderQuotes(); renderPayment(); updateBadge();
     } catch(e) { toast('ยกเลิกไม่สำเร็จ: ' + e.message, 'error'); }
     return;
   }
@@ -2377,8 +2377,8 @@ async function confirmCancelQuote() {
     closeModal('cancel-quote-modal');
     toast('ยกเลิกใบเสนอราคา ' + q.Title + ' เรียบร้อยแล้ว', 'success');
     // ส่ง Email — Pending แจ้ง Approver, Approved แจ้ง Approver + จัดซื้อ
+    renderDash(); renderQuotes(); renderPayment(); renderApprove(); updateBadge();
     await sendCancelNotification(q, reason);
-    renderDash(); renderQuotes(); renderApprove(); updateBadge();
     cancellingQuoteId = null;
   } catch(e) { toast('ยกเลิกไม่สำเร็จ: ' + e.message, 'error'); }
 }

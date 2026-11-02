@@ -71,11 +71,11 @@ function renderSalesReport() {
     if (start && dt < start) return false;
     return dt <= end;
   };
-  const rows = quotesData.filter(inRange);
+  const rows = quotesData.filter(q=>q.Status!=='Cancelled').filter(inRange);
 
   const STATUSES = [
     { key:'Draft', color:'#94a3b8' }, { key:'Pending', color:'#fbbf24' },
-    { key:'Approved', color:'#34d399' }, { key:'Closed', color:'#38bdf8' }, { key:'Rejected', color:'#f87171' },
+    { key:'Approved', color:'#34d399' }, { key:'PO Received', color:'#a78bfa' }, { key:'Closed', color:'#38bdf8' }, { key:'Rejected', color:'#f87171' },
   ];
   const byStatus = STATUSES.map(s => ({ label:s.key, color:s.color, value: rows.filter(q=>q.Status===s.key).length })).filter(s=>s.value>0);
   const totalValue = rows.reduce((s,q)=>s+(Number(q.TotalAmount)||0),0);
@@ -85,7 +85,7 @@ function renderSalesReport() {
   const now = new Date(); const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   let gStart = start;
   if (!gStart) { // ทั้งหมด → หาเดือนเริ่มจากใบที่เก่าสุด
-    const dates = quotesData.map(q=>q.QuoteDate&&new Date(q.QuoteDate)).filter(d=>d&&!isNaN(d));
+    const dates = rows.map(q=>q.QuoteDate&&new Date(q.QuoteDate)).filter(d=>d&&!isNaN(d));
     gStart = dates.length ? new Date(Math.min(...dates)) : new Date(now.getFullYear(), now.getMonth()-5, 1);
   }
   const monthSpan = (now.getFullYear()-gStart.getFullYear())*12 + (now.getMonth()-gStart.getMonth()) + 1;

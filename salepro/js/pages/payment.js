@@ -3,6 +3,9 @@
 // ============================================================
 function renderPayment() {
   const payable = quotesData.filter(q => q.Status === 'PO Received');
+  if(currentPaymentQuoteId&&quotesData.some(q=>q.id===currentPaymentQuoteId&&q.Status==='Cancelled')){
+    closeModal('payment-modal');currentPaymentQuoteId=null;clearSlip();
+  }
   document.getElementById('payment-list').innerHTML = payable.map(q => {
     const pct = Math.min(100, Math.round(((q.PaidAmount||0)/(q.TotalAmount||1))*100));
     const rem = (q.TotalAmount||0) - (q.PaidAmount||0);
@@ -28,8 +31,9 @@ function renderPayment() {
 }
 
 function openPaymentModal(id) {
-  currentPaymentQuoteId = id;
   const q = quotesData.find(x => x.id === id);
+  if(!q||q.Status==='Cancelled'){toast('ใบเสนอราคานี้ถูกยกเลิกแล้ว ไม่สามารถบันทึกชำระเงินได้','error');return;}
+  currentPaymentQuoteId = id;
   document.getElementById('pay-title').textContent = `ชำระเงิน — ${q?.Title||''}`;
   document.getElementById('pay-amount').value = '';
   document.getElementById('pay-date').value = new Date().toISOString().split('T')[0];
@@ -110,6 +114,7 @@ async function savePayment() {
   if (!amt || amt <= 0) { toast('กรุณาระบุจำนวนเงิน', 'error'); return; }
   const q = quotesData.find(x => x.id === currentPaymentQuoteId);
   if (!q) return;
+  if(q.Status==='Cancelled'){toast('ใบเสนอราคานี้ถูกยกเลิกแล้ว ไม่สามารถบันทึกชำระเงินได้','error');return;}
   try {
     toast('กำลังบันทึก...', 'info');
     const payRef = 'PAY-' + Date.now();
