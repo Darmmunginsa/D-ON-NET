@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="stylesheet" href="assets/style.css?v=g12">
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="assets/catalog-drawer.css?v=20261102"></head>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="assets/catalog-drawer.css?v=service20261102"></head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -1184,6 +1184,16 @@
 </div>
 
 <!-- Modals -->
+<dialog id="service-catalog-dialog" class="service-catalog-dialog" aria-labelledby="svc-heading">
+  <h3 id="svc-heading">เก็บเป็น Catalog · Service</h3>
+  <p>เก็บเป็นรายการใหม่ ราคาอ้างอิงต่อหน่วยไม่รวมส่วนลดจากใบเสนอราคา ตรวจและลบข้อมูลเฉพาะลูกค้า/สถานที่ก่อนบันทึก โดย S/N ต้องกรอกใหม่เมื่อเรียกใช้</p>
+  <label for="svc-Title">ชื่องาน</label><input id="svc-Title" maxlength="500">
+  <label for="svc-PartNumber">Part No. / รุ่นอ้างอิง</label><input id="svc-PartNumber">
+  <div class="svc-grid"><div><label for="svc-Unit">หน่วย</label><input id="svc-Unit"></div><div><label for="svc-Price">ราคาอ้างอิงต่อหน่วย (บาท)</label><input id="svc-Price" type="number" min="0.01" step="0.01"></div><div><label for="svc-Cost">ต้นทุนต่อหน่วย (บาท)</label><input id="svc-Cost" type="number" min="0" step="0.01"></div></div>
+  <label for="svc-Description">รายละเอียดต้นแบบ (ไม่ใส่ S/N ของงานเดิม)</label><textarea id="svc-Description" rows="4"></textarea>
+  <p id="svc-status" role="status" aria-live="polite"></p>
+  <div class="svc-actions"><button class="btn" type="button" onclick="if(!_serviceCatalogBusy)document.getElementById('service-catalog-dialog').close()">ยกเลิก</button><button id="svc-save" type="button" class="btn btn-primary" onclick="saveServiceCatalog()">บันทึกเข้า Catalog · Service</button></div>
+</dialog>
 <div class="overlay" id="product-modal">
   <div class="modal">
     <div class="modal-header"><h3 id="pm-title">เพิ่มสินค้าใหม่</h3><button class="btn btn-sm" onclick="closeModal('product-modal')">✕</button></div>
@@ -1440,10 +1450,10 @@
 <script src="js/sync.js?v=approval20261102"></script>
 <script src="js/pages/ui.js?v=drawer20261102"></script>
 <script src="js/pages/dashboard.js?v=approval20261102"></script>
-<script src="js/pages/quotes.js?v=admin2"></script>
+<script src="js/pages/quotes.js?v=service20261102"></script>
 <script src="js/pages/approve.js?v=approval20261102"></script>
 <script src="js/pages/payment.js?v=admin1"></script>
-<script src="js/pages/catalog.js?v=drawer20261102"></script>
+<script src="js/pages/catalog.js?v=drawer20261102"></script><script src="js/pages/service-catalog.js?v=20261102"></script>
 <script src="js/pages/settings.js?v=approval20261102"></script>
 <script src="js/pages/customers.js?v=admin1"></script>
 <script src="js/pages/signature.js?v=admin1"></script>

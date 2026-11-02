@@ -18,3 +18,12 @@
 .quote-catalog-open .catalog-drawer-tab{visibility:hidden}
 @media(min-width:1200px){.quote-catalog-open .main{margin-left:120px;min-width:0}}
 @media print{.catalog-drawer-tab,.quote-catalog-drawer{display:none!important}.quote-catalog-open .main{margin-left:0!important}}
+.service-catalog-dialog{box-sizing:border-box;width:min(560px,calc(100vw - 28px));max-height:90vh;overflow:auto;margin:auto;padding:24px;border:1px solid var(--accent2);border-radius:14px;background:var(--surface);color:var(--text);font:13px/1.6 var(--font)}
+.service-catalog-dialog::backdrop{background:#000a}
+.service-catalog-dialog h3{margin:0 0 10px}
+.service-catalog-dialog p{color:var(--muted);font-size:12px}
+.service-catalog-dialog label{display:block;margin:10px 0 4px;font-size:12px}
+.service-catalog-dialog input,.service-catalog-dialog textarea{box-sizing:border-box;width:100%;padding:9px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font:inherit}
+.svc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.svc-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:16px}
+@media(max-width:500px){.svc-grid{grid-template-columns:1fr}.service-catalog-dialog{padding:18px}}
