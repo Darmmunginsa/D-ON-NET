@@ -1,0 +1,25 @@
+@media screen{
+ #workspace-background{display:none}
+ .ws-custom #workspace-background{display:block;position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+ #workspace-background::before{content:'';position:absolute;inset:0;background-image:var(--ws-image);background-size:var(--ws-size);background-position:var(--ws-position);background-repeat:var(--ws-repeat);opacity:var(--ws-opacity);filter:blur(var(--ws-blur))}
+ #workspace-background::after{content:'';position:absolute;inset:0;background:#000;opacity:var(--ws-shade)}
+ .ws-custom #app-screen{position:relative;z-index:1;background:transparent}
+ .ws-custom :is(.main,.content,.view){background:transparent}
+ .cyber-app.ws-custom :is(.card,.stat-card,.job-card){background:color-mix(in srgb,var(--card,var(--surface)) var(--ws-panel-opacity),transparent);box-shadow:var(--ws-card-shadow)}
+ #workspace-appearance{box-sizing:border-box;width:min(530px,calc(100vw - 28px));max-height:90vh;overflow:auto;margin:auto;padding:24px;border:1px solid var(--accent2);border-radius:14px;background:var(--surface);color:var(--text);font:13px/1.6 var(--font,sans-serif)}
+ #workspace-appearance::backdrop{background:#0009}
+ #workspace-appearance .ws-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+ #workspace-appearance h2{font-size:19px;margin:0}
+ #workspace-appearance p,#workspace-appearance small{color:var(--muted);font-size:12px}
+ #workspace-appearance label{display:block;margin:12px 0 4px;font-size:12px}
+ #workspace-appearance input,#workspace-appearance select{box-sizing:border-box;width:100%;min-height:32px;border:1px solid var(--border2);border-radius:7px;background:var(--surface2);color:var(--text);padding:6px;font:inherit}
+ #workspace-appearance input[type=range]{padding:0;accent-color:var(--accent2);cursor:pointer}
+ #workspace-appearance button{background:var(--surface2);color:var(--text);border:1px solid var(--border2);border-radius:7px;padding:8px 12px;font:inherit;cursor:pointer;width:auto}
+ #workspace-appearance #ws-save{background:#075985;color:white}
+ #workspace-appearance .ws-grid{display:grid;grid-template-columns:1fr 2fr 2fr;gap:10px}
+ #workspace-appearance .ws-image-tools,#workspace-appearance .ws-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px}
+ #workspace-appearance output{float:right;color:var(--accent2)}
+ .workspace-appearance-button{white-space:nowrap;font-size:12px;flex-shrink:0}
+ @media(max-width:600px){#workspace-appearance{padding:18px}#workspace-appearance .ws-grid{grid-template-columns:1fr}.workspace-appearance-button{font-size:0;width:34px;padding:6px}.workspace-appearance-button::before{content:'▧';font-size:16px}}
+}
+@media print{#workspace-background,#workspace-appearance,.workspace-appearance-button{display:none!important}}
