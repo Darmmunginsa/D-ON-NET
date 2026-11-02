@@ -17,16 +17,19 @@ async function saveSettingItem(key, value) {
   else { const c = await createListItem(L, { Title: key, Value: value }); if (_settingsCache) _settingsCache.push({ id: c.id, Title: key, Value: value, _srcList: L }); }
 }
 
+function approvalEmail(value){return String(value||'').trim().toLowerCase();}
+function canApproveQuotation(q){const email=approvalEmail(currentUser?.email);return !!email&&q?.Status==='Pending'&&!!approvalEmail(q.ApproverEmail)&&approvalEmail(q.ApproverEmail)===email;}
+function pendingApprovalsForUser(){return quotesData.filter(q=>q.Status==='Pending'&&(userRoles.isAdmin||canApproveQuotation(q)));}
 function filterQuotesForUser(allQuotes) {
   if (!currentUser) return [];
   // Admin and Approver see all quotes
   if (userRoles.isAdmin || userRoles.isApprover) return allQuotes;
   // Sales see only their own quotes
-  const myEmail = (currentUser.email||'').toLowerCase();
+  const myEmail = approvalEmail(currentUser.email);
   return allQuotes.filter(q => {
-    const saleEmail = (q.SaleEmail||'').toLowerCase();
+    const saleEmail = approvalEmail(q.SaleEmail);
     // Match by sale email, or show if no sale email assigned (own quotes)
-    return saleEmail === myEmail || saleEmail === '';
+    return saleEmail === myEmail || saleEmail === '' || (!!approvalEmail(q.ApproverEmail)&&approvalEmail(q.ApproverEmail)===myEmail);
   });
 }
 
@@ -71,6 +74,7 @@ async function syncAll() {
     }
     if (typeof loadCompanyExtra === 'function') loadCompanyExtra();   // ชื่อ/ที่อยู่ EN + Fax หัวเอกสาร
     await loadApprovalTiers(); // ใช้ _settingsCache ที่เซ็ตไว้แล้ว
+    await loadUserRoles(); // Re-evaluate using the freshly loaded settings/tiers before filtering quotes.
     // cache payments ไว้ใน memory
     paymentsCache = null; // invalidate cache เพื่อโหลดใหม่เมื่อจำเป็น
     // Filter quotes based on user role

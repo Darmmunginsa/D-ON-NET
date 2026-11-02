@@ -10,7 +10,7 @@ let _settingsCache = null;
 async function loadUserRoles() {
   if (!currentUser) return;
   try {
-    const email = currentUser.email.toLowerCase();
+    const email = currentUser.email.trim().toLowerCase();
 
     // Use cached settings if available (loaded by syncAll)
     const items = _settingsCache || await getListItems(CONFIG.lists.settings);
@@ -33,9 +33,9 @@ async function loadUserRoles() {
     }
 
     // Fallback: config bootstrap + approval tiers
-    const adminList    = (CONFIG.adminEmails || []).map(e => String(e).toLowerCase());
-    const approverList = (CONFIG.approverEmails || []).map(e => String(e).toLowerCase());
-    const tierEmails   = (typeof approvalTiers !== 'undefined' ? approvalTiers : []).map(t => (t.approverEmail||'').toLowerCase()).filter(Boolean);
+    const adminList    = (CONFIG.adminEmails || []).map(e => String(e).trim().toLowerCase());
+    const approverList = (CONFIG.approverEmails || []).map(e => String(e).trim().toLowerCase());
+    const tierEmails   = (typeof approvalTiers !== 'undefined' ? approvalTiers : []).map(t => (t.approverEmail||'').trim().toLowerCase()).filter(Boolean);
     if (adminList.includes(email)) {
       userRoles = { isAdmin: true, isApprover: true, isSales: false };
     } else if (approverList.includes(email) || tierEmails.includes(email)) {

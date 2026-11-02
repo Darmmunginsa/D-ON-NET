@@ -2,7 +2,7 @@
 // APPROVE
 // ============================================================
 function renderApprove() {
-  const pending = quotesData.filter(q => q.Status === 'Pending');
+  const pending = pendingApprovalsForUser();
   document.getElementById('approve-list').innerHTML = pending.length ? pending.map(q => `
     <div class="card" style="margin-bottom:10px">
       <div style="padding:14px 16px">
@@ -12,6 +12,7 @@ function renderApprove() {
           <span style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--accent2)">${fmt(q.TotalAmount||0)}</span>
           ${statusBadge(q.Status)}
         </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">ผู้อนุมัติที่ระบุบนใบ: ${escHtml(q.ApproverEmail||'ยังไม่ได้ระบุ')}</div>
         <div class="timeline">
           <div class="tl-step"><div class="tl-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><div class="tl-label">สร้าง</div></div>
           <div class="tl-step"><div class="tl-dot done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><div class="tl-label">ส่งรีวิว</div></div>
@@ -21,8 +22,7 @@ function renderApprove() {
         </div>
         <div style="display:flex;gap:8px;margin-top:10px">
           <button class="btn btn-sm" onclick="openApproveModal('${q.id}')">ดูรายละเอียด</button>
-          <button class="btn btn-sm btn-danger" onclick="quickApprove('${q.id}','Rejected')">✕ ปฏิเสธ</button>
-          <button class="btn btn-sm btn-success" onclick="quickApprove('${q.id}','Approved')">✓ อนุมัติ</button>
+          ${canApproveQuotation(q)?`<button class="btn btn-sm btn-danger" onclick="quickApprove('${q.id}','Rejected')">✕ ปฏิเสธ</button><button class="btn btn-sm btn-success" onclick="quickApprove('${q.id}','Approved')">✓ อนุมัติ</button>`:'<span style="color:var(--muted);font-size:12px">ดูสถานะ — อนุมัติได้เฉพาะผู้ที่ระบุบนใบ</span>'}
         </div>
       </div>
     </div>`).join('') : '<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>ไม่มีรายการรออนุมัติ</div>';
@@ -36,7 +36,7 @@ function openApproveModal(id) {
   // Check if current user is the designated approver
   const myEmail = (currentUser?.email || '').toLowerCase();
   const approverEmail = (q.ApproverEmail || '').toLowerCase();
-  const isApprover = approverEmail && myEmail && approverEmail === myEmail;
+  const isApprover = canApproveQuotation(q);
   const isPending = q.Status === 'Pending';
 
   document.getElementById('am-title').textContent = q.Title || '';
@@ -77,9 +77,9 @@ function openApproveModal(id) {
 }
 
 async function doApprove(status) {
-  if (!currentApproveId) return;
+  if (!currentApproveId || !['Approved','Rejected'].includes(status)) return;
   // Double-check permission
-  const canApprove = document.getElementById('approve-modal')?.dataset.canApprove === '1';
+  const canApprove = canApproveQuotation(quotesData.find(q=>q.id===currentApproveId));
   if (!canApprove) { toast('คุณไม่มีสิทธิ์อนุมัติใบนี้', 'error'); return; }
   const comment = document.getElementById('approve-comment')?.value || '';
   if (status === 'Rejected' && !comment.trim()) {
@@ -121,8 +121,8 @@ async function quickApprove(id, status) {
   if (!q) return;
   const myEmail = (currentUser?.email || '').toLowerCase();
   const approverEmail = (q.ApproverEmail || '').toLowerCase();
-  if (approverEmail && myEmail !== approverEmail) {
-    toast(`เฉพาะ ${q.ApproverName||q.ApproverEmail} เท่านั้นที่อนุมัติได้`, 'error');
+  if (!canApproveQuotation(q)) {
+    toast(`เฉพาะ ${q.ApproverName||q.ApproverEmail||'ผู้อนุมัติที่ระบุในใบสถานะ Pending'} เท่านั้นที่อนุมัติได้`, 'error');
     return;
   }
   // ปฏิเสธต้องระบุเหตุผล — เปิด modal ให้กรอกก่อน (กดปฏิเสธในนั้นอีกครั้ง)

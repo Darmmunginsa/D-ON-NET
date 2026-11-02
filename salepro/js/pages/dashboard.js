@@ -121,7 +121,7 @@ function renderSalesReport() {
 }
 
 function updateBadge() {
-  const n = quotesData.filter(q => q.Status === 'Pending').length;
+  const n = pendingApprovalsForUser().length;
   document.getElementById('badge-approve').textContent = n;
 }
 

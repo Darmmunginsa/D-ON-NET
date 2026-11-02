@@ -16,7 +16,7 @@ async function loadApprovalTiers() {
   try {
     const items = _settingsCache || await getListItems(CONFIG.lists.settings);
     const item = items.find(i => i.Title === 'ApprovalTiers');
-    if (item && item.Value) { approvalTiers = JSON.parse(item.Value); settingsItemId = item.id; }
+    if (item && item.Value) { const parsed=JSON.parse(item.Value);if(!Array.isArray(parsed))throw Error('Invalid ApprovalTiers');approvalTiers = parsed; settingsItemId = item.id; }else{approvalTiers=[...DEFAULT_TIERS];settingsItemId=null;}
   } catch(e) { approvalTiers = [...DEFAULT_TIERS]; }
 }
 
@@ -25,6 +25,7 @@ async function saveApprovalTiersToSharePoint() {
     const value = JSON.stringify(approvalTiers);
     if (settingsItemId) { await updateListItem(CONFIG.lists.settings, settingsItemId, { Value: value }); }
     else { const c = await createListItem(CONFIG.lists.settings, { Title: 'ApprovalTiers', Value: value }); settingsItemId = c.id; }
+    if(Array.isArray(_settingsCache)){const cached=_settingsCache.find(i=>i.Title==='ApprovalTiers');if(cached){cached.Value=value;cached.id=settingsItemId;}else _settingsCache.push({id:settingsItemId,Title:'ApprovalTiers',Value:value});}
     toast('บันทึก Settings สำเร็จ', 'success');
   } catch(e) { toast('บันทึกไม่สำเร็จ: ' + e.message, 'error'); }
 }
