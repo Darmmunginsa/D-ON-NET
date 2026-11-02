@@ -3,7 +3,7 @@
  const C=ProspectsCore;let leads=[],selected='',baseline={},busy=false,importRows=[];
  const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- function guard(){if(typeof isAdminUser!=='function'||!isAdminUser())throw Error('หน้านี้สำหรับ Admin เท่านั้น');}
+ function guard(){if(typeof currentUser==='undefined'||!currentUser?.email)throw Error('กรุณาเข้าสู่ระบบ SalePro ก่อนจัดการเป้าหมายลูกค้า');}
  function message(text){$('prospect-message').textContent=text;}
  function lock(value){busy=value;$('page-prospects').querySelectorAll('button,input,select,textarea').forEach(el=>el.disabled=value);if(!value){const row=leads.find(x=>x.id===selected);$('prospect-promote').disabled=!row||row.stage==='dnc'||!!row.customerId;$('prospect-save-draft').disabled=row?.stage==='dnc'||!!row?.customerId;$('prospect-import-confirm').disabled=!importRows.length;}}
  function actor(){return currentUser?.email||currentUser?.displayName||'';}

@@ -4,7 +4,7 @@
 const pageTitles = {dashboard:'Dashboard',quotes:'ใบเสนอราคา',newquote:'สร้างใบเสนอราคาใหม่',approve:'รออนุมัติ',payment:'ติดตามการชำระเงิน',catalog:'Catalog สินค้า',settings:'Approve Settings',prospects:'เป้าหมายลูกค้า',customers:'ลูกค้า (CRM)',company:'ตั้งค่าบริษัท',forecast:'Sale Forecast',vendor:'Vendor',contracts:'ทะเบียนสัญญา',projects:'โครงการ (Project)',expiry:'แจ้งเตือนหมดอายุ'};
 
 function showPage(id, el) {
-  if(id==='prospects'&&!isAdminUser()){toast('หน้านี้สำหรับ Admin เท่านั้น','error');return;}
+  if(id==='prospects'&&!currentUser?.email){toast('กรุณาเข้าสู่ระบบ SalePro ก่อน','error');return;}
   if(id==='prospects')loadProspectsPage();
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
