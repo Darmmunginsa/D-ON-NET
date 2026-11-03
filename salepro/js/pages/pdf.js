@@ -267,7 +267,7 @@ function renderPDFHTML(d) {
       return `<tr style="${rh}">${cells.join('')}</tr>`;
     }
     if (it.__blank) return `<tr style="${rh}"><td colspan="${colspan}" style="${cellPad}border-bottom:0.5px solid #e5e7eb">&nbsp;</td></tr>`;
-    if (it.__note) return `<tr><td colspan="${colspan}" style="padding:${rpT}px 10px ${rpB}px;border-bottom:0.5px solid #e5e7eb;color:#1a1a2e;white-space:pre-line;line-height:${lh}">${escHtml(it.noteText||'')}</td></tr>`;
+    if (it.__note) return `<tr><td colspan="${colspan}" style="padding:${rpT}px 10px ${rpB}px;border-bottom:0.5px solid #e5e7eb;color:#1a1a2e;font-style:italic;white-space:pre-line;line-height:${lh}">${escHtml(it.noteText||'')}</td></tr>`;
     ctr.n++;
     return `<tr style="${rh}background:${ctr.n%2===0?'#fff':'#f8fafc'};color:#1a1a2e">
       <td style="${cellBase}text-align:center;color:#666;background:inherit;white-space:nowrap;word-wrap:normal">${escHtml(String(it.No||it.no||ctr.n))}</td>
