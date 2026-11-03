@@ -1,6 +1,6 @@
 const SaleCalendar=(()=>{
  const C=WorkCalendar,$=id=>document.getElementById(id),esc=s=>escHtml(String(s??''));
- let data={events:[],missing:{},problems:[]},sourceQuotes=[],sourceContracts=[],sourceSettings=[],month='',selected='',turn=0;
+ let data={events:[],missing:{},problems:[]},sourceQuotes=[],sourceContracts=[],sourceSettings=[],month='',selected='',turn=0,dataUser='',loading=false;
  const today=()=>C.date(new Date().toISOString());
  const label=d=>new Date(d+'T12:00:00Z').toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',day:'numeric',month:'long',year:'numeric'});
  const monthLabel=m=>new Date(m+'-01T12:00:00Z').toLocaleDateString('th-TH',{timeZone:'Asia/Bangkok',month:'long',year:'numeric'});
@@ -15,13 +15,13 @@ const SaleCalendar=(()=>{
   const dayItems=list.filter(e=>e.date===selected),counts=C.count(dayItems),clashes=C.collisions(data.events);
   $('cal-day-heading').textContent=label(selected);$('cal-day-count').textContent=`งานหน้างานที่ยังไม่เสร็จ ${counts.field} · รายการอื่น ${counts.other}`+(cap&&counts.field>cap?' · เกินเกณฑ์คิวที่ตั้งไว้':'');
   $('cal-agenda').replaceChildren();
-  for(const event of dayItems){const card=document.createElement('article');card.className='cal-event cal-'+event.type;card.innerHTML=`<div><span class="cal-tag">${esc(C.labels[event.type])}</span> <strong>${esc(event.time||'ไม่ระบุเวลา')}</strong>${event.done?' · เสร็จแล้ว':''}</div><h4>${esc(event.title)}</h4><p>${esc(event.client)} · ${esc(event.ref)}</p><p>ผู้รับผิดชอบ: ${esc(event.owner||'ยังไม่ระบุ')}</p>${event.status?`<p>สถานะ: ${esc(({planned:'รอนัดยืนยัน',scheduled:'นัดแล้ว',assigned:'รอรับงาน',accepted:'รับงานแล้ว',inprogress:'กำลังดำเนินการ',completed:'เสร็จแล้ว'})[event.status]||event.status)}</p>`:''}${event.amount!=null?`<p>ยอดคงเหลือ ${esc(fmt(event.amount))} บาท</p>`:''}${event.detail?`<p class="cal-detail">${esc(event.detail)}</p>`:''}${clashes.has(event.id)?'<p class="cal-warning">ช่างคนเดียวกันมีนัดเวลาเริ่มตรงกัน กรุณาตรวจคิว</p>':''}`;const open=document.createElement('button');open.type='button';open.className='btn btn-sm';open.textContent='เปิดรายการต้นทาง';open.onclick=()=>openSource(event);card.appendChild(open);$('cal-agenda').appendChild(card);}
+  for(const event of dayItems){const card=document.createElement('article');card.className='cal-event cal-'+event.type;card.innerHTML=`<div><span class="cal-tag">${esc(C.labels[event.type])}</span> <strong>${esc(event.time||'ไม่ระบุเวลา')}</strong>${event.done?' · เสร็จแล้ว':''}</div><h4>${esc(event.title)}</h4><p>${esc(event.client)} · ${esc(event.ref)}</p><p>ผู้รับผิดชอบ: ${esc(event.owner||'ยังไม่ระบุ')}</p>${event.status?`<p>สถานะ: ${esc(({planned:'รอนัดยืนยัน',scheduled:'นัดแล้ว',assigned:'รอรับงาน',accepted:'รับงานแล้ว',inprogress:'กำลังดำเนินการ',completed:'เสร็จแล้ว'})[event.status]||event.status)}</p>`:''}${event.amount!=null?`<p>ยอดคงเหลือ ${esc(fmt(event.amount))} บาท</p>`:''}${event.detail?`<p class="cal-detail">${esc(event.detail)}</p>`:''}${clashes.has(event.id)?'<p class="cal-warning">ช่างคนเดียวกันมีนัดเวลาเริ่มตรงกัน กรุณาตรวจคิว</p>':''}`;const open=document.createElement('button');open.type='button';open.className='btn btn-sm';open.textContent='เปิดรายการต้นทาง';open.disabled=loading;open.onclick=()=>openSource(event);card.appendChild(open);$('cal-agenda').appendChild(card);}
   if(!dayItems.length)$('cal-agenda').textContent='ไม่มีรายการตามตัวกรองในวันนี้';
   const missing=Object.entries(data.missing).filter(([,n])=>n).map(([type,n])=>C.labels[type]+' '+n).join(' · ');$('cal-missing').textContent=(missing?'ยังไม่ระบุวันนัด / วันไม่ถูกต้อง: '+missing+' รายการ — จึงยังไม่ลงในปฏิทิน':'')+(data.problems.length?' · ข้อมูลบางรายการอ่านไม่ครบ '+data.problems.length+' รายการ':'');
  }
  async function load(){
   const request=++turn,user=currentUser?.email;if(!user){$('cal-status').textContent='กรุณาเข้าสู่ระบบ';return;}if(!month){selected=today();month=selected.slice(0,7);}
-  data={events:[],missing:{},problems:[]};sourceQuotes=[];sourceContracts=[];sourceSettings=[];render();$('cal-refresh').disabled=true;$('cal-status').textContent='กำลังโหลดวันนัด…';
+  loading=true;if(dataUser!==user){data={events:[],missing:{},problems:[]};sourceQuotes=[];sourceContracts=[];sourceSettings=[];dataUser=user;render();}for(const b of document.querySelectorAll('#cal-agenda button'))b.disabled=true;$('cal-refresh').disabled=true;$('cal-status').textContent='กำลังโหลดวันนัด…';
   try{const L=CONFIG.lists,names=[L.quotations,L.settings,L.contracts];let result;if(typeof getListItemsMulti==='function')result=await getListItemsMulti(names);else{const rows=await Promise.all(names.map(name=>getListItems(name)));result=Object.fromEntries(names.map((name,i)=>[name,rows[i]]));}
    if(request!==turn||currentUser?.email!==user)return;
    for(const name of names)if(!Array.isArray(result[name]))throw Error('ข้อมูล '+name+' มาไม่ครบ');
@@ -29,12 +29,13 @@ const SaleCalendar=(()=>{
    sourceQuotes=quotes;sourceContracts=contracts;sourceSettings=result[L.settings];data=C.collect(quotes,contracts,sourceSettings);for(let i=0;i<malformed;i++)data.problems.push('ข้อมูลสัญญาอ่านไม่ได้');
    const chosen=$('cal-owner').value;$('cal-owner').replaceChildren(new Option('ผู้รับผิดชอบทุกคน',''));for(const name of [...new Set(data.events.map(e=>e.owner).filter(Boolean))].sort())$('cal-owner').add(new Option(name,name));if([...$('cal-owner').options].some(o=>o.value===chosen))$('cal-owner').value=chosen;
    render();$('cal-status').textContent='อัปเดต '+new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'})+' · แสดงตามสิทธิ์การเข้าถึงเดิม';
-  }catch(e){if(request===turn){$('cal-status').textContent='โหลดไม่สำเร็จ: '+e.message+' · กรุณากดโหลดใหม่ ปฏิทินยังไม่แสดงข้อมูล';}}finally{if(request===turn)$('cal-refresh').disabled=false;}
+  }catch(e){if(request===turn){$('cal-status').textContent='โหลดไม่สำเร็จ: '+e.message+' · กรุณากดโหลดใหม่ ข้อมูลเดิมที่แสดงยังไม่ได้อัปเดต';}}finally{if(request===turn){loading=false;$('cal-refresh').disabled=false;for(const b of document.querySelectorAll('#cal-agenda button'))b.disabled=false;}}
  }
  function openSource(event){
+  if(loading)return;
   if(event.source==='contract'){const c=sourceContracts.find(c=>String(c.spId)===String(event.contractId));if(!c)return;const index=contractsData.findIndex(x=>String(x.spId)===String(c.spId));if(index>=0)contractsData[index]=c;else contractsData.push(c);editContract(c.spId);return;}
-  const q=sourceQuotes.find(q=>String(q.id)===String(event.quoteId));if(!q)return;const i=quotesData.findIndex(x=>String(x.id)===String(q.id));if(i>=0)quotesData[i]=q;else quotesData.push(q);
-  const row=sourceSettings.find(r=>r.Title==='DealStatus_'+q.id);if(row){const index=_settingsCache.findIndex(r=>r.Title===row.Title);if(index>=0)_settingsCache[index]=row;else _settingsCache.push(row);}
+  const source=sourceQuotes.find(q=>String(q.id)===String(event.quoteId));if(!source)return;const row=sourceSettings.find(r=>r.Title==='DealStatus_'+source.id);const q={...source,DealStatus:row?.Value||source.DealStatus};const i=quotesData.findIndex(x=>String(x.id)===String(q.id));if(i>=0)quotesData[i]=q;else quotesData.push(q);
+ if(row){const index=_settingsCache.findIndex(r=>r.Title===row.Title);if(index>=0)_settingsCache[index]=row;else _settingsCache.push(row);}
   openSaleTrackerModal(q.id);switchSTTab(event.type==='install'?'tech':event.type==='payment'?'payment':'expiry',null);
  }
  function init(){

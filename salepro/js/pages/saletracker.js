@@ -2027,7 +2027,7 @@ function openSaleTrackerModal(id) {
   stQuoteId = id;
   const q = quotesData.find(x => x.id === id);
   if (!q) return;
-  stDealData = parseDealStatus(q.DealStatus);
+  stDealData = parseDealStatus(getStoredDealStatus(q.id) || q.DealStatus);
   stPendingDocs = []; stCurrentSlipFile = null;
   const techList = document.getElementById('tech-job-list'); if (techList) techList.innerHTML = '';
   // Clear pending docs UI
