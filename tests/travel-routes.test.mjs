@@ -20,3 +20,8 @@ test('unauthenticated route action cannot reach Google',async()=>{
  const response=await gateway.fetch(new Request('https://gateway.test/',{method:'POST',headers:{Origin:'https://darmmunginsa.github.io'},body:JSON.stringify({action:'travelDistance',...input})}),{GOOGLE_CLIENT_ID:'client',APPS_SCRIPT_URL:'https://backend.test',GATEWAY_SECRET:'x'.repeat(32),GOOGLE_MAPS_API_KEY:'secret'});
  assert.equal(response.status,401);
 });
+test('GPS coordinates become numeric latLng waypoints while address callers stay compatible',async()=>{
+ globalThis.fetch=async(url,opt)=>{const body=JSON.parse(opt.body);assert.deepEqual(body.origin,{location:{latLng:{latitude:13.75,longitude:100.5}}});assert.deepEqual(body.destination,{address:input.destination});return Response.json({routes:[{distanceMeters:12345}]});};
+ const result=await travelDistance({...input,origin:'13.7500,100.5000'},{GOOGLE_MAPS_API_KEY:'secret'},reply);assert.equal(result.body.km,12.4);
+ globalThis.fetch=()=>{throw Error('unexpected');};assert.equal((await travelDistance({...input,origin:'99.000,100.5000'},{GOOGLE_MAPS_API_KEY:'secret'},reply)).status,400);
+});

@@ -138,7 +138,7 @@ select.form-control option{background:var(--card)}
   .job-meta{gap:6px}
 }
 </style>
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"></head>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="route.css?v=20261103"></head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -319,6 +319,7 @@ async function loadJobs() {
       return (b.job.scheduledAt||'').localeCompare(a.job.scheduledAt||'');
     });
     renderJobList();
+    if(typeof TechRoute!=='undefined')TechRoute.update(settings);
   } catch(e) {
     document.getElementById('job-list').innerHTML =
       '<div class="empty-state"><div class="icon">⚠️</div><div>โหลดข้อมูลไม่สำเร็จ<br><small>'+e.message+'</small></div></div>';
@@ -328,12 +329,13 @@ async function loadJobs() {
 // ── RENDER ───────────────────────────────────────────────────────────────────
 function setFilter(f, el) {
   currentFilter = f;
-  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.filter-bar .filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderJobList();
 }
 
 function renderJobList() {
+  if(typeof TechRoute!=='undefined')TechRoute.refreshJobs();
   const list = document.getElementById('job-list');
   const filtered = currentFilter === 'all'
     ? allJobs
@@ -755,5 +757,5 @@ function toast(msg, type='info') {
   setTimeout(() => el.remove(), 3500);
 }
 </script>
-<script src="../shared/workspace-appearance.js?v=20261103"></script></body>
+<script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/tech-route.js?v=20261103"></script><script src="route.js?v=20261103"></script></body>
 </html>

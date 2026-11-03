@@ -49,8 +49,10 @@ export async function travelDistance(input,env,reply){
  const origin=typeof input.origin==='string'?input.origin.trim():'',destination=typeof input.destination==='string'?input.destination.trim():'';
  if(origin.length<5||destination.length<5||origin.length>500||destination.length>500)return reply({ok:false,error:'กรุณาระบุที่อยู่ต้นทางและหน้างานให้ชัดเจน'},400);
  if(!env.GOOGLE_MAPS_API_KEY)return reply({ok:false,error:'ยังไม่ได้ตั้งค่าคีย์ Google Maps ในระบบหลังบ้าน'},503);
+ const waypoint=value=>{const pair=value.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);if(!pair)return {address:value};const latitude=Number(pair[1]),longitude=Number(pair[2]);if(Math.abs(latitude)>90||Math.abs(longitude)>180)throw Error('Invalid coordinates');return {location:{latLng:{latitude,longitude}}};};
+ let from,to;try{from=waypoint(origin);to=waypoint(destination);}catch{return reply({ok:false,error:'พิกัดต้นทางหรือปลายทางไม่ถูกต้อง'},400);}
  try{
-  const response=await fetch('https://routes.googleapis.com/directions/v2:computeRoutes',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':env.GOOGLE_MAPS_API_KEY,'X-Goog-FieldMask':'routes.distanceMeters'},body:JSON.stringify({origin:{address:origin},destination:{address:destination},travelMode:'DRIVE',routingPreference:'TRAFFIC_UNAWARE',computeAlternativeRoutes:false,languageCode:'th-TH',regionCode:'TH',units:'METRIC'}),signal:AbortSignal.timeout(15000)});
+  const response=await fetch('https://routes.googleapis.com/directions/v2:computeRoutes',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':env.GOOGLE_MAPS_API_KEY,'X-Goog-FieldMask':'routes.distanceMeters'},body:JSON.stringify({origin:from,destination:to,travelMode:'DRIVE',routingPreference:'TRAFFIC_UNAWARE',computeAlternativeRoutes:false,languageCode:'th-TH',regionCode:'TH',units:'METRIC'}),signal:AbortSignal.timeout(15000)});
   if(!response.ok)return reply({ok:false,error:'Google Maps คำนวณไม่ได้ กรุณาตรวจการเปิด Routes API, Billing และสิทธิ์คีย์'},502);
   const data=await response.json(),meters=data.routes?.[0]?.distanceMeters;
   if(!Number.isFinite(meters)||meters<=0||meters>3000000)return reply({ok:false,error:'ไม่พบเส้นทางขับรถที่ใช้ได้ กรุณาตรวจที่อยู่ให้ชัดเจน'},422);
