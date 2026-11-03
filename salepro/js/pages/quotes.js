@@ -1474,6 +1474,8 @@ async function saveQuote(status) {
     ContractStartDate: document.getElementById('q-start').value||null,
     ContractEndDate: document.getElementById('q-end').value||null
   };
+  if(typeof quoteCustomerTax==='function'){const tax=quoteCustomerTax(fields.CustomerTaxID);if(/^\d{13}$/.test(tax))fields.CustomerTaxID=tax;}
+  const customerExtras={fax:document.getElementById('q-cust-fax')?.value||'',nameEN:document.getElementById('q-client-en')?.value||'',addrEN:document.getElementById('q-cust-address-en')?.value||''};
   // บันทึกข้อมูล Sale ลง AppStorage เพื่อใช้ครั้งต่อไป
   try { AppStorage.setItem('sale_info_' + (currentUser?.email||''), JSON.stringify({
     name:  document.getElementById('q-sale-name').value||'',
@@ -1573,7 +1575,13 @@ async function saveQuote(status) {
     else { quotesData.push(fullObj); }
     renderDash(); renderQuotes(); renderApprove(); updateBadge();
     // เพิ่มลูกค้าเข้า CRM อัตโนมัติ ถ้ายังไม่มี (ไม่ทับข้อมูลเดิม)
-    if (typeof autoAddCustomerFromQuote === 'function') { autoAddCustomerFromQuote(fields, document.getElementById('q-cust-fax')?.value || '').catch(()=>{}); }
+    let customerSyncMessage='';
+    if(typeof autoAddCustomerFromQuote==='function'){
+      try{const result=await autoAddCustomerFromQuote(fields,customerExtras.fax,customerExtras);customerSyncMessage=result?.message||'';}
+      catch(e){customerSyncMessage='ใบเสนอราคาบันทึกแล้ว แต่ยังเพิ่ม CRM ไม่สำเร็จ: '+e.message;}
+    }
+    const customerSyncStatus=document.getElementById('quote-customer-sync-status');
+    if(customerSyncStatus)customerSyncStatus.textContent=customerSyncMessage;
     editingQuoteId = null;
     const editBanner = document.getElementById('edit-banner');
     if (editBanner) editBanner.style.display = 'none';

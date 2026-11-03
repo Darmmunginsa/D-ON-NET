@@ -108,28 +108,35 @@ function customerCodeForQuote(q) {
   return c ? getCustomerCode(c.id) : '';
 }
 
-// เพิ่มลูกค้าเข้า CRM อัตโนมัติจากใบเสนอราคา — เฉพาะเมื่อยังไม่มี (จับคู่เลขภาษี→ชื่อ) ไม่ทับของเดิม
-async function autoAddCustomerFromQuote(fields, fax) {
-  try {
-    if (!customersData || !customersData.length) { try { await loadCustomers(); } catch(e) {} }
-    const name = (fields.ClientName || '').trim();
-    if (!name || name === '(ไม่ระบุ)') return null;                 // ไม่มีชื่อจริง → ไม่สร้าง
-    const existing = findCustomerForQuote({ CustomerTaxID: fields.CustomerTaxID, ClientName: name });
-    if (existing) {                                                 // มีแล้ว → เติม Fax ให้ถ้ายังว่าง (ไม่ทับ)
-      if (fax && typeof getCustomerFax === 'function' && !getCustomerFax(existing.id)) { try { await saveCustomerFax(existing.id, fax); } catch(e) {} }
-      return existing;
-    }
-    const cfields = { Title: name, ContactPerson: fields.ContactPerson || '', TaxID: fields.CustomerTaxID || '',
-      Phone: fields.CustomerTel || fields.Phone || '', Email: fields.Email || '', Address: fields.CustomerAddress || '' };
-    const created = await createListItem(CONFIG.lists.customers, cfields);
-    if (created && created.id) {
-      customersData.push({ id: created.id, ...cfields });
-      if (typeof saveCustomerCode === 'function') { try { await saveCustomerCode(created.id, nextCustomerCode()); } catch(e) {} }
-      if (fax && typeof saveCustomerFax === 'function') { try { await saveCustomerFax(created.id, fax); } catch(e) {} }
-      if (typeof toast === 'function') toast('เพิ่มลูกค้า "' + name + '" เข้า CRM แล้ว', 'success');
-    }
-    return created;
-  } catch(e) { console.warn('autoAddCustomerFromQuote:', e.message); return null; }
+// Read fresh CRM data for every saved quote; serialize auto-creates within this tab.
+let _customerAutoSaveQueue=Promise.resolve();
+function quoteCustomerTax(value){return String(value||'').replace(/[๐-๙]/g,c=>String(c.charCodeAt(0)-0x0e50)).replace(/[\s-]/g,'');}
+function autoAddCustomerFromQuote(fields, fax, docEN={}) {
+  const snapshot={...fields},extras={...docEN},owner=currentUser?.email;
+  const operation=_customerAutoSaveQueue.then(async()=>{
+    const name=String(snapshot.ClientName||'').trim(),tax=quoteCustomerTax(snapshot.CustomerTaxID);
+    if(!name||name==='(ไม่ระบุ)')return {state:'skipped',message:'ยังไม่เพิ่ม CRM: กรุณาระบุชื่อลูกค้า'};
+    if(!/^\d{13}$/.test(tax))return {state:'skipped',message:'ยังไม่เพิ่ม CRM: เลขประจำตัวผู้เสียภาษีต้องครบ 13 หลัก'};
+    if(!owner||currentUser?.email!==owner)throw Error('บัญชีผู้ใช้งานเปลี่ยน กรุณาตรวจทะเบียนลูกค้า');
+    const fresh=await getListItems(CONFIG.lists.customers);
+    if(!Array.isArray(fresh))throw Error('โหลดทะเบียนลูกค้าล่าสุดไม่สำเร็จ');
+    customersData=fresh;
+    const matches=fresh.filter(c=>quoteCustomerTax(c.TaxID)===tax);
+    if(matches.length)return {state:'existing',customer:matches[0],message:matches.length>1?'พบเลขผู้เสียภาษีซ้ำในทะเบียนเดิม กรุณาตรวจ CRM — ไม่ได้สร้างเพิ่ม':'พบเลขผู้เสียภาษีเดิม ใช้ลูกค้าใน CRM เดิมแล้ว — ไม่สร้างซ้ำ'};
+    if(currentUser?.email!==owner)throw Error('บัญชีผู้ใช้งานเปลี่ยน กรุณาตรวจทะเบียนลูกค้า');
+    const cfields={Title:name,ContactPerson:snapshot.ContactPerson||'',TaxID:tax,Phone:snapshot.CustomerTel||snapshot.Phone||'',Email:snapshot.Email||'',Address:snapshot.CustomerAddress||''};
+    const created=await createListItem(CONFIG.lists.customers,cfields);
+    if(!created?.id)throw Error('ยังไม่ยืนยันการบันทึกลูกค้า กรุณาตรวจ CRM ก่อนเพิ่มซ้ำ');
+    const customer={...cfields,...created};customersData.push(customer);
+    let extrasFailed=false;
+    try{
+      if(typeof saveCustomerCode==='function')await saveCustomerCode(created.id,nextCustomerCode());
+      if(fax&&typeof saveCustomerFax==='function')await saveCustomerFax(created.id,fax);
+      if((extras.nameEN||extras.addrEN)&&typeof saveCustomerDocEN==='function')await saveCustomerDocEN(created.id,extras.nameEN||'',extras.addrEN||'');
+    }catch(e){extrasFailed=true;}
+    return {state:'created',customer,message:extrasFailed?'เพิ่มลูกค้าเข้า CRM แล้ว แต่ข้อมูลเสริมบางส่วนยังบันทึกไม่ครบ กรุณาตรวจทะเบียนลูกค้า':'เพิ่มข้อมูลลูกค้าเข้า CRM อัตโนมัติแล้ว'};
+  });
+  _customerAutoSaveQueue=operation.catch(()=>{});return operation;
 }
 
 function renderCustomers() {
