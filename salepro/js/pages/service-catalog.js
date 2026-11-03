@@ -3,7 +3,7 @@ const ServiceCatalogDraft=(()=>{
   function reusable(value){return String(value||'').split(/\r?\n/).filter(line=>!/(?:\bs\s*\/\s*n\b|\bserial\b|หมายเลขเครื่อง)/i.test(line)).join('\n').trim();}
   function fromItem(item){
     if(!item||item.type!=='item'||item.asHeader)throw Error('เลือกรายการงานปกติที่ต้องการเก็บ');
-    return {Title:reusable(item.name),Description:reusable(item.desc),PartNumber:reusable(item.pn),Unit:String(item.unit||'งาน'),Price:item.price,Cost:Number(item.cost)||0};
+    return {Title:reusable(item.name),Description:reusable(item.desc),PartNumber:reusable(item.pn),Unit:String(item.unit||'งาน'),Price:item.travel?.basePrice??item.price,Cost:Number(item.cost)||0};
   }
   function fields(draft){
     const title=String(draft.Title||'').trim(),price=Number(draft.Price),cost=Number(draft.Cost||0);

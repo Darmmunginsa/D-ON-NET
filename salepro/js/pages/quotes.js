@@ -137,6 +137,7 @@ async function saveQuoteDefaults(note, terms) {
   catch(e) { console.warn('save quote defaults', e.message); }
 }
 function initNewQuote() {
+  if(typeof TravelQuote!=='undefined')TravelQuote.reset();
   _dupSourceId = null;   // ใบใหม่เปล่า ไม่ผูกความสัมพันธ์
   if (typeof _nqProjectId !== 'undefined') _nqProjectId = null;
   if (typeof dismissProjectUpdate === 'function') dismissProjectUpdate();
@@ -477,6 +478,7 @@ function renderItems() {
   }
   calcTotals();
   updateApproverBox();
+  if(typeof TravelQuote!=='undefined')TravelQuote.refresh();
 }
 
 function updateGroupTitle(id, val) {
@@ -1041,7 +1043,7 @@ async function editQuote(id) {
         qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
         // ราคา: ใช้ค่าดิบจาก extra ถ้ามี (รองรับข้อความ Included) ไม่งั้น fallback เป็นตัวเลขจาก column
         price: (ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0),
-        disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader
+        disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader, travel: ex.travel||null
       };
     });
   } catch(e) {
@@ -1349,6 +1351,7 @@ function _nextQuoteNo(saleName) {
 }
 
 async function duplicateQuote(id) {
+  if(typeof TravelQuote!=='undefined')TravelQuote.reset();
   const q = quotesData.find(x => x.id === id);
   if (!q) return;
   const newNo = _nextQuoteNo(q.SaleName || currentUser?.displayName || '');
@@ -1373,7 +1376,7 @@ async function duplicateQuote(id) {
         id: Date.now()+idx, type:'item',
         no: ex.no || '', pn: ex.pn || '', name: it.Title || '', desc: it.Description || '',
         qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
-        price: (ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0),
+        price: ex.travel ? ex.travel.basePrice : ((ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0)),
         disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader
       };
     });
@@ -1447,6 +1450,7 @@ function cancelEdit() {
 
 async function saveQuote(status) {
   if (!currentUser) { toast('กรุณา Login ก่อน', 'error'); return; }
+  if(typeof TravelQuote!=='undefined'){try{TravelQuote.validate();}catch(e){toast(e.message,'error');return;}}
   const t = calcTotals();
   const fields = {
     Title: document.getElementById('q-no').value,
@@ -1546,7 +1550,7 @@ async function saveQuote(status) {
         if (!it.name) continue;
         _rows.push({ Title: it.name, QuoteID: quoteId, Quantity: isNumeric(it.qty) ? parseFloat(it.qty) : 0,
           Unit: it.unit, UnitPrice: priceNum(it), DiscountPct: it.disc, LineTotal: lineTotal(it), Description: it.desc||'' });
-        itemExtra.push({ no: it.no||'', pn: it.pn||'', price: String(it.price ?? ''), qtyRaw: String(it.qty ?? ''), cost: +it.cost||0, vendorId: it.vendorId||'', asHeader: !!it.asHeader });
+        itemExtra.push({ no: it.no||'', pn: it.pn||'', price: String(it.price ?? ''), qtyRaw: String(it.qty ?? ''), cost: +it.cost||0, vendorId: it.vendorId||'', asHeader: !!it.asHeader, travel: it.travel||null });
       }
     }
     if (_rows.length) {
