@@ -17,6 +17,22 @@ Google Maps ใช้ action travelDistance ที่มีอยู่ ที�
 
 ## ตรวจสอบ
 
+## AI ช่วยจัดแผนวันนี้
+
+คำนวณระยะทางก่อน แล้วเลือกความเร่งด่วน/นาทีทำงานต่อการ์ด (เว้นว่างหากไม่ทราบ) จากนั้นกด AI ช่วยจัดแผนวันนี้ การวิเคราะห์รับได้ 1–20 งาน คืนเป็นแผนแนะนำแยกจากการ์ดลำดับระยะทาง ไม่บันทึกหรือย้ายวันนัดจริง
+
+Frontend ส่งเฉพาะ id ชั่วคราว job1–job20, appointment HH:mm, distanceKm/null, priority normal/urgent, durationMinutes/null และชนิดระยะ ไม่ส่งชื่อลูกค้า เลขใบเสนอราคา เบอร์โทร ที่อยู่ พิกัด หรือข้อความจากใบงาน Worker คัดเฉพาะฟิลด์เหล่านี้อีกครั้งก่อนเรียก OpenAI Responses API ด้วย store:false, strict JSON schema และจำกัด max_output_tokens
+
+Worker ใช้ Secret OPENAI_API_KEY และโมเดลค่าเริ่มต้น gpt-4.1-mini เปลี่ยนได้ทางตัวแปร OPENAI_ROUTE_MODEL ฝั่งเซิร์ฟเวอร์ ต้องเป็นโมเดลที่รองรับ Responses และ Structured Outputs ไม่มีการเรียกจากเบราว์เซอร์โดยตรง ไม่มี API key ในซอร์สหรือหน้าเว็บ
+
+ตรวจผลลัพธ์ว่ามีงานครบทุก id ครั้งเดียว ไม่เพิ่มงาน ไม่เรียงเวลานัดที่ทราบย้อนหลัง และคืนคำตอบที่สมบูรณ์ หากตรวจไม่ผ่านหรือ API ล้มเหลว แสดงข้อผิดพลาดโดยไม่เปลี่ยนข้อมูลงาน ไม่อ้างเวลาถึง/การจราจร/เส้นทางสั้นที่สุด เพราะยังไม่มีข้อมูลระหว่างแต่ละจุด การแก้ตำแหน่ง/ระยะ/รายละเอียดวางแผนจะล้างข้อเสนอเก่าและทิ้งคำตอบที่มาช้า
+
+ไฟล์รวมสำหรับ Deploy: outputs/travel-api/worker-ai-route-20261103.js เพิ่ม action aiRoutePlan และ helper บน Worker รุ่นรองรับพิกัดที่ผู้ใช้ Deploy แล้ว โดยตรวจว่าโค้ดเดิมส่วนอื่นไม่เปลี่ยน ใช้ Secrets เดิมทั้งหมด เครื่องนี้ยังไม่มีสิทธิ์ Deploy Cloudflare จึงต้องให้ผู้ใช้นำไฟล์ที่รวมแล้วไป Deploy ก่อนใช้งานจริง
+
+เอกสาร: [Responses Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses), [GPT-4.1 mini](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
+
+ทดสอบเพิ่ม: `node --test tests/ai-route-plan.test.mjs` และ browser mock สำหรับ payload ไม่มี PII, รายละเอียดเร่งด่วน/นาทีทำงาน, การแสดงผล, การทิ้งผลเก่าและกรณี API ล้มเหลว ไม่เรียก OpenAI จริงและไม่อ่าน Secret ในเครื่องผู้ใช้
+
 `node --test tests/tech-route.test.cjs tests/travel-routes.test.mjs tests/gateway-auth.test.mjs tests/warranty-gateway.test.mjs`
 
 Browser mock ตรวจงานวันนี้/บัญชีตัวเอง งานเสร็จและยกเลิก การเรียงระยะตัวเลข ระยะตรงไม่เรียก API ระยะขับรถจาก response จำลอง งานไม่มีตำแหน่ง การเปิดการ์ดเดิม การเปลี่ยนจุดเริ่ม และมือถือ ไม่มีการอ่าน GPS จริง ส่งที่อยู่จริง หรือเขียนฐานข้อมูล
