@@ -36,6 +36,7 @@ export default {async fetch(request,env){
  try{const token=(request.headers.get('authorization')||'').match(/^Bearer (\S+)$/)?.[1];identity=await verifyGoogleToken(token,env.GOOGLE_CLIENT_ID,String(env.ALLOWED_EMAILS||'admin@dongroups.com').split(',').map(value=>value.trim().toLowerCase()));}
  catch{return reply({ok:false,error:'กรุณาเข้าสู่ระบบ Google ด้วยบัญชีที่ได้รับอนุญาตอีกครั้ง'},401);}
  let payload;try{const raw=await request.text();if(raw.length>8*1024*1024)return reply({ok:false,error:'ไฟล์แนบใหญ่เกินขนาดที่รองรับ'},413);payload=JSON.parse(raw);if(!payload||Array.isArray(payload)||typeof payload!=='object')throw new Error();}catch{return reply({ok:false,error:'Invalid request'},400);}
+ if(payload.action==='travelDistance')return travelDistance(payload,env,reply);
  // Caller cannot override the verified actor or server-only shared secret.
  payload.email=identity.email;payload.replyTo=identity.email;payload._actor=identity;payload.gatewaySecret=env.GATEWAY_SECRET;
  try{const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),55000);let response;try{response=await fetch(env.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload),signal:controller.signal,redirect:'follow'});}finally{clearTimeout(timer);}
@@ -43,6 +44,19 @@ export default {async fetch(request,env){
  const data=await response.json();return reply(data);
  }catch{return reply({ok:false,error:'ยังยืนยันผลจากเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสถานะก่อนส่งซ้ำ'},502);}
 }};
+
+export async function travelDistance(input,env,reply){
+ const origin=typeof input.origin==='string'?input.origin.trim():'',destination=typeof input.destination==='string'?input.destination.trim():'';
+ if(origin.length<5||destination.length<5||origin.length>500||destination.length>500)return reply({ok:false,error:'กรุณาระบุที่อยู่ต้นทางและหน้างานให้ชัดเจน'},400);
+ if(!env.GOOGLE_MAPS_API_KEY)return reply({ok:false,error:'ยังไม่ได้ตั้งค่าคีย์ Google Maps ในระบบหลังบ้าน'},503);
+ try{
+  const response=await fetch('https://routes.googleapis.com/directions/v2:computeRoutes',{method:'POST',headers:{'Content-Type':'application/json','X-Goog-Api-Key':env.GOOGLE_MAPS_API_KEY,'X-Goog-FieldMask':'routes.distanceMeters'},body:JSON.stringify({origin:{address:origin},destination:{address:destination},travelMode:'DRIVE',routingPreference:'TRAFFIC_UNAWARE',computeAlternativeRoutes:false,languageCode:'th-TH',regionCode:'TH',units:'METRIC'}),signal:AbortSignal.timeout(15000)});
+  if(!response.ok)return reply({ok:false,error:'Google Maps คำนวณไม่ได้ กรุณาตรวจการเปิด Routes API, Billing และสิทธิ์คีย์'},502);
+  const data=await response.json(),meters=data.routes?.[0]?.distanceMeters;
+  if(!Number.isFinite(meters)||meters<=0||meters>3000000)return reply({ok:false,error:'ไม่พบเส้นทางขับรถที่ใช้ได้ กรุณาตรวจที่อยู่ให้ชัดเจน'},422);
+  return reply({ok:true,distanceMeters:meters,km:Math.ceil(meters/100)/10,origin,destination,source:'google-routes'});
+ }catch{return reply({ok:false,error:'เชื่อมต่อ Google Maps ไม่สำเร็จ กรุณาลองใหม่หรือกรอกระยะทางเอง'},502);}
+}
 
 async function publicWarrantyRoute(request,env){
  const origin=request.headers.get('Origin')||'';

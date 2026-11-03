@@ -1,5 +1,5 @@
 const TravelQuote=(()=>{
- const T=TravelCost,$=id=>document.getElementById(id),key='TravelSettings_v1';let config=null,settingId=null,busy=false,lastAttached='';
+ const T=TravelCost,$=id=>document.getElementById(id),key='TravelSettings_v1';let config=null,settingId=null,busy=false,lastAttached='',routeGeneration=0;
  const context=()=>({quoteAddress:$('q-cust-address').value,clientName:$('q-client').value});
  function message(s){$('travel-message').textContent=s;}
  async function load(){
@@ -20,7 +20,7 @@ const TravelQuote=(()=>{
    config=s;summary();$('travel-settings-message').textContent='บันทึกอัตราค่าเดินทางแล้ว ใช้เมื่อคำนวณใหม่ ใบเก่าไม่เปลี่ยนราคา';
   }catch(e){$('travel-settings-message').textContent=e.message;}finally{busy=false;$('travel-setting-save').disabled=false;}
  }
- function reset(){lastAttached='';for(const id of ['travel-km','travel-destination'])if($(id))$(id).value='';if($('travel-area'))$('travel-area').value='';if($('travel-confirmed'))$('travel-confirmed').checked=false;if($('travel-message'))message('');}
+ function reset(){routeGeneration++;lastAttached='';for(const id of ['travel-km','travel-destination'])if($(id))$(id).value='';if($('travel-area'))$('travel-area').value='';if($('travel-confirmed'))$('travel-confirmed').checked=false;if($('travel-message'))message('');}
  function refresh(){
   const selected=$('travel-target')?.value;if(!selected)return fillOptions();fillOptions(selected);
  }
@@ -44,9 +44,26 @@ const TravelQuote=(()=>{
    if(result.amount===0)message(result.area==='bangkok'?'หน้างานกรุงเทพฯ ไม่คิดค่าเดินทาง':'ค่าเดินทางเป็น 0 บาทตามอัตราที่ตั้ง');
   }catch(e){message(e.message);}finally{busy=false;$('travel-apply').disabled=false;}
  }
+ async function fetchDistance(){
+  if(busy)return;
+  const destination=T.text($('travel-destination').value),generation=routeGeneration;
+  try{busy=true;$('travel-fetch').disabled=true;$('travel-confirmed').checked=false;await load();summary();
+   if(!config?.enabled)throw Error('กรุณาให้ Admin เปิดใช้และตั้งค่าจุดเริ่มเดินทางก่อน');
+   if(T.bangkok(destination)||$('travel-area').value==='bangkok')throw Error('หน้างานกรุงเทพฯ ไม่คิดค่าเดินทาง ไม่จำเป็นต้องเรียก API');
+   if(destination.length<5)throw Error('กรุณาระบุที่อยู่หน้างานให้ชัดเจน');
+   const origin=config.origin;message('กำลังดึงระยะทางขับรถจาก Google Maps…');
+   const result=await GatewayClient.call(CONFIG.appsScriptUrl,{action:'travelDistance',origin,destination});
+   if(generation!==routeGeneration)return;
+   if(T.text($('travel-destination').value)!==destination||config.origin!==origin)throw Error('ที่อยู่เปลี่ยนระหว่างคำนวณ กรุณาดึงระยะทางใหม่');
+   if(!Number.isFinite(result.km)||result.km<=0||result.km>3000)throw Error('ระยะทางจากเซิร์ฟเวอร์ไม่ถูกต้อง');
+   $('travel-km').value=result.km;message(`Google Maps: ระยะทางขับรถเที่ยวเดียว ${result.km} กม. กรุณาตรวจเส้นทางและยืนยันพื้นที่นอกกรุงเทพฯ ก่อนรวมราคา`);
+  }catch(e){if(generation===routeGeneration)message(e.message);}finally{busy=false;$('travel-fetch').disabled=false;}
+ }
  function restore(){fillOptions();}
  function init(){
   const box=document.createElement('details');box.id='travel-quote-card';box.className='card travel-card';box.innerHTML=`<summary>ค่าเดินทางนอกกรุงเทพฯ · รวมในราคางาน</summary><div class="travel-body"><p id="travel-rate-summary"></p><p>เปิดเส้นทาง Google Maps แล้วตรวจและกรอกระยะทางขับรถเที่ยวเดียว ระบบคำนวณค่าเดินทางตามอัตรา Admin ยังไม่ได้เชื่อม API ดึงระยะทางอัตโนมัติ</p><label for="travel-destination">ที่อยู่หน้างานจริง</label><textarea id="travel-destination" rows="2"></textarea><button type="button" class="btn btn-sm" id="travel-use-address">ใช้ที่อยู่ลูกค้าในใบเสนอราคา</button> <a id="travel-maps" class="btn btn-sm" href="https://www.google.com/maps" target="_blank" rel="noopener">เปิดเส้นทาง Google Maps ↗</a><div class="travel-grid"><div><label for="travel-area">พื้นที่หน้างาน</label><select id="travel-area"><option value="">กรุณาตรวจพื้นที่</option><option value="bangkok">กรุงเทพมหานคร · ไม่คิดค่าเดินทาง</option><option value="outside">นอกกรุงเทพมหานคร</option></select></div><div><label for="travel-km">ระยะทางขับรถเที่ยวเดียว (กม.)</label><input id="travel-km" type="number" min="0" max="3000" step="0.1"></div></div><label><input id="travel-confirmed" type="checkbox"> ตรวจแล้วว่าหน้างานอยู่นอกกรุงเทพฯ และระยะทางเที่ยวเดียวถูกต้อง</label><label for="travel-target">รวมค่าเดินทางในรายการงาน</label><select id="travel-target"></select><p>เลือกรายการงานจำนวน 1 และไม่มีส่วนลดรายรายการ ค่าเดินทางรวมก่อนส่วนลดรวมและ VAT โดยไม่เพิ่มแถวใหม่ในเอกสาร</p><button type="button" class="btn btn-primary btn-sm" id="travel-apply">คำนวณและรวมในราคางาน</button> <button type="button" class="btn btn-sm" id="travel-remove">นำค่าเดินทางออก</button><p id="travel-message" role="status" aria-live="polite"></p></div>`;
+  box.querySelector('.travel-body > p:nth-child(2)').textContent='ดึงระยะทางขับรถจาก Google Maps หรือตรวจเส้นทางแล้วกรอกเอง จากนั้นยืนยันพื้นที่นอกกรุงเทพฯ และรวมค่าเดินทางในราคางาน';
+  const fetchButton=document.createElement('button');fetchButton.id='travel-fetch';fetchButton.type='button';fetchButton.className='btn btn-primary btn-sm';fetchButton.textContent='ดึงระยะทางจาก Google Maps';fetchButton.addEventListener('click',fetchDistance);box.querySelector('#travel-maps').after(fetchButton);
   $('page-newquote').insertBefore(box,$('page-newquote').querySelector('.card'));
   box.addEventListener('keydown',e=>{if(e.key==='Escape'){box.open=false;box.querySelector('summary').focus();}});
   const settings=document.createElement('section');settings.id='travel-settings-card';settings.className='card travel-card';settings.hidden=true;settings.innerHTML=`<div class="travel-body"><h3>ตั้งค่าเดินทางนอกกรุงเทพฯ · Admin</h3><label><input id="travel-setting-enabled" type="checkbox"> เปิดใช้ค่าเดินทาง</label><label for="travel-setting-origin">ที่อยู่จุดเริ่มเดินทาง</label><textarea id="travel-setting-origin" rows="2"></textarea><div class="travel-grid"><div><label for="travel-setting-rate">อัตราบาท / กิโลเมตร</label><input id="travel-setting-rate" type="number" min="0" step="0.01"></div><div><label for="travel-setting-trips">จำนวนเที่ยว</label><select id="travel-setting-trips"><option value="1">เที่ยวเดียว</option><option value="2">ไป–กลับ (ระยะทางเที่ยวเดียว × 2)</option></select></div></div><p>คิดเฉพาะระยะทาง ไม่รวมค่าทางด่วนหรือค่าใช้จ่ายอื่น ใบเสนอราคาเก่าไม่เปลี่ยนตามอัตราใหม่</p><button id="travel-setting-save" type="button" class="btn btn-primary btn-sm">บันทึกค่าเดินทาง</button><p id="travel-settings-message" role="status"></p></div>`;$('page-settings').appendChild(settings);
