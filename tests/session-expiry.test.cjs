@@ -53,3 +53,6 @@ test('reauthentication keeps the draft screen and rejects a different account',(
 test('manual logout clears idle clock and renewal UI',()=>{
  const r=runtime();r.auth.accept(r.token(),'test');r.auth.clear();assert.equal(r.session.size,0);assert.equal(r.timers.size,0);assert.equal(r.auth.refreshCredential(r.token(),'test'),false);
 });
+test('manual renewal from warning remains in-place when Google prompt is blocked',()=>{
+ const r=runtime();r.c.google={accounts:{id:{prompt(){throw Error('blocked');},renderButton(){}}}};r.auth.accept(r.token(),'test');const renewed=r.token('user',60*60*1000);assert.equal(r.auth.refreshCredential(renewed,'test'),true);assert.equal(r.auth.token('test'),renewed);assert.equal(r.logouts(),0);
+});

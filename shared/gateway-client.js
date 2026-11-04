@@ -45,7 +45,7 @@ const AuthSession=(()=>{
   }
   function accept(value,audience){const p=claims(value||'',audience);if(!p){clear();return false;}memory=value;identity=p.sub;lastActivity=Date.now();rememberActivity();try{window.sessionStorage.setItem(key,value);}catch(e){}if(notice){notice.remove();notice=null;}removeWarning();refreshing=false;watch(value,audience);return true;}
   // Consume re-authentication without running afterLogin/initNewQuote again.
-  function refreshCredential(value,audience){if(!refreshing&&!notice)return false;const p=claims(value||'',audience);if(!p||!identity||p.sub!==identity){const message=typeof document!=='undefined'?document.getElementById('session-expired-message'):null;if(message)message.textContent='กรุณาใช้บัญชีเดิมเพื่อกลับไปยังข้อมูลที่ค้างอยู่ หากต้องการเปลี่ยนบัญชี ให้กลับหน้าเข้าสู่ระบบ';return true;}
+  function refreshCredential(value,audience){if(!refreshing&&!notice&&warningKind!=='token')return false;const p=claims(value||'',audience);if(!p||!identity||p.sub!==identity){const message=typeof document!=='undefined'?document.getElementById('session-expired-message'):null;if(message)message.textContent='กรุณาใช้บัญชีเดิมเพื่อกลับไปยังข้อมูลที่ค้างอยู่ หากต้องการเปลี่ยนบัญชี ให้กลับหน้าเข้าสู่ระบบ';return true;}
     const previousActivity=lastActivity,wasExpired=!!notice;accept(value,audience);if(!wasExpired){lastActivity=previousActivity;rememberActivity();watch(value,audience);}return true;}
   function activity(){if(!memory||notice)return;const now=Date.now();if(now-lastActivity>=idleMs){expired('idle');return;}if(now-lastActivity<5000)return;lastActivity=now;rememberActivity();watch(memory,aud);}
   function profile(audience){const value=token(audience);return value?claims(value,audience):null;}
