@@ -299,7 +299,7 @@
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
                 คอลัมน์
               </button>
-              <div class="col-toggle-panel" id="col-toggle-panel">
+              <div class="col-toggle-panel" id="col-toggle-panel" onclick="event.stopPropagation()">
                 <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">แสดง / ซ่อน คอลัมน์</div>
                 <label><input type="checkbox" id="colcb-pn" checked onchange="toggleCol('pn',this.checked)"> Part No.</label>
                 <label><input type="checkbox" id="colcb-qty" checked onchange="toggleCol('qty',this.checked)"> จำนวน</label>
@@ -309,6 +309,7 @@
                 <label><input type="checkbox" id="colcb-total" checked onchange="toggleCol('total',this.checked)"> รวม</label>
                 <div style="font-size:10px;color:var(--muted);margin:6px 0;border-top:1px solid var(--border);padding-top:6px;text-transform:uppercase;letter-spacing:0.05em">เส้นตาราง</div>
                 <label><input type="checkbox" id="colcb-lines" onchange="toggleColLines(this.checked)"> เส้นแบ่งคอลัมน์ (แนวตั้ง)</label>
+                <button type="button" class="btn btn-sm" onclick="toggleColPanel(event)" style="margin-top:8px;width:100%">เสร็จแล้ว</button>
               </div>
             </div>
             <!-- Row spacing -->
