@@ -24,6 +24,7 @@ function _initGIS() {
   return true;
 }
 function _onGoogleCredential(resp) {
+  if(AuthSession.refreshCredential(resp&&resp.credential,CONFIG.googleClientId))return;
   if(!AuthSession.accept(resp && resp.credential,CONFIG.googleClientId)){toast("กรุณาใช้บัญชี Google Workspace ของ dongroups.com", "error");return;}
   const p = _decodeJwt(resp && resp.credential);
   if (!p || !p.email) { toast('เข้าสู่ระบบไม่สำเร็จ', 'error'); return; }
