@@ -1,3 +1,4 @@
+import {queueAnalyze} from './queue-analysis.mjs';
 // Cloudflare Worker: verify Google RS256 ID tokens with native Web Crypto.
 // The Apps Script URL and shared secret are Worker variables, not browser code.
 let cachedKeys=null;
@@ -36,6 +37,7 @@ export default {async fetch(request,env){
  try{const token=(request.headers.get('authorization')||'').match(/^Bearer (\S+)$/)?.[1];identity=await verifyGoogleToken(token,env.GOOGLE_CLIENT_ID,String(env.ALLOWED_EMAILS||'admin@dongroups.com').split(',').map(value=>value.trim().toLowerCase()));}
  catch{return reply({ok:false,error:'กรุณาเข้าสู่ระบบ Google ด้วยบัญชีที่ได้รับอนุญาตอีกครั้ง'},401);}
  let payload;try{const raw=await request.text();if(raw.length>8*1024*1024)return reply({ok:false,error:'ไฟล์แนบใหญ่เกินขนาดที่รองรับ'},413);payload=JSON.parse(raw);if(!payload||Array.isArray(payload)||typeof payload!=='object')throw new Error();}catch{return reply({ok:false,error:'Invalid request'},400);}
+ if(payload.action==='queueAnalyze')return queueAnalyze(payload,env,reply);
  if(payload.action==='travelDistance')return travelDistance(payload,env,reply);
  if(payload.action==='aiRoutePlan')return aiRoutePlan(payload,env,reply);
  // Caller cannot override the verified actor or server-only shared secret.
