@@ -24,6 +24,17 @@
   const base=it.travel?Number(it.travel.basePrice):Number(it.price);if(!Number.isFinite(round(base+result.amount)))throw Error('ราคางานสูงเกินขนาดตัวเลขที่รองรับ');remove(items);
   it.price=round(base+result.amount);it.travel={version:1,basePrice:base,amount:result.amount,chargedPrice:it.price,...result,...context,source:'manual-google-maps',at:new Date().toISOString()};
  }
- function validate(items,context){for(const it of items)if(it.travel){const m=it.travel;if(!eligible(it)||Number(it.price)!==Number(m.chargedPrice)||text(m.quoteAddress)!==text(context.quoteAddress)||text(m.clientName)!==text(context.clientName)||bangkok(m.destination)||m.area!=='outside')throw Error('ข้อมูลหน้างานหรือรายการที่รวมค่าเดินทางเปลี่ยน กรุณานำค่าเดินทางออกแล้วตรวจและคำนวณใหม่');}}
- const api={round,text,bangkok,settings,calculate,eligible,remove,apply,validate};if(typeof module==='object'&&module.exports)module.exports=api;else root.TravelCost=api;
+
+ function eligibleAll(it){return it?.type==='item'&&!it.asHeader&&text(it.name)&&Number.isFinite(Number(it.qty))&&Number(it.qty)>0&&String(it.price??'').trim()!==''&&Number.isFinite(Number(it.price))&&Number(it.price)>=0&&Number.isFinite(Number(it.disc||0))&&Number(it.disc||0)>=0&&Number(it.disc||0)<=100;}
+ function applyAll(items,result,context){
+  if(result.amount===0){remove(items);return;}
+  const rows=items.filter(eligibleAll);if(!rows.length)throw Error('ต้องมีรายการสินค้า/บริการที่มีจำนวนและราคาตัวเลขก่อนรวมค่าเดินทาง');
+  const totalCents=Math.round(result.amount*100),share=Math.floor(totalCents/rows.length),remainder=totalCents%rows.length;
+  const plans=rows.map((it,i)=>{const base=Number(it.travel?it.travel.basePrice:it.price),qty=Number(it.qty),price=round(base+(share+(i<remainder?1:0))/100/qty);if(!Number.isFinite(price))throw Error('ราคางานสูงเกินขนาดตัวเลขที่รองรับ');return {it,base,qty,price};});
+  let actual=round(plans.reduce((sum,p)=>sum+(p.price-p.base)*p.qty,0));
+  const single=plans.find(p=>p.qty===1);if(single){single.price=round(single.price+round(result.amount-actual));actual=round(plans.reduce((sum,p)=>sum+(p.price-p.base)*p.qty,0));}
+  remove(items);const at=new Date().toISOString();for(const p of plans){p.it.price=p.price;p.it.travel={...result,...context,version:2,basePrice:p.base,baseQty:p.qty,baseDisc:Number(p.it.disc||0),amount:round((p.price-p.base)*p.qty),totalAmount:result.amount,actualAmount:actual,allocationCount:rows.length,chargedPrice:p.price,source:'manual-google-maps',at};}
+ }
+ function validate(items,context){for(const it of items)if(it.travel){const m=it.travel;if(!(m.version===2?eligibleAll(it)&&Number(it.qty)===m.baseQty&&Number(it.disc||0)===m.baseDisc&&items.filter(eligibleAll).length===m.allocationCount&&items.filter(x=>x.travel?.version===2&&x.travel.at===m.at).length===m.allocationCount:eligible(it))||Number(it.price)!==Number(m.chargedPrice)||text(m.quoteAddress)!==text(context.quoteAddress)||text(m.clientName)!==text(context.clientName)||bangkok(m.destination)||m.area!=='outside')throw Error('ข้อมูลหน้างานหรือรายการที่รวมค่าเดินทางเปลี่ยน กรุณานำค่าเดินทางออกแล้วตรวจและคำนวณใหม่');}}
+ const api={round,text,bangkok,settings,calculate,eligible,eligibleAll,remove,apply,applyAll,validate};if(typeof module==='object'&&module.exports)module.exports=api;else root.TravelCost=api;
 })(globalThis);

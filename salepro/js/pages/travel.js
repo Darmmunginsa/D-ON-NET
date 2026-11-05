@@ -21,16 +21,13 @@ const TravelQuote=(()=>{
   }catch(e){$('travel-settings-message').textContent=e.message;}finally{busy=false;$('travel-setting-save').disabled=false;}
  }
  function reset(){routeGeneration++;lastAttached='';for(const id of ['travel-km','travel-destination'])if($(id))$(id).value='';if($('travel-area'))$('travel-area').value='';if($('travel-confirmed'))$('travel-confirmed').checked=false;if($('travel-message'))message('');}
- function refresh(){
-  const selected=$('travel-target')?.value;if(!selected)return fillOptions();fillOptions(selected);
- }
- function fillOptions(selected=''){
-  const select=$('travel-target');if(!select)return;
-  select.replaceChildren(new Option('เลือกรายการงานที่จะรวมค่าเดินทาง',''));
-  for(const it of quoteItems.filter(T.eligible))select.add(new Option(it.name,String(it.id)));
-  if([...select.options].some(o=>o.value===selected))select.value=selected;
+ function refresh(){fillOptions();}
+ function fillOptions(){
   const attached=quoteItems.find(i=>i.travel);
-  if(attached){const m=attached.travel,signature=String(attached.id)+'|'+m.at;if(lastAttached!==signature){$('travel-destination').value=m.destination;$('travel-area').value=m.area;$('travel-km').value=m.km;$('travel-confirmed').checked=true;lastAttached=signature;}select.value=String(attached.id);message(`รวมค่าเดินทาง ${fmt(m.amount)} บาท ใน “${attached.name}” แล้ว (ก่อนส่วนลดรวมและ VAT)\nอัตราที่ใช้ ${fmt(m.rate)} บาท/กม. × ${m.km} กม. × ${m.trips} เที่ยว`);}else lastAttached='';
+  if(attached){const m=attached.travel,signature=String(attached.id)+'|'+m.at;if(lastAttached!==signature){$('travel-destination').value=m.destination;$('travel-area').value=m.area;$('travel-km').value=m.km;$('travel-confirmed').checked=true;lastAttached=signature;}
+   const total=m.version===2?m.actualAmount:m.amount,count=quoteItems.filter(i=>i.travel).length;
+   message('รวมค่าเดินทาง '+fmt(total)+' บาท ใน '+count+' รายการแล้ว (ก่อนส่วนลดรายรายการ ส่วนลดรวม และ VAT)'+(m.version===2&&m.actualAmount!==m.totalAmount?' · ยอดตามระยะทาง '+fmt(m.totalAmount)+' บาท ต่างกันจากการปัดราคาต่อหน่วย 2 ตำแหน่ง':'')+'\nอัตราที่ใช้ '+fmt(m.rate)+' บาท/กม. × '+m.km+' กม. × '+m.trips+' เที่ยว');
+  }else lastAttached='';
   // Editing quantity/price/line discount requires removing the travel allocation first.
   for(const it of quoteItems){const row=[...document.querySelectorAll('#items-body tr[data-id]')].find(r=>r.dataset.id===String(it.id));if(row)for(const el of row.querySelectorAll('.col-qty input,.col-price input,.col-disc input')){el.disabled=!!it.travel;if(it.travel)el.title='นำค่าเดินทางออกก่อนแก้จำนวน ราคา หรือส่วนลด';}}
  }
@@ -40,7 +37,7 @@ const TravelQuote=(()=>{
   try{busy=true;$('travel-apply').disabled=true;const previousOrigin=config?.origin;await load();summary();if(previousOrigin&&config?.origin!==previousOrigin){$('travel-confirmed').checked=false;throw Error('Admin เปลี่ยนจุดเริ่มเดินทาง กรุณาตรวจเส้นทางและยืนยันระยะทางใหม่');}
    const result=T.calculate(config,{destination:$('travel-destination').value,area:$('travel-area').value,confirmed:$('travel-confirmed').checked,km:$('travel-km').value});
    if(result.amount>0&&typeof pricePeriod!=='undefined'&&pricePeriod)throw Error('ค่าเดินทางใช้กับงานครั้งเดียว กรุณาเลือกงวดราคา/หน่วยปกติก่อนรวมค่าเดินทาง');
-   T.apply(quoteItems,$('travel-target').value,result,{...context(),destination:T.text($('travel-destination').value)});$('items-body').innerHTML='';renderItems();
+   T.applyAll(quoteItems,result,{...context(),destination:T.text($('travel-destination').value)});$('items-body').innerHTML='';renderItems();
    if(result.amount===0)message(result.area==='bangkok'?'หน้างานกรุงเทพฯ ไม่คิดค่าเดินทาง':'ค่าเดินทางเป็น 0 บาทตามอัตราที่ตั้ง');
   }catch(e){message(e.message);}finally{busy=false;$('travel-apply').disabled=false;}
  }
@@ -61,7 +58,7 @@ const TravelQuote=(()=>{
  }
  function restore(){fillOptions();}
  function init(){
-  const box=document.createElement('details');box.id='travel-quote-card';box.className='card travel-card';box.innerHTML=`<summary>ค่าเดินทางนอกกรุงเทพฯ · รวมในราคางาน</summary><div class="travel-body"><p id="travel-rate-summary"></p><p>เปิดเส้นทาง Google Maps แล้วตรวจและกรอกระยะทางขับรถเที่ยวเดียว ระบบคำนวณค่าเดินทางตามอัตรา Admin ยังไม่ได้เชื่อม API ดึงระยะทางอัตโนมัติ</p><label for="travel-destination">ที่อยู่หน้างานจริง</label><textarea id="travel-destination" rows="2"></textarea><button type="button" class="btn btn-sm" id="travel-use-address">ใช้ที่อยู่ลูกค้าในใบเสนอราคา</button> <a id="travel-maps" class="btn btn-sm" href="https://www.google.com/maps" target="_blank" rel="noopener">เปิดเส้นทาง Google Maps ↗</a><div class="travel-grid"><div><label for="travel-area">พื้นที่หน้างาน</label><select id="travel-area"><option value="">กรุณาตรวจพื้นที่</option><option value="bangkok">กรุงเทพมหานคร · ไม่คิดค่าเดินทาง</option><option value="outside">นอกกรุงเทพมหานคร</option></select></div><div><label for="travel-km">ระยะทางขับรถเที่ยวเดียว (กม.)</label><input id="travel-km" type="number" min="0" max="3000" step="0.1"></div></div><label><input id="travel-confirmed" type="checkbox"> ตรวจแล้วว่าหน้างานอยู่นอกกรุงเทพฯ และระยะทางเที่ยวเดียวถูกต้อง</label><label for="travel-target">รวมค่าเดินทางในรายการงาน</label><select id="travel-target"></select><p>เลือกรายการงานจำนวน 1 และไม่มีส่วนลดรายรายการ ค่าเดินทางรวมก่อนส่วนลดรวมและ VAT โดยไม่เพิ่มแถวใหม่ในเอกสาร</p><button type="button" class="btn btn-primary btn-sm" id="travel-apply">คำนวณและรวมในราคางาน</button> <button type="button" class="btn btn-sm" id="travel-remove">นำค่าเดินทางออก</button><p id="travel-message" role="status" aria-live="polite"></p></div>`;
+  const box=document.createElement('details');box.id='travel-quote-card';box.className='card travel-card';box.innerHTML=`<summary>ค่าเดินทางนอกกรุงเทพฯ · รวมในราคางาน</summary><div class="travel-body"><p id="travel-rate-summary"></p><p>เปิดเส้นทาง Google Maps แล้วตรวจและกรอกระยะทางขับรถเที่ยวเดียว ระบบคำนวณค่าเดินทางตามอัตรา Admin ยังไม่ได้เชื่อม API ดึงระยะทางอัตโนมัติ</p><label for="travel-destination">ที่อยู่หน้างานจริง</label><textarea id="travel-destination" rows="2"></textarea><button type="button" class="btn btn-sm" id="travel-use-address">ใช้ที่อยู่ลูกค้าในใบเสนอราคา</button> <a id="travel-maps" class="btn btn-sm" href="https://www.google.com/maps" target="_blank" rel="noopener">เปิดเส้นทาง Google Maps ↗</a><div class="travel-grid"><div><label for="travel-area">พื้นที่หน้างาน</label><select id="travel-area"><option value="">กรุณาตรวจพื้นที่</option><option value="bangkok">กรุงเทพมหานคร · ไม่คิดค่าเดินทาง</option><option value="outside">นอกกรุงเทพมหานคร</option></select></div><div><label for="travel-km">ระยะทางขับรถเที่ยวเดียว (กม.)</label><input id="travel-km" type="number" min="0" max="3000" step="0.1"></div></div><label><input id="travel-confirmed" type="checkbox"> ตรวจแล้วว่าหน้างานอยู่นอกกรุงเทพฯ และระยะทางเที่ยวเดียวถูกต้อง</label><p>เฉลี่ยค่าเดินทางเท่ากันในทุกรายการสินค้า/บริการที่มีจำนวนและราคาตัวเลข โดยหารตามจำนวนของแต่ละรายการเพื่อบวกในราคาต่อหน่วย ปัดราคา 2 ตำแหน่ง ไม่รวมแถวหัวข้อหรือหมายเหตุ ค่าเดินทางรวมก่อนส่วนลดและ VAT โดยไม่เพิ่มแถวในเอกสาร</p><button type="button" class="btn btn-primary btn-sm" id="travel-apply">คำนวณและรวมในราคางาน</button> <button type="button" class="btn btn-sm" id="travel-remove">นำค่าเดินทางออก</button><p id="travel-message" role="status" aria-live="polite"></p></div>`;
   box.querySelector('.travel-body > p:nth-child(2)').textContent='ดึงระยะทางขับรถจาก Google Maps หรือตรวจเส้นทางแล้วกรอกเอง จากนั้นยืนยันพื้นที่นอกกรุงเทพฯ และรวมค่าเดินทางในราคางาน';
   const fetchButton=document.createElement('button');fetchButton.id='travel-fetch';fetchButton.type='button';fetchButton.className='btn btn-primary btn-sm';fetchButton.textContent='ดึงระยะทางจาก Google Maps';fetchButton.addEventListener('click',fetchDistance);box.querySelector('#travel-maps').after(fetchButton);
   const dialog=document.createElement('dialog');dialog.id='travel-dialog';dialog.className='quote-floating';dialog.setAttribute('aria-labelledby','travel-dialog-title');
