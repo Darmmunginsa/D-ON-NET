@@ -22,7 +22,67 @@ function catExtra(id){ return CatalogPolicy.extra(catalogData.find(p=>p.id===id)
 async function saveVendorsStore(){ await putSetting('Vendors', JSON.stringify(vendorsData)); }
 
 // ════════ CATALOG ════════
-async function loadCatalogAndRender(){ await loadCatalogData(); renderCatalog(); }
+// ── พิจารณานำเข้า Catalog — รายการที่ Sale ส่งมาจาก SalePro (+C) ──
+function _getCatalogPending(){
+  try{ const it=(_settingsCache||[]).find(i=>i.Title==='CatalogPending'); return (it&&it.Value)?(JSON.parse(it.Value)||[]):[]; }catch(e){ return []; }
+}
+async function _saveCatalogPending(arr){ await putSetting('CatalogPending', JSON.stringify(arr||[])); }
+function _catPendingBadge(){
+  const n=_getCatalogPending().length; const el=document.getElementById('cat-pending-navcount');
+  if(el) el.innerHTML = n ? (' <span style="background:var(--amber);color:#1a1a2e;font-size:10px;font-weight:700;border-radius:9px;padding:1px 7px">'+n+'</span>') : '';
+}
+function renderCatalogPending(){
+  _catPendingBadge();
+  const card=document.getElementById('cat-pending-card'); if(!card) return;
+  const pend=_getCatalogPending();
+  if(!pend.length){ card.style.display='none'; card.innerHTML=''; return; }
+  card.style.display='block';
+  const rows=pend.map(p=>{
+    const margin=(+p.price||0)-(+p.cost||0);
+    return `<tr>
+      <td style="font-family:var(--mono);font-size:11px">${esc(p.pn||'')}</td>
+      <td style="font-weight:500">${esc(p.name||'')}${p.desc?`<div style="font-size:11px;color:var(--muted)">${esc(p.desc)}</div>`:''}</td>
+      <td style="text-align:center">${esc(p.unit||'')}</td>
+      <td style="text-align:right;font-family:var(--mono)">${fmt(p.cost||0)}</td>
+      <td style="text-align:right;font-family:var(--mono)">${fmt(p.price||0)}</td>
+      <td style="text-align:right;font-family:var(--mono);color:${margin>=0?'var(--green)':'var(--red)'}">${fmt(margin)}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(p.byName||p.byEmail||'')}${p.quoteTitle?`<div>${esc(p.quoteTitle)}${p.client?(' · '+esc(p.client)):''}</div>`:''}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm btn-primary" onclick="approveCatalogPending('${p.id}')">✓ นำเข้า</button>
+        <button class="btn btn-sm" onclick="rejectCatalogPending('${p.id}')" style="color:var(--red)">✕</button>
+      </td></tr>`;
+  }).join('');
+  card.innerHTML='<div class="card" style="border:1px solid var(--amber);margin-bottom:16px">'
+    +'<div class="card-head" style="background:rgba(245,158,11,.08)">📥 พิจารณานำเข้า Catalog — จาก Sale ('+pend.length+')</div>'
+    +'<div style="padding:4px 0"><table><thead><tr><th>Part No.</th><th>ชื่อสินค้า</th><th>หน่วย</th><th style="text-align:right">ทุน</th><th style="text-align:right">ขาย</th><th style="text-align:right">กำไร</th><th>ส่งโดย</th><th></th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table></div></div>';
+}
+async function approveCatalogPending(id){
+  const pend=_getCatalogPending(); const p=pend.find(x=>x.id===id); if(!p){ renderCatalogPending(); return; }
+  const nm=(p.name||'').trim().toLowerCase();
+  if((catalogData||[]).some(c=>(c.Title||'').trim().toLowerCase()===nm)){
+    if(!confirm('มีสินค้าชื่อนี้ใน Catalog อยู่แล้ว — ยังต้องการเพิ่มซ้ำไหม?')){ return; }
+  }
+  try{
+    toast('กำลังนำเข้า...','info');
+    const c=await createListItem(CONFIG.lists.catalog,{Title:p.name||'',Unit:p.unit||'',Price:+p.price||0,CatalogStatus:'Active',Category:p.category||'Hardware',Description:p.desc||''});
+    catalogExtra[c.id]={cost:+p.cost||0,vendorId:p.vendorId||'',pn:p.pn||'',pdoc:null};
+    await saveCatalogExtra();
+    const rest=_getCatalogPending().filter(x=>x.id!==id);
+    await _saveCatalogPending(rest);
+    await loadCatalogData(); renderCatalog(); renderCatalogPending();
+    if(typeof logActivity==='function') logActivity('นำเข้า Catalog', p.name||'', 'จาก Sale: '+(p.byName||p.byEmail||''));
+    toast('นำเข้า "'+(p.name||'')+'" เข้า Catalog แล้ว','success');
+  }catch(e){ toast('นำเข้าไม่สำเร็จ: '+e.message,'error'); }
+}
+async function rejectCatalogPending(id){
+  const p=_getCatalogPending().find(x=>x.id===id);
+  if(!confirm('ไม่นำเข้า "'+(p?p.name:'')+'" และลบออกจากรายการพิจารณา?')) return;
+  try{ const rest=_getCatalogPending().filter(x=>x.id!==id); await _saveCatalogPending(rest); renderCatalogPending(); toast('ลบออกจากรายการพิจารณาแล้ว','success'); }
+  catch(e){ toast('ไม่สำเร็จ: '+e.message,'error'); }
+}
+
+async function loadCatalogAndRender(){ await loadCatalogData(); renderCatalog(); if(typeof renderCatalogPending==='function') renderCatalogPending(); }
 function renderCatalog(){
   CatalogBaskets.toolbar();
   const body=document.getElementById('catalog-body'); if(!body)return;
@@ -166,5 +226,5 @@ async function deleteVendor(id){
 // ── hook showPage ให้โหลด catalog เมื่อเปิดหน้า ──
 if (typeof showPage === 'function') {
   const _origShowPage = showPage;
-  showPage = function(id, el){ _origShowPage(id, el); if(id==='catalog'){ if(!catalogData.length) loadCatalogAndRender(); else renderCatalog(); } };
+  showPage = function(id, el){ _origShowPage(id, el); if(id==='catalog'){ if(!catalogData.length) loadCatalogAndRender(); else { renderCatalog(); if(typeof renderCatalogPending==='function') renderCatalogPending(); } } };
 }

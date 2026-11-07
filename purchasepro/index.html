@@ -36,7 +36,7 @@
     <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard',this)">📊 ภาพรวม</div>
     <div class="nav-item" data-page="purchases" onclick="showPage('purchases',this)">📦 งานจัดซื้อ</div>
     <div class="nav-group">ข้อมูลหลัก</div>
-    <div class="nav-item" data-page="catalog" onclick="showPage('catalog',this)">🛒 Catalog สินค้า</div>
+    <div class="nav-item" data-page="catalog" onclick="showPage('catalog',this)">🛒 Catalog สินค้า<span id="cat-pending-navcount"></span></div>
     <div class="nav-item" data-page="vendors" onclick="showPage('vendors',this)">🏢 Vendor</div>
     <div class="nav-item" data-page="settings" onclick="showPage('settings',this)">⚙️ ตั้งค่าบริษัท</div>
     <div class="sidebar-foot">
@@ -87,6 +87,7 @@
 
       <!-- CATALOG -->
       <div class="page" id="page-catalog">
+        <div id="cat-pending-card" style="display:none"></div>
         <div style="display:flex;gap:10px;margin-bottom:16px">
           <input id="cat-search" placeholder="ค้นหาสินค้า / Part No...." oninput="renderCatalog()" style="max-width:300px">
           <label class="btn" style="display:flex;gap:8px;align-items:center">นำเข้า Draft JSON<input id="draft-import-file" type="file" accept=".json,application/json" style="max-width:190px"></label><button class="btn btn-primary" onclick="openAddProduct()" style="margin-left:auto">+ เพิ่มสินค้า</button>
@@ -370,7 +371,7 @@
 <script src="js/api.js?v=monitor20261107"></script>
 <script src="js/auth.js?v=idle60-20261104"></script>
 <script src="js/app.js?v=monitor20261107"></script>
-<script src="js/manage.js?v=baskets20261101"></script>
+<script src="js/manage.js?v=monitor20261107"></script>
 <script src="js/tour.js?v=admin1"></script>
 <script src="js/catalog-draft-import.js?v=20261101"></script><script src="../shared/workspace-appearance.js?v=20261103"></script></body>
 </html>
