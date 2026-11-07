@@ -94,6 +94,7 @@ function openFollowUpModal() {
   document.getElementById('fu-subject').value = fu?.subject || 'ครบกำหนดต่อสัญญา';
   document.getElementById('fu-note').value = fu?.note || '';
   document.getElementById('fu-emails').value = (fu?.emails || [q.SaleEmail || currentUser?.email || '']).join(', ');
+  { const _tc = document.getElementById('fu-to-contract'); if (_tc) _tc.checked = !!(fu && fu.toContract); }
   document.getElementById('fu-remove-btn').style.display = fu ? '' : 'none';
   const st = document.getElementById('fu-status');
   st.textContent = fu?.sentAt ? '✅ ส่งแจ้งเตือนไปแล้วเมื่อ ' + formatDateTime(fu.sentAt) : (fu ? '⏳ รอถึงกำหนด — ระบบจะส่งเมลอัตโนมัติเมื่อมีคนเปิดแอปหลังถึงวันนัด' : '');
@@ -102,6 +103,44 @@ function openFollowUpModal() {
 function parseFuEmails(raw) {
   return String(raw||'').split(/[,;\n]+/).map(s=>s.trim()).filter(s=>s.includes('@'));
 }
+// ส่งข้อมูลติดตาม → ทะเบียนสัญญา (สร้าง/อัปเดต) — ดึงจากใบเสนอราคา
+async function _syncFollowUpToContract(q, fu) {
+  if (!q) return null;
+  try {
+    if (typeof loadContracts === 'function' && (!Array.isArray(contractsData) || !contractsData.length)) {
+      try { await loadContracts(); } catch(e) {}
+    }
+    const emails = (fu.emails || []).join(', ');
+    const list = (typeof contractsData !== 'undefined' && Array.isArray(contractsData)) ? contractsData : [];
+    let c = fu.contractId ? list.find(x => String(x.spId) === String(fu.contractId)) : null;
+    if (!c) c = list.find(x => String(x.quoteId || '').split(',').map(s => s.trim()).includes(String(q.id)));
+    if (c) {
+      c.end = fu.date || c.end;
+      if (emails) c.alertEmails = emails;
+      if (!c.party) c.party = q.ClientName || '';
+      if (!c.name)  c.name  = fu.subject || 'ครบกำหนดต่อสัญญา';
+      if (!c.value) c.value = +q.TotalAmount || 0;
+      if (!c.start) c.start = q.ContractStartDate || '';
+      if (!c.vendorTax) c.vendorTax = q.CustomerTaxID || '';
+      if (!c.coordinator) c.coordinator = q.SaleName || '';
+      if (!(c.quoteId || '').split(',').map(s => s.trim()).includes(String(q.id)))
+        c.quoteId = (c.quoteId ? c.quoteId + ',' : '') + q.id;
+      c.remindSentFor = (c.remindSentFor === c.end) ? c.remindSentFor : '';
+      const { spId, ...clean } = c;
+      await updateListItem(CONFIG.lists.contracts, c.spId, { Title: clean.party || clean.name, Value: JSON.stringify(clean) });
+      return c.spId;
+    }
+    const obj = {
+      id: 'CT' + Date.now(), invNo: '', party: q.ClientName || '', name: fu.subject || 'ครบกำหนดต่อสัญญา',
+      vendorTax: q.CustomerTaxID || '', poRef: '', start: q.ContractStartDate || '', end: fu.date || '',
+      billing: 'รายปี', value: +q.TotalAmount || 0, coordinator: q.SaleName || '', alertDays: 30,
+      alertEmails: emails, quoteId: String(q.id), manualDisbursed: 0, note: fu.note || '', remindSentFor: '', ackFor: ''
+    };
+    const created = await createListItem(CONFIG.lists.contracts, { Title: obj.party || obj.name, Value: JSON.stringify(obj) });
+    if (typeof contractsData !== 'undefined' && Array.isArray(contractsData)) contractsData.push({ ...obj, spId: created.id });
+    return created.id;
+  } catch(e) { console.warn('followup->contract:', e.message); return null; }
+}
 async function saveFollowUp() {
   const date = document.getElementById('fu-date').value;
   if (!date) { toast('กรุณาระบุวันที่แจ้งเตือน', 'error'); return; }
@@ -109,14 +148,22 @@ async function saveFollowUp() {
   if (!emails.length) { toast('กรุณาระบุ Email ผู้เกี่ยวข้องอย่างน้อย 1 คน', 'error'); return; }
   const subject = document.getElementById('fu-subject').value;
   const note = document.getElementById('fu-note').value.trim();
-  stDealData.followUp = { date, subject, note, emails, sentAt: null, setBy: currentUser?.displayName||currentUser?.email||'' };
+  const toContract = !!document.getElementById('fu-to-contract')?.checked;
+  const prevFu = stDealData.followUp || {};
+  stDealData.followUp = { date, subject, note, emails, sentAt: null, toContract, contractId: prevFu.contractId || null, setBy: currentUser?.displayName||currentUser?.email||'' };
+  let contractMsg = '';
+  if (toContract) {
+    const q = quotesData.find(x => x.id === stQuoteId);
+    const cid = await _syncFollowUpToContract(q, stDealData.followUp);
+    if (cid) { stDealData.followUp.contractId = cid; contractMsg = ' + บันทึกเข้าทะเบียนสัญญาแล้ว'; }
+  }
   stDealData.notes = stDealData.notes || [];
-  stDealData.notes.push({ id: Date.now(), user: currentUser?.displayName||'User', text: '🔔 ตั้งการติดตาม ['+subject+'] วันที่ '+date+' → '+emails.join(', '), ts: new Date().toISOString(), type: 'reminder' });
+  stDealData.notes.push({ id: Date.now(), user: currentUser?.displayName||'User', text: '🔔 ตั้งการติดตาม ['+subject+'] วันที่ '+date+' → '+emails.join(', ') + (contractMsg?' 📄 เข้าทะเบียนสัญญา':''), ts: new Date().toISOString(), type: 'reminder' });
   await saveSTDealData();
   updateFollowUpBtn();
   renderSTTimeline();
   closeModal('followup-modal');
-  toast('บันทึกการติดตามแล้ว — จะแจ้งเตือนวันที่ ' + date, 'success');
+  toast('บันทึกการติดตามแล้ว — จะแจ้งเตือนวันที่ ' + date + contractMsg, 'success');
 }
 async function removeFollowUp() {
   if (!confirm('ลบการติดตามนี้?')) return;
