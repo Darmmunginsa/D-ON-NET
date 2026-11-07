@@ -176,7 +176,7 @@ async function openAddProduct() {
   editingProductId = null;
   _npPDoc = null;
   document.getElementById('pm-title').textContent = 'เพิ่มสินค้าใหม่';
-  ['np-name','np-sku','np-pn','np-cost','np-price','np-unit','np-desc','np-internal-notes'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  ['np-name','np-sku','np-pn','np-cost','np-price','np-unit','np-desc'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('np-pdoc-status').textContent = '';
   if (typeof loadVendors === 'function' && !vendorsLoaded) { try { await loadVendors(); } catch(e){} }
   _fillVendorSelect('');
@@ -199,7 +199,6 @@ async function editProduct(id) {
   document.getElementById('np-unit').value = p.Unit || '';
   document.getElementById('np-cat').value = p.Category || 'Hardware';
   document.getElementById('np-desc').value = p.Description || '';
-  document.getElementById('np-internal-notes').value = p.InternalNotes || '';
   document.getElementById('np-pdoc-status').textContent = '';
   if (typeof loadVendors === 'function' && !vendorsLoaded) { try { await loadVendors(); } catch(e){} }
   _fillVendorSelect(ex.vendorId || '');
@@ -215,7 +214,6 @@ async function saveProduct() {
     Title: name, SKU: document.getElementById('np-sku').value,
     Price: priceText===''?'':price, CatalogStatus:priceText===''?'Draft':'Active', Unit: document.getElementById('np-unit').value,
     Category: document.getElementById('np-cat').value,
-    InternalNotes:document.getElementById('np-internal-notes').value.trim(),
     Description: document.getElementById('np-desc').value
   };
   const extra = {

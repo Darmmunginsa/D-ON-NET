@@ -123,7 +123,7 @@ function fillVendorSelect(sel){ const el=document.getElementById('np-vendor'); i
 function openAddProduct(){
   editingProductId=null; _npPDoc=null;
   document.getElementById('pm-title').textContent='เพิ่มสินค้าใหม่';
-  ['np-name','np-sku','np-pn','np-cost','np-price','np-unit','np-desc'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['np-name','np-sku','np-pn','np-cost','np-price','np-unit','np-desc','np-internal-notes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   document.getElementById('np-cat').value='Hardware';
   document.getElementById('np-pdoc-status').textContent='';
   fillVendorSelect(''); updateProductMargin(); renderProductDoc();
@@ -141,6 +141,7 @@ function editProduct(id){
   document.getElementById('np-unit').value=p.Unit||'';
   document.getElementById('np-cat').value=p.Category||'Hardware';
   document.getElementById('np-desc').value=p.Description||'';
+  document.getElementById('np-internal-notes').value=p.InternalNotes||'';
   document.getElementById('np-pdoc-status').textContent='';
   fillVendorSelect(ex.vendorId||''); updateProductMargin(); renderProductDoc();
   openModal('product-modal');
@@ -148,7 +149,7 @@ function editProduct(id){
 async function saveProduct(){
   const name=document.getElementById('np-name').value, price=+document.getElementById('np-price').value;
   const priceText=document.getElementById('np-price').value.trim();if(!name.trim()||(priceText!==''&&(!Number.isFinite(price)||price<=0))){toast('กรอกชื่อสินค้า และราคาขายต้องมากกว่า 0 หรือเว้นว่างเป็น Draft','error');return;}
-  const fields={Title:name,SKU:document.getElementById('np-sku').value,Price:priceText===''?'':price,CatalogStatus:priceText===''?'Draft':'Active',Unit:document.getElementById('np-unit').value,Category:document.getElementById('np-cat').value,Description:document.getElementById('np-desc').value};
+  const fields={Title:name,SKU:document.getElementById('np-sku').value,Price:priceText===''?'':price,CatalogStatus:priceText===''?'Draft':'Active',Unit:document.getElementById('np-unit').value,Category:document.getElementById('np-cat').value,InternalNotes:document.getElementById('np-internal-notes').value.trim(),Description:document.getElementById('np-desc').value};
   const extra={cost:+document.getElementById('np-cost').value||0,vendorId:document.getElementById('np-vendor').value||'',pn:document.getElementById('np-pn').value||'',pdoc:_npPDoc||null};
   try{
     toast('กำลังบันทึก...','info'); let pid=editingProductId;

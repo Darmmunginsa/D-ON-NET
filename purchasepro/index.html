@@ -209,6 +209,7 @@
         <div class="form-group"><label>หมวดหมู่</label><select id="np-cat"><option>Hardware</option><option>Software</option><option>Service</option><option>Consumable</option></select></div>
         <div class="form-group" style="grid-column:1/-1"><label>Vendor</label><select id="np-vendor"></select></div>
         <div class="form-group" style="grid-column:1/-1"><label>รายละเอียด</label><textarea id="np-desc" style="min-height:56px"></textarea></div>
+        <div class="form-group" style="grid-column:1/-1"><label for="np-internal-notes">ข้อมูลเชิงลึก (ภายใน)</label><textarea id="np-internal-notes" maxlength="10000" rows="4" style="min-height:100px" placeholder="เช่น จำนวนแบตเตอรี่ วิธีตั้งค่า ขนาดพิเศษ หรือข้อควรตรวจสอบสำหรับทีมงาน..."></textarea><small>แสดงใต้รายการใน SalePro แบบอ่านอย่างเดียว ไม่แสดงในใบเสนอราคาและ PDF</small></div>
         <div class="form-group" style="grid-column:1/-1"><label>เอกสารการซื้อ <span id="np-pdoc-status" style="color:var(--muted)"></span></label>
           <label class="btn btn-sm" style="cursor:pointer;display:inline-block;margin-bottom:6px">+ แนบเอกสาร<input type="file" onchange="uploadProductDoc(this)" style="display:none"></label>
           <div id="np-pdoc"></div>
@@ -393,7 +394,7 @@
 <script src="js/api.js?v=monitor20261107"></script>
 <script src="js/auth.js?v=idle60-20261104"></script>
 <script src="js/app.js?v=monitor20261107"></script>
-<script src="js/manage.js?v=monitor20261107"></script>
+<script src="js/manage.js?v=internal20261108"></script>
 <script src="js/tour.js?v=admin1"></script>
 <script src="js/catalog-draft-import.js?v=20261101"></script><script src="../shared/workspace-appearance.js?v=20261103"></script></body>
 </html>
