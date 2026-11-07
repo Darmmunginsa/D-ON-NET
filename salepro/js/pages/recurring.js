@@ -113,7 +113,8 @@ async function issueRecurringNow() {
 async function _issueRecurring(src, sched, allItems, manual) {
   const srcId = src.id;
   const today = new Date().toISOString().split('T')[0];
-  const newNo = _nextQuoteNo(src.SaleName || src.SaleEmail || '');
+  let newNo = ''; // Draft has no quotation number.
+  if(sched.status==='Approved')await requireQuotationNumbering();
   // 1) สร้าง header ใบใหม่ (ก๊อปจากต้นทาง, เปลี่ยนเลขที่/วันที่/สถานะ)
   const fields = {
     Title: newNo,
@@ -129,6 +130,7 @@ async function _issueRecurring(src, sched, allItems, manual) {
   };
   const created = await createListItem(CONFIG.lists.quotations, fields);
   const newId = created.id;
+  newNo=created.Title||'';
   // ให้ _nextQuoteNo ครั้งถัดไป (ถ้าออกหลายใบในรอบเดียว) นับต่อได้ถูก
   quotesData.push({ id: newId, Title: newNo, SaleName: src.SaleName||'', SaleEmail: src.SaleEmail||'', Status: fields.Status, ClientName: fields.ClientName });
   // 2) ก๊อปรายการ (line items)

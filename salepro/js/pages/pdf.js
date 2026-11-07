@@ -190,7 +190,7 @@ function renderPDFHTML(d) {
       <div style="display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;text-align:right;width:282px;flex-shrink:0;overflow:hidden">
         <div style="background:${primaryColor};color:#fff;padding:5px 12px;border-radius:5px;margin-bottom:8px;display:inline-block">
           <div style="font-size:${Zi.s};opacity:0.8">Quotation No.</div>
-          <div style="font-size:${Zi.l};font-weight:700;letter-spacing:0.5px">${q.Title||''}</div>
+          <div style="font-size:${Zi.l};font-weight:700;letter-spacing:0.5px">${q.Title||'Draft · รอออกเลขหลังอนุมัติ'}</div>
         </div>
         <table style="font-size:${Zi.m};width:100%;border-collapse:collapse;text-align:left;color:#1a1a2e">
           <tr><td style="color:#666;padding:1.5px 8px 1.5px 0;white-space:nowrap;width:84px;vertical-align:top">Quotation Date:</td><td style="font-weight:600;color:#1a1a2e">${fmtDate(q.QuoteDate)}</td></tr>

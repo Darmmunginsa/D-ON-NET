@@ -14,6 +14,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="stylesheet" href="assets/style.css?v=internal20261108">
 <link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="assets/catalog-drawer.css?v=service20261102"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="assets/travel.css?v=floating20261103"><link rel="stylesheet" href="assets/calendar.css?v=dispatch20261105"><link rel="stylesheet" href="assets/customer-history.css?v=20261108">
+<link rel="stylesheet" href="assets/draft-drawer.css?v=20261108">
 </head>
 <body class="cyber-app">
 
@@ -144,10 +145,12 @@
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
         Sync
       </button>
+      <button type="button" class="btn btn-sm" id="draft-drawer-toggle" aria-expanded="false" aria-controls="draft-drawer">Draft <span id="draft-drawer-count">0</span> ▾</button>
       <button class="btn btn-sm" id="important-bell" onclick="openImportantNotes()" title="Note สำคัญ" style="position:relative">🔔<span id="important-bell-count" style="display:none;position:absolute;top:-5px;right:-5px;background:var(--red);color:#fff;border-radius:10px;font-size:9px;font-weight:700;padding:1px 5px;min-width:16px;text-align:center">0</span></button>
       <button class="btn btn-sm" onclick="openThemeModal()" title="ปรับธีม">🎨 ธีม</button>
     </div>
 
+    <section id="draft-drawer" hidden aria-labelledby="draft-drawer-heading"><header><div><h3 id="draft-drawer-heading">ตะกร้า Draft</h3><small>ยังไม่ออกเลข Quotation จนกว่าจะอนุมัติ</small></div><button type="button" class="btn btn-sm" id="draft-drawer-close">ปิด ✕</button></header><input id="draft-drawer-search" type="search" placeholder="ค้นหาลูกค้า หรือหมายเหตุ"><p id="draft-drawer-status" role="status"></p><div id="draft-drawer-list"></div></section>
     <div class="content">
       <!-- DASHBOARD -->
       <div class="page active" id="page-dashboard">
@@ -246,7 +249,7 @@
           </div>
           <div style="padding:16px">
             <div class="form-grid">
-              <div class="form-group"><label>เลขที่ใบเสนอราคา</label><input id="q-no" readonly style="opacity:0.6"></div>
+              <div class="form-group"><label>เลขที่ใบเสนอราคา</label><input id="q-no" placeholder="ออกเลขอัตโนมัติหลังอนุมัติ" readonly style="opacity:0.6"></div>
               <div class="form-group"><label>วันที่</label><input id="q-date" type="date" onchange="updateAutoDates()"></div>
               <div class="form-group"><label>ชื่อลูกค้า / บริษัท</label><div style="position:relative;width:100%">
                 <input id="q-client" placeholder="บริษัท / ชื่อลูกค้า" oninput="showClientSuggest(this.value)" autocomplete="off" style="width:100%">
@@ -1617,15 +1620,15 @@
 <script src="js/sync.js?v=history20261108"></script>
 <script src="js/pages/ui.js?v=monitor20261107"></script>
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
-<script src="../shared/travel-cost.js?v=average20261105"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=average20261105"></script><script src="js/pages/quotes.js?v=internal20261108"></script>
-<script src="js/pages/approve.js?v=monitor20261107"></script>
+<script src="../shared/travel-cost.js?v=average20261105"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=average20261105"></script><script src="js/pages/quotes.js?v=drafts20261108"></script>
+<script src="js/pages/approve.js?v=drafts20261108"></script>
 <script src="js/pages/payment.js?v=cancel20261103"></script>
 <script src="js/pages/catalog.js?v=internalpurchase20261108"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
 <script src="js/pages/settings.js?v=monitor20261107"></script>
 <script src="js/pages/customers.js?v=taxcrm20261103"></script>
 <script src="js/pages/signature.js?v=admin1"></script>
 <script src="js/pages/company.js?v=monitor20261107"></script>
-<script src="js/pages/pdf.js?v=notespaces20261103"></script>
+<script src="js/pages/pdf.js?v=drafts20261108"></script>
 <script src="js/pages/saletracker.js?v=sttracker20261107"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>
@@ -1634,7 +1637,7 @@
 <script src="js/pages/projects.js?v=g1"></script>
 <script src="js/pages/expiry.js?v=g1"></script>
 <script src="js/pages/saleresult.js?v=safer20261108"></script>
-<script src="js/pages/recurring.js?v=monitor20261107"></script>
+<script src="js/pages/recurring.js?v=drafts20261108"></script>
 <script src="js/pages/merge.js?v=internal20261108"></script>
 <script src="js/pages/activity.js?v=monitor20261107"></script>
 <script src="js/pages/contracts.js?v=customerprofile1"></script>
@@ -1650,5 +1653,6 @@
 </datalist>
 <script src="js/pages/service-agreements.js?v=customerprofile1"></script><script src="js/pages/prospects-core.js?v=20261101"></script><script src="js/pages/prospects.js?v=teamprospects20261102"></script><script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/queue-core.js?v=dispatch20261105"></script><script src="../shared/tech-route.js?v=20261105"></script><script src="../shared/work-calendar.js?v=dispatch20261105"></script><script src="js/pages/datetime-picker.js?v=dtpall20261107"></script><script src="js/pages/queue-planner.js?v=dtp20261107"></script><script src="js/pages/queue-dispatch.js?v=20261105"></script><script src="js/pages/calendar.js?v=dispatch20261105"></script>
 <script src="../shared/customer-history-core.js?v=20261108"></script><script src="js/pages/customer-history.js?v=20261108"></script>
+<script src="js/pages/draft-drawer.js?v=20261108"></script>
 </body>
 </html>

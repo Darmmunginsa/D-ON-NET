@@ -73,7 +73,7 @@ function createRow(name, fields) {
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var sh = _sheet(name);
-    fields = prepareContractNumberFields(name,fields||{},null);
+    fields = prepareQuotationNumberFields(name,prepareContractNumberFields(name,fields||{},null),null);
     var keys = Object.keys(fields);
     var hdr = _ensureCols(sh, [ID_COL].concat(keys));
     var id = _uuid();
@@ -104,7 +104,7 @@ function batchCreate(name, rows) {
     var hdr = _ensureCols(sh, [ID_COL].concat(Object.keys(keySet)));
     var matrix = [];
     rows.forEach(function (f) {
-      f = prepareContractNumberFields(name,f||{},null);
+      f = prepareQuotationNumberFields(name,prepareContractNumberFields(name,f||{},null),null);
       var id = _uuid();
       matrix.push(hdr.map(function (h) {
         if (h === ID_COL) return id;
@@ -136,9 +136,10 @@ function updateRow(name, id, fields) {
   try {
     var sh = _sheet(name);
     fields = fields || {};
-    var hdr = _ensureCols(sh, Object.keys(fields));
     var rowIdx = _findRowIndex(sh, id);
     if (rowIdx < 0) throw new Error('ไม่พบรายการ id=' + id + ' ใน ' + name);
+    if(name==='Quotations'){var previousQuote=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];fields=prepareQuotationNumberFields(name,fields,previousQuote);}
+    var hdr = _ensureCols(sh, Object.keys(fields));
     if(name==='Contracts'){var oldRow=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];fields=prepareContractNumberFields(name,fields,oldRow);}
     var rng = sh.getRange(rowIdx, 1, 1, hdr.length);
     var cur = rng.getValues()[0].map(function (v) { return (v === null || v === undefined) ? '' : String(v); });
@@ -148,7 +149,7 @@ function updateRow(name, id, fields) {
     }
     rng.setNumberFormat('@');                  // เก็บเป็นข้อความ กันเลข 0 นำหน้าหาย
     rng.setValues([cur]);
-    return { id: String(id) };
+    var result={id:String(id)};hdr.forEach(function(h,i){if(h!==ID_COL)result[h]=cur[i];});return result;
   } finally { lock.releaseLock(); }
 }
 function deleteRow(name, id) {
@@ -214,7 +215,7 @@ function uploadFile(req) {
 
 function handle(req) {
   var a = req.action;
-  if(a==='serviceCapabilities')return {ok:true,serviceAutomationVersion:1,privateVisitUploads:true,contractNumbering:true};
+  if(a==='serviceCapabilities')return {ok:true,serviceAutomationVersion:1,privateVisitUploads:true,contractNumbering:true,quotationNumbering:true};
   if(a==='ensureContractNumbers')return ensureContractNumbers();
   if (a === 'list')        return { ok: true, items: listRows(req.list) };
   if (a === 'multiList')   { var _o = {}; (req.lists || []).forEach(function (n) { _o[n] = listRows(n); }); return { ok: true, lists: _o }; }   // อ่านหลายแท็บในครั้งเดียว

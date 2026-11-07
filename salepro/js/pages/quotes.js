@@ -45,8 +45,8 @@ async function shareQuote(id) {
     catch(e) { toast('ไม่สำเร็จ: ' + e.message, 'error'); }
     return;
   }
-  const newNo = (q.Title || '').replace(/^[^\d]+/, 'QT');
-  if (!confirm('แชร์ใบนี้ให้เพื่อนร่วมทีมช่วยกันสร้าง?\nเลขที่ใบจะเปลี่ยนเป็น ' + newNo + ' (ใช้ QT)')) return;
+  const newNo = q.Title || '';
+  if (!confirm('แชร์ใบนี้ให้เพื่อนร่วมทีมช่วยกันสร้าง?')) return;
   try {
     toast('กำลังแชร์...', 'info');
     if (newNo && newNo !== q.Title) { await updateListItem(CONFIG.lists.quotations, id, { Title: newNo }); q.Title = newNo; }
@@ -85,6 +85,7 @@ function _updateSortIndicators() {
 }
 
 function renderQuotes() {
+  if(typeof DraftDrawer!=='undefined')DraftDrawer.render();
   renderBasketBar();
   if(typeof renderMergeRecovery==='function')renderMergeRecovery();
   if (typeof _updateSortIndicators === 'function') _updateSortIndicators();
@@ -95,7 +96,7 @@ function renderQuotes() {
   const allFiltered = quotesData.filter(q => {
     const matchStatus = !sf || q.Status === sf;
     const matchSearch = !sq || (q.Title||'').toLowerCase().includes(sq) || (q.ClientName||'').toLowerCase().includes(sq) || (q.Tag||'').toLowerCase().includes(sq);
-    return matchStatus && matchSearch && passBasketFilter(q);
+    return (sf==='Draft'||q.Status!=='Draft') && matchStatus && matchSearch && passBasketFilter(q);
   });
 
   // จัด tree (แขน ↳) เมื่อไม่ได้ค้นหา/กรองสถานะ — ยังเคารพตัวกรองตะกร้า (จัดกลุ่มภายในชุดที่กรองแล้ว)
@@ -1437,15 +1438,7 @@ function _saleInitials(name) {
 }
 // เลขที่ใบ: <initials><NN>-<MM>-<YYYY> — NN รันต่อเดือน (2 หลัก), ไม่นับ -RV
 function _nextQuoteNo(saleName) {
-  const _now = new Date();
-  const mm = String(_now.getMonth() + 1).padStart(2, '0');
-  const yyyy = _now.getFullYear();
-  let _maxN = 0;
-  quotesData.forEach(q => {
-    const m = (q.Title || '').match(/(\d+)-(\d{2})-(\d{4})$/);   // ...NN-MM-YYYY (ท้ายสุด, ตัด -RV ออกอัตโนมัติ)
-    if (m && m[2] === mm && String(m[3]) === String(yyyy)) _maxN = Math.max(_maxN, parseInt(m[1], 10));
-  });
-  return _saleInitials(saleName) + String(_maxN + 1).padStart(2, '0') + '-' + mm + '-' + yyyy;
+  return ''; // Assigned atomically by Apps Script only after approval.
 }
 
 async function duplicateQuote(id) {
@@ -1453,7 +1446,7 @@ async function duplicateQuote(id) {
   const q = quotesData.find(x => x.id === id);
   if (!q) return;
   const newNo = _nextQuoteNo(q.SaleName || currentUser?.displayName || '');
-  if (!confirm('สร้างใบเสนอราคาใหม่ ' + newNo + '\nจากเนื้อหาของ ' + (q.Title||'') + ' (ลูกค้า: ' + (q.ClientName||'-') + ')?\n\nเลขที่จะเป็นใบใหม่ทั้งหมด แก้ไขได้ก่อนบันทึก')) return;
+  if (!confirm('สร้าง Draft ใหม่ (ออกเลขหลังอนุมัติ) ' + newNo + '\nจากเนื้อหาของ ' + (q.Title||'') + ' (ลูกค้า: ' + (q.ClientName||'-') + ')?\n\nแก้ไขข้อมูลก่อนส่งอนุมัติได้')) return;
 
   toast('กำลังคัดลอกข้อมูล...', 'info');
   _dupSourceId = id;   // ★ จำใบต้นทางไว้ผูกความสัมพันธ์ตอนบันทึกใบใหม่
@@ -1547,7 +1540,9 @@ function cancelEdit() {
   initNewQuote();
 }
 
-async function saveQuote(status) {
+let _quoteSaveBusy=false;
+async function saveQuote(status){if(_quoteSaveBusy)return;_quoteSaveBusy=true;try{return await _saveQuoteImpl(status);}finally{_quoteSaveBusy=false;}}
+async function _saveQuoteImpl(status) {
   if (!currentUser) { toast('กรุณา Login ก่อน', 'error'); return; }
   if(typeof TravelQuote!=='undefined'){try{TravelQuote.validate();}catch(e){toast(e.message,'error');return;}}
   const t = calcTotals();
@@ -1624,6 +1619,8 @@ async function saveQuote(status) {
       // ผูกความสัมพันธ์ถ้าใบนี้มาจาก "สร้างใหม่จากใบเก่า"
       if (_dupSourceId) { try { await saveQuoteParent(quoteId, _dupSourceId); } catch(e) {} _dupSourceId = null; }
     }
+    if(status==='Approved'&&!fields.Title){const saved=(await getListItems(CONFIG.lists.quotations)).find(q=>String(q.id)===String(quoteId));if(!saved?.Title)throw Error('ยังไม่ได้รับเลขใบเสนอราคาจากฐานข้อมูล');fields.Title=saved.Title;document.getElementById('q-no').value=saved.Title;}
+    editingQuoteId=quoteId;
     // ผูกใบเสนอราคาเข้ากับโครงการ (ถ้าดึงรายการมาจาก Project)
     if (typeof _nqProjectId !== 'undefined' && _nqProjectId && typeof linkQuoteToProject === 'function') {
       try { await linkQuoteToProject(_nqProjectId, quoteId); } catch(e) {}
@@ -1695,7 +1692,7 @@ async function saveQuote(status) {
     editingQuoteId = null;
     const editBanner = document.getElementById('edit-banner');
     if (editBanner) editBanner.style.display = 'none';
-    toast(`บันทึก ${fields.Title} สำเร็จ${status==='Pending'?' — ส่งอนุมัติแล้ว':''}`, 'success');
+    toast(`บันทึก ${fields.Title||'Draft (ยังไม่มีเลข)'} สำเร็จ${status==='Pending'?' — ส่งอนุมัติแล้ว':''}`, 'success');
     if (typeof logActivity === 'function') logActivity(existIdx >= 0 ? 'แก้ไขใบเสนอราคา' : 'สร้างใบเสนอราคา', fields.Title, (existIdx>=0?'แก้ไข':'สร้าง') + ' มูลค่า ' + (Number(fields.TotalAmount)||0).toLocaleString() + ' บาท' + (status==='Pending'?' · ส่งอนุมัติ':''), { value: Number(fields.TotalAmount)||0, status: status });
     // ส่ง Email แจ้ง Approver เมื่อส่งอนุมัติ
     if (status === 'Pending') {

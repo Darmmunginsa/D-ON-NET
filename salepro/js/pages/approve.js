@@ -7,7 +7,7 @@ function renderApprove() {
     <div class="card" style="margin-bottom:10px">
       <div style="padding:14px 16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-          <span style="font-family:var(--mono);font-size:13px;font-weight:500">${q.Title||''}</span>
+          <span style="font-family:var(--mono);font-size:13px;font-weight:500">${q.Title||'Draft · รอออกเลขหลังอนุมัติ'}</span>
           <span style="color:var(--muted);font-size:13px;flex:1">${q.ClientName||''}</span>
           <span style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--accent2)">${fmt(q.TotalAmount||0)}</span>
           ${statusBadge(q.Status)}
@@ -40,7 +40,7 @@ function openApproveModal(id) {
   const isApprover = canApproveQuotation(q) || selfOK;
   const isPending = q.Status === 'Pending';
 
-  document.getElementById('am-title').textContent = q.Title || '';
+  document.getElementById('am-title').textContent = q.Title || 'Draft · รอออกเลขหลังอนุมัติ';
   document.getElementById('am-body').innerHTML = `
     <div class="form-grid">
       <div class="form-group"><label>ลูกค้า</label><input value="${escHtml(q.ClientName||'')}" readonly></div>
@@ -93,7 +93,8 @@ async function doApprove(status) {
   try {
     toast('กำลังอัปเดต...', 'info');
     // Save approver email + name to quotation
-    await updateListItem(CONFIG.lists.quotations, currentApproveId, {
+    if(status==='Approved'&&!_qd.Title)await requireQuotationNumbering();
+    const approvalResult=await updateListItem(CONFIG.lists.quotations, currentApproveId, {
       Status: status,
       ApproverEmail: currentUser?.email||'',
       ApproverName: currentUser?.displayName||''
