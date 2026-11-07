@@ -86,6 +86,7 @@ function _updateSortIndicators() {
 
 function renderQuotes() {
   renderBasketBar();
+  if(typeof renderMergeRecovery==='function')renderMergeRecovery();
   if (typeof _updateSortIndicators === 'function') _updateSortIndicators();
   const sf = document.getElementById('f-status')?.value || '';
   const sq = (document.getElementById('f-search')?.value || '').toLowerCase();
@@ -1706,7 +1707,7 @@ async function saveQuote(status) {
     }
     // ★ ถ้าใบนี้มาจากการ "รวมใบ" → ลบใบต้นทางทั้งหมดถาวร (ไม่ให้ไปคิดซ้ำที่ผลการขาย)
     if (typeof _mergeSourceIds !== 'undefined' && _mergeSourceIds && _mergeSourceIds.length && typeof finalizeMerge === 'function') {
-      try { await finalizeMerge(savedId); } catch(e) { console.warn('merge cleanup:', e.message); }
+      try { await finalizeMerge(savedId); } catch(e) { toast('ใบรวมบันทึกแล้ว แต่ยังล้างต้นฉบับไม่ครบ: '+e.message,'error'); }
     }
     showPage('quotes', null);
   } catch(e) {

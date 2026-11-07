@@ -6,6 +6,7 @@
 // ============================================================
 
 function _srClassify(q) {
+  if(typeof mergeSourceExcluded==='function'&&mergeSourceExcluded(q.id))return 'skip';
   try {
     const ds = (typeof parseDealStatus === 'function') ? parseDealStatus(q.DealStatus) : {};
     // ชนะ = ปิดการขายจริงเท่านั้น (ปุ่มปิดการขาย → DealStatus.closed) หรือ Status Closed
