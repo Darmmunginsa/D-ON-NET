@@ -675,19 +675,29 @@ function _projItemsEditor(){
       : `<button class="btn btn-sm" onclick="projToggleLock(${idx})" title="ล็อกรายการนี้ (กันดึงซ้ำ)" style="padding:3px 7px;color:var(--muted)">🔓</button>`;
     return `<tr style="${rowSt}">
     <td style="text-align:center;color:var(--muted)">${idx+1}</td>
-    <td><input ${dis} value="${esc(it.name||'')}" oninput="projSetItem(${idx},'name',this.value)" placeholder="ชื่อรายการ/งาน" style="${ip}">${lk&&it.lockedBy?`<div style="font-size:10px;color:var(--amber)">🔒 ใช้แล้ว: ${esc(it.lockedBy)}</div>`:''}</td>
-    <td><input ${dis} value="${esc(it.pn||'')}" oninput="projSetItem(${idx},'pn',this.value)" placeholder="รหัส/PN" style="${ip}"></td>
-    <td><input ${dis} type="number" min="0" value="${it.qty!=null?it.qty:''}" oninput="projSetItem(${idx},'qty',this.value)" placeholder="จำนวน" style="${ip};text-align:center;max-width:70px"></td>
-    <td><input ${dis} value="${esc(it.unit||'')}" oninput="projSetItem(${idx},'unit',this.value)" placeholder="หน่วย" style="${ip};max-width:70px"></td>
-    <td>${scopes.length?`<select ${dis} onchange="projSetItem(${idx},'scope',this.value)" style="${ip}">${scopeOpts(idx)}</select>`:`<input ${dis} value="${esc(it.scope||'')}" oninput="projSetItem(${idx},'scope',this.value)" placeholder="สายงาน" style="${ip}">`}</td>
+    <td><input ${dis} value="${esc(it.no||'')}" oninput="projSetItem(${idx},'no',this.value)" placeholder="เลขที่" style="${ip};text-align:center;max-width:54px"></td>
+    <td><input ${dis} value="${esc(it.pn||'')}" oninput="projSetItem(${idx},'pn',this.value)" placeholder="รหัส/PN" style="${ip};min-width:80px"></td>
+    <td><input ${dis} value="${esc(it.name||'')}" oninput="projSetItem(${idx},'name',this.value)" placeholder="ชื่อรายการ/งาน" style="${ip};min-width:130px">${lk&&it.lockedBy?`<div style="font-size:10px;color:var(--amber)">🔒 ใช้แล้ว: ${esc(it.lockedBy)}</div>`:''}</td>
+    <td><input ${dis} value="${esc(it.desc||'')}" oninput="projSetItem(${idx},'desc',this.value)" placeholder="รายละเอียด/Serial/Warranty" style="${ip};min-width:120px"></td>
+    <td><input ${dis} type="number" min="0" value="${it.qty!=null?it.qty:''}" oninput="projSetItem(${idx},'qty',this.value)" placeholder="จำนวน" style="${ip};text-align:center;max-width:62px"></td>
+    <td><input ${dis} value="${esc(it.unit||'')}" oninput="projSetItem(${idx},'unit',this.value)" placeholder="หน่วย" style="${ip};max-width:62px"></td>
+    <td><input ${dis} type="number" min="0" value="${it.price!=null&&it.price!==''?it.price:''}" oninput="projSetItem(${idx},'price',this.value)" placeholder="ราคาขาย" style="${ip};text-align:right;max-width:84px"></td>
+    <td><input ${dis} type="number" min="0" max="100" value="${it.disc!=null&&it.disc!==''?it.disc:''}" oninput="projSetItem(${idx},'disc',this.value)" placeholder="%" style="${ip};text-align:right;max-width:52px"></td>
+    <td><input ${dis} type="number" min="0" value="${it.cost!=null&&it.cost!==''?it.cost:''}" oninput="projSetItem(${idx},'cost',this.value)" placeholder="ต้นทุน" style="${ip};text-align:right;max-width:84px"></td>
+    <td>${scopes.length?`<select ${dis} onchange="projSetItem(${idx},'scope',this.value)" style="${ip};min-width:100px">${scopeOpts(idx)}</select>`:`<input ${dis} value="${esc(it.scope||'')}" oninput="projSetItem(${idx},'scope',this.value)" placeholder="สายงาน" style="${ip};min-width:90px">`}</td>
     <td style="text-align:center;white-space:nowrap">${lockBtn}${lk?'':`<button class="btn btn-sm" onclick="projDelItem(${idx})" style="color:var(--red);padding:3px 7px">✕</button>`}</td></tr>`; }).join('');
   const col=!!_projCollapse['items'];
-  return `<div class="card" style="margin-bottom:14px"><div class="card-head" style="cursor:pointer" onclick="projToggleCollapse('items')">${_colArrow('items')} 📋 รายการที่ต้องจัดหา (ขอราคา) — เพิ่มเองตามสายงาน <span style="color:var(--muted);font-weight:400">(${items.length})</span></div>
+  return `<div class="card" style="margin-bottom:14px"><div class="card-head" style="cursor:pointer" onclick="projToggleCollapse('items')">${_colArrow('items')} 📋 รายการที่ต้องจัดหา (ขอราคา) — ครบทุกช่องของใบเสนอราคา SalePro <span style="color:var(--muted);font-weight:400">(${items.length})</span></div>
     ${col?'':`<div style="padding:10px 12px">
-    <table><thead><tr><th style="width:34px">#</th><th>รายการ</th><th style="width:90px">รหัส/PN</th><th style="width:72px">จำนวน</th><th style="width:72px">หน่วย</th><th style="width:130px">สายงาน</th><th style="width:72px">ล็อก</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:10px">— ยังไม่มีรายการ กด “+ เพิ่มรายการ” —</td></tr>'}</tbody></table>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn btn-sm" onclick="projExportCSV()" style="font-size:11px;border:1px solid var(--accent2);background:none;color:var(--accent2)">⬇ Export Template (.csv)</button>
+      <button class="btn btn-sm" onclick="document.getElementById('proj-csv-file').click()" style="font-size:11px;border:1px solid var(--green,#34d399);background:none;color:var(--green,#34d399)">⬆ Import จาก .csv</button>
+      <input type="file" id="proj-csv-file" accept=".csv,text/csv" style="display:none" onchange="projImportCSV(this)">
+    </div>
+    <div style="overflow-x:auto"><table style="min-width:960px"><thead><tr><th style="width:30px">#</th><th style="width:56px">เลขที่</th><th style="width:88px">รหัส/PN</th><th>รายการ</th><th>รายละเอียด</th><th style="width:64px">จำนวน</th><th style="width:64px">หน่วย</th><th style="width:86px">ราคาขาย</th><th style="width:54px">ลด%</th><th style="width:86px">ต้นทุน</th><th style="width:120px">สายงาน</th><th style="width:66px">ล็อก</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:10px">— ยังไม่มีรายการ กด “+ เพิ่มรายการ” หรือ Import .csv —</td></tr>'}</tbody></table></div>
     <button class="btn btn-sm" onclick="projAddItem()" style="font-size:11px;margin-top:8px;border:1px dashed var(--accent2);background:none;color:var(--accent2)">+ เพิ่มรายการ</button>
-    <div style="font-size:11px;color:var(--muted);margin-top:6px">🔒 รายการที่ถูกดึงไป Vendor แล้วจะล็อกอัตโนมัติ (กันดึงซ้ำ) — กดปลดล็อกเพื่อดึงไปใช้กับเจ้าอื่นได้</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">🔒 รายการที่ถูกดึงไป Vendor แล้วจะล็อกอัตโนมัติ (กันดึงซ้ำ) · 💡 Export เป็น .csv ไปกรอกนอกระบบแล้ว Import กลับมาได้ · ทุกช่องจะถูกส่งกลับเข้าใบเสนอราคา SalePro</div>
     </div>`}</div>`;
 }
 function projToggleLock(i){ const it=(editingPO.items||[])[i]; if(!it)return; it.locked=!it.locked; if(!it.locked){it.lockedBy='';it.lockedByVid='';} renderStageBody(); _saveProjItemsNow(); }
@@ -695,9 +705,64 @@ let _projItemsT=null;
 function _findProcRec(){ return (typeof procurements!=='undefined'?procurements:[]).find(p=>String(p.id)===String(editingPO.id)); }
 function _saveProjItemsSoon(){ clearTimeout(_projItemsT); _projItemsT=setTimeout(_saveProjItemsNow,500); }
 async function _saveProjItemsNow(){ const rec=_findProcRec(); if(rec){ rec.items=editingPO.items||[]; try{ _quietWrite=true; await putSetting('Procurements', JSON.stringify(procurements)); }catch(e){} finally{ _quietWrite=false; } } }
-function projAddItem(){ editingPO.items=editingPO.items||[]; editingPO.items.push({name:'',pn:'',qty:1,unit:'',scope:''}); renderStageBody(); _saveProjItemsSoon(); }
+function projAddItem(){ editingPO.items=editingPO.items||[]; editingPO.items.push({no:'',pn:'',name:'',desc:'',qty:1,unit:'',price:'',disc:'',cost:'',scope:''}); renderStageBody(); _saveProjItemsSoon(); }
 function projDelItem(i){ (editingPO.items||[]).splice(i,1); renderStageBody(); _saveProjItemsSoon(); }
-function projSetItem(i,f,v){ const it=(editingPO.items||[])[i]; if(!it)return; it[f]=(f==='qty')?(v===''?'':+v):v; _saveProjItemsSoon(); }
+function projSetItem(i,f,v){ const it=(editingPO.items||[])[i]; if(!it)return; const numF=(f==='qty'||f==='price'||f==='disc'||f==='cost'); it[f]=numF?(v===''?'':+v):v; _saveProjItemsSoon(); }
+
+// ── Export/Import CSV (ครบทุกช่องของใบเสนอราคา SalePro) ──
+const PROJ_CSV_COLS=[['no','เลขที่'],['pn','รหัส/PN'],['name','ชื่อรายการ'],['desc','รายละเอียด'],['qty','จำนวน'],['unit','หน่วย'],['price','ราคาขาย'],['disc','ส่วนลด%'],['cost','ต้นทุน'],['scope','สายงาน']];
+function _csvCell(v){ v=(v==null?'':String(v)); return /[",\n\r]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; }
+function projExportCSV(){
+  const items=(editingPO.items||[]);
+  const head=PROJ_CSV_COLS.map(c=>c[1]).join(',');
+  const body=items.map(it=>PROJ_CSV_COLS.map(c=>_csvCell(it[c[0]])).join(',')).join('\r\n');
+  const csv='﻿'+head+'\r\n'+(body|| PROJ_CSV_COLS.map(()=>'').join(','));
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  const nm=(editingPO.quoteTitle||editingPO.projectName||'project').replace(/[^\w฀-๿.-]+/g,'_');
+  a.download='items-template-'+nm+'.csv'; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },100);
+  toast('ดาวน์โหลดเทมเพลต .csv แล้ว — กรอกแล้ว Import กลับเข้ามาได้','success');
+}
+function _parseCSV(text){
+  text=text.replace(/^﻿/,''); const rows=[]; let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){ const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else { if(c==='"')q=true; else if(c===','){row.push(cur);cur='';} else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';} else if(c==='\r'){} else cur+=c; }
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(c=>(c||'').trim()!==''));
+}
+function projImportCSV(input){
+  const file=input&&input.files&&input.files[0]; if(!file){ return; }
+  const rd=new FileReader();
+  rd.onload=function(){
+    try{
+      const rows=_parseCSV(String(rd.result||''));
+      if(!rows.length){ toast('ไฟล์ว่าง','error'); input.value=''; return; }
+      const header=rows[0].map(h=>(h||'').trim());
+      const looksHeader=header.some(h=>PROJ_CSV_COLS.some(c=>c[1]===h||c[0]===h.toLowerCase()));
+      const map=PROJ_CSV_COLS.map((c,ci)=>{ if(!looksHeader) return ci; const j=header.findIndex(h=>h===c[1]||h.toLowerCase()===c[0]); return j; });
+      const dataRows=looksHeader?rows.slice(1):rows;
+      const numF={qty:1,price:1,disc:1,cost:1};
+      const imported=dataRows.map(r=>{ const o={};
+        PROJ_CSV_COLS.forEach((c,ci)=>{ const j=map[ci]; let val=(j>=0&&j<r.length)?(r[j]||'').trim():''; if(numF[c[0]]) val=(val===''?'':(+String(val).replace(/,/g,'')||0)); o[c[0]]=val; });
+        return o;
+      }).filter(o=>(o.name||'').trim()||(o.pn||'').trim());
+      if(!imported.length){ toast('ไม่พบรายการ (ต้องมีชื่อรายการหรือรหัส)','error'); input.value=''; return; }
+      const cur=(editingPO.items||[]);
+      const mode=cur.length? (confirm('นำเข้า '+imported.length+' รายการ\n\nกด "ตกลง" = แทนที่รายการเดิมทั้งหมด\nกด "ยกเลิก" = เพิ่มต่อท้ายรายการเดิม')?'replace':'append') : 'replace';
+      if(mode==='replace'){ const locked=cur.filter(x=>x.locked); editingPO.items=locked.concat(imported); }
+      else { editingPO.items=cur.concat(imported); }
+      renderStageBody(); _saveProjItemsNow();
+      if(typeof logActivity==='function') logActivity('นำเข้ารายการจัดหา (CSV)', editingPO.quoteTitle||editingPO.projectName||'', imported.length+' รายการ');
+      toast('นำเข้า '+imported.length+' รายการจาก .csv แล้ว','success');
+    }catch(e){ toast('อ่านไฟล์ไม่สำเร็จ: '+e.message,'error'); }
+    input.value='';
+  };
+  rd.onerror=function(){ toast('เปิดไฟล์ไม่สำเร็จ','error'); input.value=''; };
+  rd.readAsText(file,'utf-8');
+}
 // บันทึกผลเทียบราคา (รายการ+เจ้า+ราคา) เป็น "รายการโครงการ" ให้ Sale เปิดใบเสนอราคาต่อ
 async function saveProjectItems(){
   if(editingPO.type!=='project'){ return; }
