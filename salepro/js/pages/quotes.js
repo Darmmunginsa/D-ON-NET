@@ -323,7 +323,7 @@ function updateAutoDates() {
 let _itemSeq = 0;
 function _nextItemId() { return Date.now() * 1000 + (_itemSeq++ % 1000); }
 function addItem(p = null) {
-  quoteItems.push({ id: _nextItemId(), type:'item', no:'', pn: p ? (p.PartNumber||p.SKU||'') : '', name: p ? p.Title : '', desc: p ? (p.Description||'') : '', qty: p ? 1 : '', unit: p ? (p.Unit||'ชิ้น') : 'ชิ้น', price: p ? (p.Price ?? '') : '', disc: 0, cost: p ? (+p.Cost||0) : 0, vendorId: p ? (p.VendorId||'') : '' });
+  quoteItems.push({ id: _nextItemId(), type:'item', no:'', pn: p ? (p.PartNumber||p.SKU||'') : '', name: p ? p.Title : '', desc: p ? (p.Description||'') : '', internalNotes:p?String(p.InternalNotes||''):'', catalogId:p?String(p.id||''):'', qty: p ? 1 : '', unit: p ? (p.Unit||'ชิ้น') : 'ชิ้น', price: p ? (p.Price ?? '') : '', disc: 0, cost: p ? (+p.Cost||0) : 0, vendorId: p ? (p.VendorId||'') : '' });
   renderItems();
 }
 
@@ -541,6 +541,7 @@ function renderItems() {
         <td>
           <input value="${escHtml(it.name)}" onchange="updateItemText(${it.id},'name',this.value)" placeholder="ชื่อรายการ..." style="min-width:160px;margin-bottom:0.25em">
           <textarea class="autogrow" oninput="autoGrow(this)" onchange="updateItemText(${it.id},'desc',this.value)" placeholder="รายละเอียดเพิ่มเติม..." rows="1" style="width:100%;min-height:1.6em;resize:none;overflow:hidden;color:var(--muted);line-height:1.35">${escHtml(it.desc||'')}</textarea>
+          ${renderQuoteInternalNotes(it)}
         </td>
         <td class="col-qty" style="width:70px;position:relative"><input value="${escHtml(String(it.qty ?? ''))}" placeholder="จำนวน" oninput="updateItemQtyRaw(${it.id},this.value)" style="text-align:center;padding-right:18px" title="ใส่ตัวเลข หรือข้อความ (เว้นว่างได้) — ข้อความไม่นำไปคำนวณ">${_blankDot}</td>
         <td class="col-unit" style="width:70px;position:relative"><input value="${escHtml(it.unit)}" onchange="updateItemText(${it.id},'unit',this.value)" style="padding-right:18px">${_blankDot}</td>
@@ -1136,7 +1137,7 @@ async function editQuote(id) {
       return {
         id: Date.now() + idx, type:'item', spId: it.id,
         no: ex.no || '', pn: ex.pn || '',
-        name: it.Title || '', desc: it.Description || '',
+        name: it.Title || '', desc: it.Description || '', internalNotes:String(ex.internalNotes||''), catalogId:String(ex.catalogId||''),
         qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
         // ราคา: ใช้ค่าดิบจาก extra ถ้ามี (รองรับข้อความ Included) ไม่งั้น fallback เป็นตัวเลขจาก column
         price: (ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0),
@@ -1472,7 +1473,7 @@ async function duplicateQuote(id) {
       if (it.Title === '__NOTE__')      return { id: Date.now()+idx, type:'note', text: it.Description || '' };
       return {
         id: Date.now()+idx, type:'item',
-        no: ex.no || '', pn: ex.pn || '', name: it.Title || '', desc: it.Description || '',
+        no: ex.no || '', pn: ex.pn || '', name: it.Title || '', desc: it.Description || '', internalNotes:String(ex.internalNotes||''), catalogId:String(ex.catalogId||''),
         qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
         price: ex.travel ? ex.travel.basePrice : ((ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0)),
         disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader
@@ -1648,7 +1649,7 @@ async function saveQuote(status) {
         if (!it.name) continue;
         _rows.push({ Title: it.name, QuoteID: quoteId, Quantity: isNumeric(it.qty) ? parseFloat(it.qty) : 0,
           Unit: it.unit, UnitPrice: priceNum(it), DiscountPct: it.disc, LineTotal: lineTotal(it), Description: it.desc||'' });
-        itemExtra.push({ no: it.no||'', pn: it.pn||'', price: String(it.price ?? ''), qtyRaw: String(it.qty ?? ''), cost: +it.cost||0, vendorId: it.vendorId||'', asHeader: !!it.asHeader, travel: it.travel||null });
+        itemExtra.push({ no: it.no||'', pn: it.pn||'', price: String(it.price ?? ''), qtyRaw: String(it.qty ?? ''), cost: +it.cost||0, vendorId: it.vendorId||'', internalNotes:String(it.internalNotes||''),catalogId:String(it.catalogId||''), asHeader: !!it.asHeader, travel: it.travel||null });
       }
     }
     if (_rows.length) {
@@ -1715,3 +1716,14 @@ async function saveQuote(status) {
   }
 }
 
+
+// Internal catalog knowledge is an editor-only snapshot, never a customer description.
+function quoteInternalNotesText(item){
+  const rows=typeof catalogData!=='undefined'?catalogData:[],norm=v=>String(v||'').trim().toUpperCase();
+  let matches=item?.catalogId?rows.filter(p=>String(p.id)===String(item.catalogId)):[];
+  if(!matches.length&&!item?.catalogId&&item?.pn)matches=rows.filter(p=>norm(p.PartNumber||p.SKU||'')===norm(item.pn));
+  if(!matches.length&&!item?.catalogId&&item?.name)matches=rows.filter(p=>norm(p.Title)===norm(item.name));
+  if(matches.length===1&&Object.prototype.hasOwnProperty.call(matches[0],'InternalNotes'))return String(matches[0].InternalNotes||'');
+  return String(item?.internalNotes||'');
+}
+function renderQuoteInternalNotes(item){const text=quoteInternalNotesText(item);return text?'<div class="quote-internal-notes" aria-label="ข้อมูลเชิงลึกภายใน อ่านอย่างเดียว"><span class="quote-internal-label">ข้อมูลเชิงลึก · ภายใน</span><div>'+escHtml(text)+'</div></div>':'';}

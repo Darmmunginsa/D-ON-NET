@@ -12,7 +12,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<link rel="stylesheet" href="assets/style.css?v=g13">
+<link rel="stylesheet" href="assets/style.css?v=internal20261108">
 <link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="assets/catalog-drawer.css?v=service20261102"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="assets/travel.css?v=floating20261103"><link rel="stylesheet" href="assets/calendar.css?v=dispatch20261105"></head>
 <body class="cyber-app">
 
@@ -1318,6 +1318,7 @@
         </div>
         <div class="form-group"><label>Vendor (ผู้ขาย/ต้นทุน)</label><select id="np-vendor"></select></div>
         <div class="form-group" style="grid-column:1/-1"><label>รายละเอียด</label><textarea id="np-desc" placeholder="รายละเอียดสินค้า..."></textarea></div>
+        <div class="form-group" style="grid-column:1/-1"><label for="np-internal-notes">ข้อมูลเชิงลึก (ภายใน)</label><textarea id="np-internal-notes" maxlength="10000" rows="4" placeholder="เช่น จำนวนแบตเตอรี่ วิธีตั้งค่า ข้อควรตรวจสอบ หรือข้อมูลสำหรับทีมงาน..."></textarea><small>แสดงเป็นข้อความอ่านอย่างเดียวใต้รายการใน SalePro ไม่รวมในใบเสนอราคา / PDF แก้ข้อความได้ที่ Catalog</small></div>
         <div class="form-group" style="grid-column:1/-1">
           <label>เอกสารการซื้อ (ใบเสนอราคา Vendor / ใบสั่งซื้อ ฯลฯ)</label>
           <div id="np-pdoc" style="margin-bottom:6px"></div>
@@ -1610,10 +1611,10 @@
 <script src="js/sync.js?v=monitor20261107"></script>
 <script src="js/pages/ui.js?v=monitor20261107"></script>
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
-<script src="../shared/travel-cost.js?v=average20261105"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=average20261105"></script><script src="js/pages/quotes.js?v=safer20261108"></script>
+<script src="../shared/travel-cost.js?v=average20261105"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=average20261105"></script><script src="js/pages/quotes.js?v=internal20261108"></script>
 <script src="js/pages/approve.js?v=monitor20261107"></script>
 <script src="js/pages/payment.js?v=cancel20261103"></script>
-<script src="js/pages/catalog.js?v=monitor20261107"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
+<script src="js/pages/catalog.js?v=internal20261108"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
 <script src="js/pages/settings.js?v=monitor20261107"></script>
 <script src="js/pages/customers.js?v=taxcrm20261103"></script>
 <script src="js/pages/signature.js?v=admin1"></script>
@@ -1628,7 +1629,7 @@
 <script src="js/pages/expiry.js?v=g1"></script>
 <script src="js/pages/saleresult.js?v=safer20261108"></script>
 <script src="js/pages/recurring.js?v=monitor20261107"></script>
-<script src="js/pages/merge.js?v=safer20261108"></script>
+<script src="js/pages/merge.js?v=internal20261108"></script>
 <script src="js/pages/activity.js?v=monitor20261107"></script>
 <script src="js/pages/contracts.js?v=customerprofile1"></script>
 <script src="js/app.js?v=admin1"></script>

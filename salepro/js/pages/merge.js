@@ -91,7 +91,7 @@ function _mergeMapItems(sourceId, allItems, baseIdx, sourceQuote) {
     if (it.Title === '__NOTE__')      return { id: uid, type: 'note', text: it.Description || '' };
     return {
       id: uid, type: 'item',
-      no: ex.no || '', pn: ex.pn || '', name: it.Title || '', desc: it.Description || '',
+      no: ex.no || '', pn: ex.pn || '', name: it.Title || '', desc: it.Description || '',internalNotes:String(ex.internalNotes||''),catalogId:String(ex.catalogId||''),
       qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
       price: ex.travel ? ex.travel.basePrice : ((ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0)),
       disc: 100*(1-(1-Number(it.DiscountPct||0)/100)*(1-Number(sourceQuote?.DiscountPct||0)/100)), rowH: rh, cost: +ex.cost || 0, vendorId: ex.vendorId || '', asHeader: !!ex.asHeader, travel: null
