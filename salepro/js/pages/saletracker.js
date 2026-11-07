@@ -1488,6 +1488,7 @@ function renderCDEditor() {
   let h='';
   // ชนิดเอกสาร + สำเนา (สลับได้ในพรีวิว)
   const kinds=[['delivery','ใบส่งของ/ใบแจ้งหนี้'],['tax','ใบกำกับภาษี'],['receipt','ใบเสร็จรับเงิน'],['tempdelivery','ใบส่งของชั่วคราว']];
+  try { ((typeof companySettings!=='undefined'&&companySettings.DocTypes)||[]).forEach(function(t){ if(t&&t.key&&(t.name||'').trim()) kinds.push([t.key, t.name]); }); } catch(e){}
   h+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:4px">ชนิดเอกสาร</div>';
   h+='<select onchange="switchCDKind(this.value)" style="width:100%;font-size:12px;margin-bottom:8px">'+kinds.map(k=>'<option value="'+k[0]+'" '+(kind===k[0]?'selected':'')+'>'+k[1]+'</option>').join('')+'</select>';
   const copies=[['customer','ต้นฉบับลูกค้า'],['acct','สำเนา (บัญชี)'],['company','สำเนาบริษัท']];
@@ -1868,8 +1869,10 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   // เลขเอกสาร: คำนำหน้าปรับได้จากตั้งค่าบริษัท (ค่าเริ่มต้น IV/RV/TAX)
   const _reEsc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const PFX_IV=((co.DocPfxIV||'').trim()||'IV'), PFX_RV=((co.DocPfxRV||'').trim()||'RV'), PFX_TAX=((co.DocPfxTAX||'').trim()||'TAX');
+  const _ct=((co.DocTypes||[]).find(t=>t&&t.key===kind))||null;   // ชนิดเอกสารที่เพิ่มเอง
   let docNo = custDocNo(q);
   if (kind === 'receipt') docNo = docNo.replace(new RegExp(_reEsc(PFX_IV),'i'), PFX_RV);
+  else if (_ct && (_ct.prefix||'').trim()) docNo = docNo.replace(new RegExp(_reEsc(PFX_IV),'i'), _ct.prefix.trim());
   // สินค้าเป็น Hardware → เลขเอกสารใช้ prefix Hardware แทน IV/RV
   if (manual && manual.hardware) docNo = docNo.replace(new RegExp(_reEsc(PFX_IV)+'|'+_reEsc(PFX_RV),'i'), PFX_TAX);
   const poRef = po.poNumber || q.PONumber || '-';
@@ -1883,7 +1886,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
     delivery:     ['ใบส่งของ / ใบแจ้งหนี้', 'DELIVERY ORDER / INVOICE'],
     tempdelivery: ['ใบส่งของชั่วคราว', 'TEMPORARY DELIVERY NOTE']
   };
-  const [titleTh, titleEn] = titles[kind] || titles.delivery;
+  const [titleTh, titleEn] = _ct ? [(_ct.name||'เอกสาร'), (_ct.name||'')] : (titles[kind] || titles.delivery);
   const fmt2 = n => Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
   const esc = s => escHtml(s);
   // จำนวนเงินโหมด Manual: ถ้าเป็นตัวเลข → จัดรูปแบบ 1,000.00 ; ถ้าเป็นข้อความ (เช่น Included, -) → แสดงตามเดิม

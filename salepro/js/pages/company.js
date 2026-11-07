@@ -1,20 +1,34 @@
 // ============================================================
 // COMPANY SETTINGS
 // ============================================================
-let companySettings = { CompanyName:'', CompanyNameEn:'', TaxID:'', Phone:'', Fax:'', Email:'', Address:'', AddressEn:'', PrimaryColor:'#1a3a5c', FooterText:'', LogoURL:'', SignatureURL:'', LogoBase64:'', SignatureBase64:'', HeaderFontSize:10, DocNoFormat:'', HeaderNameImage:'', HeaderNameW:0, HeaderNameH:0, DefaultCC:'', DocPfxIV:'', DocPfxRV:'', DocPfxTAX:'' };
+let companySettings = { CompanyName:'', CompanyNameEn:'', TaxID:'', Phone:'', Fax:'', Email:'', Address:'', AddressEn:'', PrimaryColor:'#1a3a5c', FooterText:'', LogoURL:'', SignatureURL:'', LogoBase64:'', SignatureBase64:'', HeaderFontSize:10, DocNoFormat:'', HeaderNameImage:'', HeaderNameW:0, HeaderNameH:0, DefaultCC:'', DocPfxIV:'', DocPfxRV:'', DocPfxTAX:'', DocTypes:[] };
 // ข้อมูลหัวเอกสารเพิ่มเติม (ชื่อ/ที่อยู่ EN + Fax) — เก็บใน Settings JSON เลี่ยงเพิ่มคอลัมน์ Company list
 function loadCompanyExtra() {
-  try { const it = (_settingsCache || []).find(i => i.Title === 'CompanyExtra'); if (it && it.Value) { const o = JSON.parse(it.Value)||{}; companySettings.CompanyNameEn=o.CompanyNameEn||''; companySettings.AddressEn=o.AddressEn||''; companySettings.Fax=o.Fax||''; companySettings.DocNoFormat=o.DocNoFormat||''; companySettings.HeaderNameImage=o.HeaderNameImage||''; companySettings.HeaderNameW=+o.HeaderNameW||0; companySettings.HeaderNameH=+o.HeaderNameH||0; companySettings.DefaultCC=o.DefaultCC||''; companySettings.DocPfxIV=o.DocPfxIV||''; companySettings.DocPfxRV=o.DocPfxRV||''; companySettings.DocPfxTAX=o.DocPfxTAX||''; } } catch(e) {}
+  try { const it = (_settingsCache || []).find(i => i.Title === 'CompanyExtra'); if (it && it.Value) { const o = JSON.parse(it.Value)||{}; companySettings.CompanyNameEn=o.CompanyNameEn||''; companySettings.AddressEn=o.AddressEn||''; companySettings.Fax=o.Fax||''; companySettings.DocNoFormat=o.DocNoFormat||''; companySettings.HeaderNameImage=o.HeaderNameImage||''; companySettings.HeaderNameW=+o.HeaderNameW||0; companySettings.HeaderNameH=+o.HeaderNameH||0; companySettings.DefaultCC=o.DefaultCC||''; companySettings.DocPfxIV=o.DocPfxIV||''; companySettings.DocPfxRV=o.DocPfxRV||''; companySettings.DocPfxTAX=o.DocPfxTAX||''; companySettings.DocTypes=Array.isArray(o.DocTypes)?o.DocTypes:[]; } } catch(e) {}
   try { if (typeof _defaultCCEmails !== 'undefined' && typeof _parseEmailList === 'function') _defaultCCEmails = _parseEmailList(companySettings.DefaultCC); } catch(e) {}
 }
 async function saveCompanyExtra() {
-  const value = JSON.stringify({ CompanyNameEn:companySettings.CompanyNameEn||'', AddressEn:companySettings.AddressEn||'', Fax:companySettings.Fax||'', DocNoFormat:companySettings.DocNoFormat||'', HeaderNameImage:companySettings.HeaderNameImage||'', HeaderNameW:+companySettings.HeaderNameW||0, HeaderNameH:+companySettings.HeaderNameH||0, DefaultCC:companySettings.DefaultCC||'', DocPfxIV:companySettings.DocPfxIV||'', DocPfxRV:companySettings.DocPfxRV||'', DocPfxTAX:companySettings.DocPfxTAX||'' });
+  const value = JSON.stringify({ CompanyNameEn:companySettings.CompanyNameEn||'', AddressEn:companySettings.AddressEn||'', Fax:companySettings.Fax||'', DocNoFormat:companySettings.DocNoFormat||'', HeaderNameImage:companySettings.HeaderNameImage||'', HeaderNameW:+companySettings.HeaderNameW||0, HeaderNameH:+companySettings.HeaderNameH||0, DefaultCC:companySettings.DefaultCC||'', DocPfxIV:companySettings.DocPfxIV||'', DocPfxRV:companySettings.DocPfxRV||'', DocPfxTAX:companySettings.DocPfxTAX||'', DocTypes:(companySettings.DocTypes||[]).filter(t=>t&&(t.name||t.prefix)) });
   try { if (typeof _defaultCCEmails !== 'undefined' && typeof _parseEmailList === 'function') _defaultCCEmails = _parseEmailList(companySettings.DefaultCC); } catch(e) {}
   const items = _settingsCache || await getListItems(CONFIG.lists.settings);
   const ex = items.find(i => i.Title === 'CompanyExtra');
   if (ex) { await updateListItem(CONFIG.lists.settings, ex.id, { Value: value }); ex.Value = value; }
   else { const c = await createListItem(CONFIG.lists.settings, { Title: 'CompanyExtra', Value: value }); if (_settingsCache) _settingsCache.push({ id: c.id, Title: 'CompanyExtra', Value: value }); }
 }
+// ── ชนิดเอกสารที่เพิ่มเอง (ชื่อ + prefix) → โผล่ในดรอปดาวน์หน้าพรีวิว ──
+function renderDocTypes(){
+  const tb=document.getElementById('doc-types-body'); if(!tb) return;
+  const _e=s=>String(s==null?'':s).replace(/"/g,'&quot;');
+  const list=companySettings.DocTypes||[];
+  tb.innerHTML = list.map((t,i)=>`<tr>
+    <td><input value="${_e(t.name)}" oninput="updateDocTypeField(${i},'name',this.value)" placeholder="เช่น ใบวางบิล" style="width:100%;font-size:12px;padding:4px 7px"></td>
+    <td><input value="${_e(t.prefix)}" oninput="updateDocTypeField(${i},'prefix',this.value)" placeholder="เช่น BL" style="width:100%;font-size:12px;padding:4px 7px;font-family:var(--mono);text-transform:uppercase"></td>
+    <td style="text-align:center"><button class="btn btn-sm" onclick="removeDocType(${i})" style="color:var(--red)">✕</button></td></tr>`).join('')
+    || '<tr><td colspan="3" style="text-align:center;color:var(--muted);font-size:12px;padding:8px">ยังไม่มีชนิดเอกสารที่เพิ่มเอง — กด “+ เพิ่มชนิดเอกสาร”</td></tr>';
+}
+function addDocTypeRow(){ companySettings.DocTypes=companySettings.DocTypes||[]; companySettings.DocTypes.push({key:'dt'+Date.now(),name:'',prefix:''}); renderDocTypes(); }
+function updateDocTypeField(i,f,v){ const l=companySettings.DocTypes||[]; if(l[i]){ l[i][f]=v; if(!l[i].key)l[i].key='dt'+Date.now(); } }
+function removeDocType(i){ const l=companySettings.DocTypes||[]; l.splice(i,1); renderDocTypes(); }
 let companySettingsId = null;
 let pendingLogoFile = null;
 let pendingSignatureFile = null;
@@ -51,6 +65,7 @@ function renderCompanySettingsForm() {
     const _pIV=document.getElementById('co-pfx-iv'); if(_pIV) _pIV.value=s.DocPfxIV||'';
     const _pRV=document.getElementById('co-pfx-rv'); if(_pRV) _pRV.value=s.DocPfxRV||'';
     const _pTAX=document.getElementById('co-pfx-tax'); if(_pTAX) _pTAX.value=s.DocPfxTAX||'';
+    if(typeof renderDocTypes==='function') renderDocTypes();
     document.getElementById('co-footer').value = s.FooterText||'';
     document.getElementById('co-color').value = s.PrimaryColor||'#1a3a5c';
     document.getElementById('co-color-label').textContent = s.PrimaryColor||'#1a3a5c';
