@@ -482,6 +482,69 @@ function deleteSTNote(id) {
   saveSTDealData();
 }
 
+// ── Note สำคัญ: ติดดาว → รวมขึ้นกระดิ่งหน้าหลัก + พาเนลสืบค้น ──
+function toggleNoteImportant(id) {
+  const n = (stDealData.notes||[]).find(x => String(x.id) === String(id)); if (!n) return;
+  n.important = !n.important;
+  renderSTTimeline();
+  saveSTDealData();
+  if (typeof renderImportantBell === 'function') renderImportantBell();
+}
+function _allImportantNotes() {
+  const out = [];
+  (quotesData || []).forEach(function(q) {
+    let ds; try { ds = parseDealStatus(q.DealStatus); } catch(e) { return; }
+    (ds && Array.isArray(ds.notes) ? ds.notes : []).forEach(function(n) {
+      if (n && n.important) out.push({ quoteId: q.id, quoteTitle: q.Title||'', client: q.ClientName||'', text: n.text||'', user: n.user||'', ts: n.ts||'' });
+    });
+  });
+  out.sort((a,b) => String(b.ts||'').localeCompare(String(a.ts||'')));
+  return out;
+}
+function renderImportantBell() {
+  const badge = document.getElementById('important-bell-count'); if (!badge) return;
+  const n = _allImportantNotes().length;
+  if (n > 0) { badge.textContent = n > 99 ? '99+' : String(n); badge.style.display = ''; }
+  else badge.style.display = 'none';
+}
+function openImportantNotes() {
+  const old = document.getElementById('_impNotes'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = '_impNotes';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(10,16,28,.55);display:flex;align-items:flex-start;justify-content:center;padding:34px 16px;overflow:auto';
+  ov.innerHTML = '<div style="background:var(--surface2,#1e2333);border:1px solid var(--border2,rgba(255,255,255,.12));border-radius:12px;width:640px;max-width:100%;box-shadow:0 18px 50px rgba(0,0,0,.55)">'
+    + '<div style="padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"><span style="font-weight:600;color:var(--text)">⭐ Note สำคัญ</span>'
+    + '<input id="_impSearch" oninput="renderImportantList()" placeholder="🔍 ค้นหา ข้อความ/ลูกค้า/ใบ" style="flex:1;font-size:12px;padding:6px 9px;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:7px">'
+    + '<button style="background:none;border:none;color:var(--muted);font-size:18px;cursor:pointer" onclick="(function(){var o=document.getElementById(\'_impNotes\');if(o)o.remove();})()">✕</button></div>'
+    + '<div id="_impList" style="padding:12px 16px;max-height:70vh;overflow:auto"></div></div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('mousedown', function(e){ if (e.target === ov) ov.remove(); });
+  renderImportantList();
+}
+function renderImportantList() {
+  const box = document.getElementById('_impList'); if (!box) return;
+  const q = (document.getElementById('_impSearch')?.value || '').trim().toLowerCase();
+  let list = _allImportantNotes();
+  if (q) list = list.filter(n => ((n.text||'')+' '+(n.client||'')+' '+(n.quoteTitle||'')+' '+(n.user||'')).toLowerCase().includes(q));
+  if (!list.length) { box.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:24px">ไม่มี Note สำคัญ</div>'; return; }
+  box.innerHTML = list.map(function(n) {
+    return '<div style="border:1px solid var(--amber);background:rgba(251,191,36,0.07);border-radius:9px;padding:10px 12px;margin-bottom:9px">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'
+      + '<span style="font-size:12px;font-weight:600;color:var(--text)">' + escHtml(n.quoteTitle||'(ไม่มีเลข)') + '</span>'
+      + (n.client?'<span style="font-size:11px;color:var(--muted)">· ' + escHtml(n.client) + '</span>':'')
+      + '<span style="font-size:10px;color:var(--muted);margin-left:auto">' + escHtml(n.user||'') + (n.ts?(' · '+formatDateTime(n.ts)):'') + '</span></div>'
+      + '<div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5">' + escHtml(n.text||'') + '</div>'
+      + '<div style="text-align:right;margin-top:6px"><button class="btn btn-sm" onclick="openImportantDeal(\'' + n.quoteId + '\')" style="font-size:11px">เปิดดีล</button></div>'
+      + '</div>';
+  }).join('');
+}
+function openImportantDeal(id) {
+  const o = document.getElementById('_impNotes'); if (o) o.remove();
+  const q = (quotesData||[]).find(x => String(x.id) === String(id));
+  if (!q) { toast('ไม่พบดีล', 'error'); return; }
+  openSaleTrackerModal(q.id);
+  setTimeout(function(){ try { switchSTTab('timeline', document.querySelector('.st-tab[data-tab="timeline"]')); } catch(e) {} }, 350);
+}
+
 // ---- DOCS ----
 function handleSTDocSelect(input) { Array.from(input.files).forEach(f => processSTDoc(f)); input.value=''; }
 function handleSTDocDrop(e) { e.preventDefault(); document.getElementById('st-drop-zone').style.borderColor='var(--border2)'; document.getElementById('st-drop-zone').style.background=''; Array.from(e.dataTransfer.files).forEach(f=>processSTDoc(f)); }
@@ -2826,10 +2889,11 @@ function renderSTTimeline() {
   list.innerHTML = notes.map(n => `
     <div style="display:flex;gap:10px;margin-bottom:12px;align-items:flex-start">
       <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;flex-shrink:0;margin-top:2px">${escHtml((n.user||'?')[0].toUpperCase())}</div>
-      <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+      <div style="flex:1;background:var(--surface2);border:1px solid ${n.important?'var(--amber)':'var(--border)'};${n.important?'background:rgba(251,191,36,0.06);':''}border-radius:8px;padding:10px 12px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
           <span style="font-size:12px;font-weight:500;color:var(--text)">${escHtml(n.user||'')}</span>
-          <span style="font-size:10px;color:var(--muted);margin-left:auto">${formatDateTime(n.ts)}</span>
+          <button class="action-btn" onclick="toggleNoteImportant('${n.id}')" title="${n.important?'เอาออกจาก Note สำคัญ':'ทำเป็น Note สำคัญ (ขึ้นกระดิ่งหน้าหลัก)'}" style="margin-left:auto;color:${n.important?'var(--amber)':'var(--muted)'};font-size:13px;line-height:1">${n.important?'★':'☆'}</button>
+          <span style="font-size:10px;color:var(--muted)">${formatDateTime(n.ts)}</span>
           ${n.type==='payment'?'<span class="badge badge-approved" style="font-size:9px">💳 ชำระเงิน</span>':''}
           ${n.type==='doc'?'<span class="badge badge-sent" style="font-size:9px">📎 เอกสาร</span>':''}
           ${n.type==='closed'?'<span class="badge badge-approved" style="font-size:9px">✅ ปิดการขาย</span>':''}

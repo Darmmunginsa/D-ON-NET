@@ -98,6 +98,7 @@ async function syncAll() {
     checkFollowUpsDue().catch(e => console.warn('followup check:', e.message));
     if (typeof checkExpiriesDue === 'function') checkExpiriesDue().catch(e => console.warn('expiry check:', e.message));
     if (typeof checkRecurringDue === 'function') checkRecurringDue().catch(e => console.warn('recurring check:', e.message));
+    if (typeof renderImportantBell === 'function') renderImportantBell();
     if (typeof checkContractsDue === 'function') checkContractsDue().catch(e => console.warn('contract check:', e.message));
   } catch(e) {
     toast('Sync ไม่สำเร็จ: ' + e.message, 'error');
