@@ -24,8 +24,36 @@ function canEditQuote(q) {
   return saleEmail === myEmail;
 }
 
+let _quoteSort = { key: 'date', dir: 'desc' };   // default: ใบล่าสุดอยู่บน
+function _quoteSortCmp(a, b) {
+  const s = _quoteSort; let r = 0;
+  if (s.key === 'no') {
+    r = String(a.Title||'').localeCompare(String(b.Title||''), 'th', { numeric: true });
+  } else if (s.key === 'value') {
+    r = (+a.TotalAmount||0) - (+b.TotalAmount||0);
+    if (r === 0) r = (+a.id||0) - (+b.id||0);
+  } else { // date
+    const da = a.QuoteDate||'', db = b.QuoteDate||'';
+    r = da < db ? -1 : da > db ? 1 : 0;
+    if (r === 0) r = (+a.id||0) - (+b.id||0);
+  }
+  return s.dir === 'desc' ? -r : r;
+}
+function setQuoteSort(key) {
+  if (_quoteSort.key === key) _quoteSort.dir = (_quoteSort.dir === 'desc' ? 'asc' : 'desc');
+  else _quoteSort = { key: key, dir: 'desc' };
+  renderQuotes();
+}
+function _updateSortIndicators() {
+  ['no','date','value'].forEach(k => {
+    const el = document.getElementById('qsort-' + k);
+    if (el) el.textContent = (_quoteSort.key === k) ? (_quoteSort.dir === 'desc' ? ' ▼' : ' ▲') : '';
+  });
+}
+
 function renderQuotes() {
   renderBasketBar();
+  if (typeof _updateSortIndicators === 'function') _updateSortIndicators();
   const sf = document.getElementById('f-status')?.value || '';
   const sq = (document.getElementById('f-search')?.value || '').toLowerCase();
 
@@ -66,13 +94,24 @@ function renderQuotes() {
         .sort((a,b) => (a.Title||'').localeCompare(b.Title||''))
         .forEach(c => renderNode(c, depth + 1));
     };
-    pool.filter(q => !parentOf[q.id]).forEach(q => renderNode(q, 0));
+    pool.filter(q => !parentOf[q.id]).slice().sort(_quoteSortCmp).forEach(q => renderNode(q, 0));
   } else {
-    allFiltered.forEach(q => { rows += buildQuoteRow(q, false); });
+    allFiltered.slice().sort(_quoteSortCmp).forEach(q => { rows += buildQuoteRow(q, false); });
   }
 
   document.getElementById('quotes-body').innerHTML = rows ||
     '<tr><td colspan=10 style="text-align:center;padding:32px;color:var(--muted)">ยังไม่มีข้อมูล</td></tr>';
+}
+
+function _projectBadgeHtml(qid) {
+  try {
+    if (typeof _linkedProjectForQuote !== 'function') return '';
+    const p = _linkedProjectForQuote(qid);
+    if (!p) return '';
+    const nm = String(p.projectName || 'โครงการ');
+    const short = nm.length > 16 ? nm.slice(0, 16) + '…' : nm;
+    return `<span class="badge" title="สร้างจากโครงการ: ${escHtml(nm)}" style="margin-left:5px;background:rgba(245,158,11,.15);color:var(--amber);font-size:9px;white-space:nowrap">🏗 ${escHtml(short)}</span>`;
+  } catch(e) { return ''; }
 }
 
 function buildQuoteRow(q, isChild, depth) {
@@ -83,7 +122,7 @@ function buildQuoteRow(q, isChild, depth) {
 
   return `
     <tr style="${childBg}" draggable="true" ondragstart="quoteRowDragStart(event,'${q.id}')" title="ลากไปวางที่ตะกร้าเพื่อจัดกลุ่ม">
-      <td style="font-family:var(--mono);font-size:12px;font-weight:500;${indent}">${prefix}${q.Title||''}${basketDots(q.id)}</td>
+      <td style="font-family:var(--mono);font-size:12px;font-weight:500;${indent}">${prefix}${q.Title||''}${basketDots(q.id)}${_projectBadgeHtml(q.id)}</td>
       <td style="font-size:13px${isChild?';color:var(--muted)':''}">${isChild ? '' : (q.ClientName||'')}</td>
       <td style="font-size:12px">${q.Tag ? `<span style="display:inline-block;color:var(--accent2);background:rgba(79,142,247,0.1);border:1px solid rgba(79,142,247,0.2);border-radius:5px;padding:2px 8px;white-space:nowrap"># ${escHtml(q.Tag)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${fmtDate(q.QuoteDate)}</td>
@@ -460,7 +499,7 @@ function renderItems() {
         </td>
         <td class="col-qty" style="width:70px;position:relative"><input value="${escHtml(String(it.qty ?? ''))}" placeholder="จำนวน" oninput="updateItemQtyRaw(${it.id},this.value)" style="text-align:center;padding-right:18px" title="ใส่ตัวเลข หรือข้อความ (เว้นว่างได้) — ข้อความไม่นำไปคำนวณ">${_blankDot}</td>
         <td class="col-unit" style="width:70px;position:relative"><input value="${escHtml(it.unit)}" onchange="updateItemText(${it.id},'unit',this.value)" style="padding-right:18px">${_blankDot}</td>
-        <td class="col-price" style="width:110px;position:relative"><input value="${escHtml(String(it.price))}" oninput="updateItemPrice(${it.id},this.value)" placeholder="0 หรือ Included" style="text-align:right;padding-right:18px" title="ใส่ตัวเลข หรือข้อความ เช่น Included (ราคาเหมา)">${_blankDot}${(()=>{const _c=itemCost(it);const _p=catalogPriceFor(it);return `<div style="font-size:9px;text-align:right;margin-top:1px;line-height:1.3">${_p>0?`<span style="color:var(--accent2)" title="ราคาขายมาตรฐานจาก Catalog">ขาย ${fmt(_p)}</span>`:''}<span style="color:${_c>0?'var(--muted)':'var(--amber)'};margin-left:6px" title="ราคาต้นทุน (จากจัดซื้อ/Catalog)">ทุน ${fmt(_c)}</span></div>`;})()}</td>
+        <td class="col-price" style="width:110px;position:relative"><input value="${escHtml(String(it.price))}" oninput="updateItemPrice(${it.id},this.value)" placeholder="0 หรือ Included" style="text-align:right;padding-right:18px" title="ใส่ตัวเลข หรือข้อความ เช่น Included (ราคาเหมา)">${_blankDot}${(()=>{const _c=itemCost(it);const _p=catalogPriceFor(it);return `<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end;margin-top:2px;line-height:1.3">${_p>0?`<span style="font-size:9px;color:var(--accent2)" title="ราคาขายมาตรฐานจาก Catalog">ขาย ${fmt(_p)}</span>`:''}<span style="font-size:9px;color:var(--muted)">ทุน</span><input type="number" min="0" step="any" value="${_c>0?_c:''}" placeholder="ระบุ" onchange="updateItemCost(${it.id},this.value)" title="ราคาต้นทุน/หน่วย — ใส่เองได้ ใช้คำนวณกำไรในหน้าผลการขาย" style="width:60px;font-size:10px;padding:1px 4px;text-align:right;border:1px solid ${_c>0?'var(--border2)':'var(--amber)'};border-radius:4px;background:${_c>0?'transparent':'rgba(245,158,11,0.10)'}"></div>`;})()}</td>
         <td class="col-disc" style="width:70px"><input type="number" value="${it.disc}" min="0" max="100" oninput="updateItemNum(${it.id},'disc',+this.value)" style="text-align:right${isBelowCost(it)?';border-color:var(--red);background:rgba(248,113,113,0.08)':''}" ${isBelowCost(it)?'title="ราคาขายหลังลด ต่ำกว่าทุน — ลดเพิ่มไม่ได้ ต้องขออนุมัติ"':''}></td>
         <td class="col-total" style="text-align:right;font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--accent2);padding-right:8px">${isBelowCost(it)?'<span title="ต่ำกว่าทุน" style="color:var(--red)">⚠ </span>':''}${totalCell(it)}</td>
         ${itemAction}
@@ -971,6 +1010,17 @@ function updateItemPrice(id, val) {
   it.price = val;
   const row = document.querySelector(`#items-body tr[data-id="${id}"]`);
   if (row) { const lt = row.querySelector('.col-total'); if (lt) lt.textContent = totalCell(it); }
+  calcTotals();
+  updateApproverBox();
+}
+
+// ต้นทุน/หน่วย: กรอกเองรายรายการ (ใบที่ไม่มีต้นทุนจากจัดซื้อ/Catalog) → ใช้คำนวณกำไร
+function updateItemCost(id, val) {
+  const it = quoteItems.find(i => i.id == id);
+  if (!it) return;
+  it.cost = +val || 0;
+  document.getElementById('items-body').innerHTML = '';
+  renderItems();
   calcTotals();
   updateApproverBox();
 }

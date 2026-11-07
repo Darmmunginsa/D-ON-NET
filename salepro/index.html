@@ -196,7 +196,7 @@
         </div>
         <div id="basket-bar" style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:0 0 12px"></div>
         <div class="card">
-          <table><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>Tag / Project</th><th>วันที่</th><th>มูลค่า (บาท)</th><th>วิธีชำระ</th><th>สถานะ</th><th>ชำระเงิน</th><th>ติดตาม</th><th></th></tr></thead>
+          <table><thead><tr><th onclick="setQuoteSort('no')" style="cursor:pointer;user-select:none" title="คลิกเพื่อเรียงลำดับ">เลขที่<span id="qsort-no"></span></th><th>ลูกค้า</th><th>Tag / Project</th><th onclick="setQuoteSort('date')" style="cursor:pointer;user-select:none" title="คลิกเพื่อเรียงลำดับ">วันที่<span id="qsort-date"></span></th><th onclick="setQuoteSort('value')" style="cursor:pointer;user-select:none" title="คลิกเพื่อเรียงลำดับ">มูลค่า (บาท)<span id="qsort-value"></span></th><th>วิธีชำระ</th><th>สถานะ</th><th>ชำระเงิน</th><th>ติดตาม</th><th></th></tr></thead>
           <tbody id="quotes-body"></tbody></table>
         </div>
       </div>
