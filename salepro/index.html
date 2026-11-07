@@ -1492,6 +1492,43 @@
   </div>
 </div>
 
+<!-- RECURRING MODAL -->
+<div class="overlay" id="recurring-modal" style="z-index:300">
+  <div class="modal" style="width:470px;max-width:94vw">
+    <div class="modal-header">
+      <h3>🔁 ออกใบเสนอราคาซ้ำอัตโนมัติ</h3>
+      <button class="btn btn-sm" onclick="closeModal('recurring-modal')" style="margin-left:auto">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px 20px">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">ใบต้นแบบ: <b id="rec-quote-label" style="color:var(--text)"></b></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;cursor:pointer">
+        <input id="rec-enabled" type="checkbox"> เปิดใช้งานการออกซ้ำอัตโนมัติ
+      </label>
+      <div class="form-grid">
+        <div class="form-group"><label>ความถี่</label>
+          <select id="rec-freq"><option value="monthly">รายเดือน</option><option value="yearly">รายปี</option></select>
+        </div>
+        <div class="form-group"><label>สถานะใบที่ออก</label>
+          <select id="rec-status"><option value="Draft">ร่าง (ตรวจก่อนส่ง)</option><option value="Sent">ส่งแล้ว</option></select>
+        </div>
+        <div class="form-group"><label>ออกครั้งถัดไป (วันที่)</label><input id="rec-next" type="date"></div>
+        <div class="form-group"><label>สิ้นสุด (เว้นว่าง = ไม่สิ้นสุด)</label><input id="rec-end" type="date"></div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Email แจ้งเตือนเมื่อออกใบใหม่ (คั่นด้วย , หรือขึ้นบรรทัดใหม่)</label>
+          <textarea id="rec-emails" placeholder="sale@company.com, manager@company.com" style="min-height:52px;font-family:var(--mono);font-size:12px"></textarea>
+        </div>
+      </div>
+      <div id="rec-info" style="font-size:11px;color:var(--muted);margin-top:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="rec-remove-btn" class="btn btn-sm btn-danger" onclick="removeRecurring()" style="display:none;margin-right:auto">ยกเลิกการออกซ้ำ</button>
+      <button id="rec-issue-btn" class="btn btn-sm" onclick="issueRecurringNow()" style="display:none">ออกเลยตอนนี้</button>
+      <button class="btn btn-sm" onclick="closeModal('recurring-modal')">ปิด</button>
+      <button class="btn btn-sm btn-primary" onclick="saveRecurringFromModal()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- CANCEL QUOTE MODAL -->
 <div class="overlay" id="cancel-quote-modal">
   <div class="modal">
@@ -1564,6 +1601,7 @@
 <script src="js/pages/projects.js?v=g1"></script>
 <script src="js/pages/expiry.js?v=g1"></script>
 <script src="js/pages/saleresult.js?v=monitor20261107"></script>
+<script src="js/pages/recurring.js?v=monitor20261107"></script>
 <script src="js/pages/activity.js?v=monitor20261107"></script>
 <script src="js/pages/contracts.js?v=customerprofile1"></script>
 <script src="js/app.js?v=admin1"></script>

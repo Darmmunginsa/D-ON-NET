@@ -153,6 +153,7 @@ function buildQuoteRow(q, isChild, depth) {
         ${q.Status !== 'Cancelled' && q.Status !== 'Closed' && !parseDealStatus(q.DealStatus).closed && canEditQuote(q) ? `<button class="action-btn" style="color:var(--red)" onclick="cancelQuote('${q.id}')" title="${q.Status === 'Draft' ? 'ลบ' : 'ยกเลิก'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
         </button>` : ''}
+        ${(typeof openRecurringModal==='function' && q.Status!=='Cancelled') ? `<button class="action-btn" style="color:${(typeof hasRecurring==='function'&&hasRecurring(q.id))?'var(--green)':'var(--muted)'}" onclick="openRecurringModal('${q.id}')" title="${(typeof hasRecurring==='function'&&hasRecurring(q.id))?'ตั้งออกซ้ำอัตโนมัติอยู่ — กดเพื่อแก้ไข':'ตั้งออกใบเสนอราคาซ้ำอัตโนมัติ (รายเดือน/รายปี)'}">🔁</button>` : ''}
       </td>
       <td>${renderTrackerBtn(q)}</td>
     </tr>`;
