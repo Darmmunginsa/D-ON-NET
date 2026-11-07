@@ -21,7 +21,7 @@ function renderDocTypes(){
   const _e=s=>String(s==null?'':s).replace(/"/g,'&quot;');
   const list=companySettings.DocTypes||[];
   tb.innerHTML = list.map((t,i)=>`<tr>
-    <td><input value="${_e(t.name)}" oninput="updateDocTypeField(${i},'name',this.value)" placeholder="เช่น ใบวางบิล" style="width:100%;font-size:12px;padding:4px 7px"></td>
+    <td><input value="${_e(t.name)}" oninput="updateDocTypeField(${i},'name',this.value)" placeholder="เช่น ใบเสร็จ Hardware" style="width:100%;font-size:12px;padding:4px 7px"></td>
     <td><input value="${_e(t.prefix)}" oninput="updateDocTypeField(${i},'prefix',this.value)" placeholder="เช่น BL" style="width:100%;font-size:12px;padding:4px 7px;font-family:var(--mono);text-transform:uppercase"></td>
     <td style="text-align:center"><button class="btn btn-sm" onclick="removeDocType(${i})" style="color:var(--red)">✕</button></td></tr>`).join('')
     || '<tr><td colspan="3" style="text-align:center;color:var(--muted);font-size:12px;padding:8px">ยังไม่มีชนิดเอกสารที่เพิ่มเอง — กด “+ เพิ่มชนิดเอกสาร”</td></tr>';
