@@ -134,6 +134,7 @@ function renderQuotes() {
 
   document.getElementById('quotes-body').innerHTML = rows ||
     '<tr><td colspan=10 style="text-align:center;padding:32px;color:var(--muted)">ยังไม่มีข้อมูล</td></tr>';
+  if (typeof _renderMergeBar === 'function') _renderMergeBar();
 }
 
 function _projectBadgeHtml(qid) {
@@ -155,7 +156,7 @@ function buildQuoteRow(q, isChild, depth) {
 
   return `
     <tr style="${childBg}" draggable="true" ondragstart="quoteRowDragStart(event,'${q.id}')" title="ลากไปวางที่ตะกร้าเพื่อจัดกลุ่ม">
-      <td style="font-family:var(--mono);font-size:12px;font-weight:500;${indent}">${prefix}${q.Title||''}${basketDots(q.id)}${_projectBadgeHtml(q.id)}</td>
+      <td style="font-family:var(--mono);font-size:12px;font-weight:500;${indent}">${(typeof mergeCheckboxHtml==='function'?mergeCheckboxHtml(q):'')}${prefix}${q.Title||''}${basketDots(q.id)}${_projectBadgeHtml(q.id)}</td>
       <td style="font-size:13px${isChild?';color:var(--muted)':''}">${isChild ? '' : (q.ClientName||'')}</td>
       <td style="font-size:12px">${q.Tag ? `<span style="display:inline-block;color:var(--accent2);background:rgba(79,142,247,0.1);border:1px solid rgba(79,142,247,0.2);border-radius:5px;padding:2px 8px;white-space:nowrap"># ${escHtml(q.Tag)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${fmtDate(q.QuoteDate)}</td>
@@ -163,14 +164,14 @@ function buildQuoteRow(q, isChild, depth) {
       <td style="${isChild?'color:var(--muted)':''}">${isChild ? '' : (q.PaymentMethod||'')}</td>
       <td>${statusBadge(q.Status)}${_isQuoteShared(q.id)?'<span class="badge" style="margin-left:4px;background:rgba(52,211,153,.14);color:var(--green);font-size:9px">👥 แชร์</span>':''}</td>
       <td>${payBadge(q)}</td>
-      <td style="white-space:nowrap;vertical-align:middle">
+      <td class="act-cell">
         <button class="action-btn" onclick="openApproveModal('${q.id}')" title="ดูรายละเอียด">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
         ${q.Status !== 'Approved' && q.Status !== 'Pending' && q.Status !== 'Cancelled' && q.Status !== 'Closed' && q.Status !== 'PO Received' && canEditQuote(q) ? `<button class="action-btn" style="color:var(--accent2)" onclick="editQuote('${q.id}')" title="แก้ไข">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>` : ''}
-        ${QueuePlanner.can(q) ? `<button class="btn btn-xs" onclick="QueuePlanner.open('${q.id}')" title="นัดหมายและจัดคิว">▦ นัดหมาย</button>` : ''}
+        ${QueuePlanner.can(q) ? `<button class="action-btn" style="color:var(--accent2)" onclick="QueuePlanner.open('${q.id}')" title="นัดหมายและจัดคิว"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>` : ''}
         <button class="action-btn" onclick="showPDFForQuote('${q.id}')" title="PDF">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         </button>
@@ -186,8 +187,8 @@ function buildQuoteRow(q, isChild, depth) {
         ${q.Status !== 'Cancelled' && q.Status !== 'Closed' && !parseDealStatus(q.DealStatus).closed && canEditQuote(q) ? `<button class="action-btn" style="color:var(--red)" onclick="cancelQuote('${q.id}')" title="${q.Status === 'Draft' ? 'ลบ' : 'ยกเลิก'}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
         </button>` : ''}
-        ${(typeof openRecurringModal==='function' && q.Status!=='Cancelled') ? `<button class="action-btn" style="color:${(typeof hasRecurring==='function'&&hasRecurring(q.id))?'var(--green)':'var(--muted)'}" onclick="openRecurringModal('${q.id}')" title="${(typeof hasRecurring==='function'&&hasRecurring(q.id))?'ตั้งออกซ้ำอัตโนมัติอยู่ — กดเพื่อแก้ไข':'ตั้งออกใบเสนอราคาซ้ำอัตโนมัติ (รายเดือน/รายปี)'}">🔁</button>` : ''}
-        ${(isQuoteOwner(q) && q.Status!=='Closed' && q.Status!=='Cancelled' && q.Status!=='PO Received') ? `<button class="action-btn" style="color:${_isQuoteShared(q.id)?'var(--green)':'var(--muted)'}" onclick="shareQuote('${q.id}')" title="${_isQuoteShared(q.id)?'แชร์อยู่ (ทีมแก้ได้) — กดเพื่อยกเลิกแชร์':'แชร์ให้ทีมช่วยกันสร้าง — เลขที่เป็น QT'}">👥</button>` : ''}
+        ${(typeof openRecurringModal==='function' && q.Status!=='Cancelled') ? `<button class="action-btn" style="color:${(typeof hasRecurring==='function'&&hasRecurring(q.id))?'var(--green)':'var(--muted)'}" onclick="openRecurringModal('${q.id}')" title="${(typeof hasRecurring==='function'&&hasRecurring(q.id))?'ตั้งออกซ้ำอัตโนมัติอยู่ — กดเพื่อแก้ไข':'ตั้งออกใบเสนอราคาซ้ำอัตโนมัติ (รายเดือน/รายปี)'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></button>` : ''}
+        ${(isQuoteOwner(q) && q.Status!=='Closed' && q.Status!=='Cancelled' && q.Status!=='PO Received') ? `<button class="action-btn" style="color:${_isQuoteShared(q.id)?'var(--green)':'var(--muted)'}" onclick="shareQuote('${q.id}')" title="${_isQuoteShared(q.id)?'แชร์อยู่ (ทีมแก้ได้) — กดเพื่อยกเลิกแชร์':'แชร์ให้ทีมช่วยกันสร้าง — เลขที่เป็น QT'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></button>` : ''}
       </td>
       <td>${renderTrackerBtn(q)}</td>
     </tr>`;
@@ -214,6 +215,7 @@ async function saveQuoteDefaults(note, terms) {
 function initNewQuote() {
   if(typeof TravelQuote!=='undefined')TravelQuote.reset();
   _dupSourceId = null;   // ใบใหม่เปล่า ไม่ผูกความสัมพันธ์
+  if (typeof _mergeSourceIds !== 'undefined') _mergeSourceIds = null;   // ไม่ใช่ใบรวม
   if (typeof _nqProjectId !== 'undefined') _nqProjectId = null;
   if (typeof dismissProjectUpdate === 'function') dismissProjectUpdate();
   document.getElementById('q-date').value = new Date().toISOString().split('T')[0];
@@ -1105,6 +1107,7 @@ async function editQuote(id) {
   if (!q) return;
   if (q.Status === 'Cancelled') { toast('ใบเสนอราคานี้ถูกยกเลิกแล้ว — เก็บเป็นประวัติเท่านั้น', 'error'); return; }
   if (!canEditQuote(q)) { toast('คุณไม่มีสิทธิ์แก้ไขใบเสนอราคานี้', 'error'); return; }
+  if (typeof _mergeSourceIds !== 'undefined') _mergeSourceIds = null;   // แก้ใบเดิม ไม่ใช่ใบรวม
   editingQuoteId = id;
 
   // Load quote items from SharePoint
@@ -1452,6 +1455,7 @@ async function duplicateQuote(id) {
 
   toast('กำลังคัดลอกข้อมูล...', 'info');
   _dupSourceId = id;   // ★ จำใบต้นทางไว้ผูกความสัมพันธ์ตอนบันทึกใบใหม่
+  if (typeof _mergeSourceIds !== 'undefined') _mergeSourceIds = null;   // ไม่ใช่ใบรวม
   // โหลดรายการจากใบเดิม (เหมือน editQuote แต่ไม่ผูก spId เพราะจะสร้างใหม่)
   try {
     const allItems = await getListItems(CONFIG.lists.quoteItems);
@@ -1699,6 +1703,10 @@ async function saveQuote(status) {
         if (typeof currentQuotePDFAttachment === 'function') att = await currentQuotePDFAttachment();
       } catch(e) { console.warn('สร้าง PDF แนบเมลไม่สำเร็จ (ส่งเมลแบบไม่มีไฟล์แนบแทน):', e.message); }
       sendApprovalRequestEmail(newQ, att).catch(e => console.warn('Approval email failed:', e.message));
+    }
+    // ★ ถ้าใบนี้มาจากการ "รวมใบ" → ลบใบต้นทางทั้งหมดถาวร (ไม่ให้ไปคิดซ้ำที่ผลการขาย)
+    if (typeof _mergeSourceIds !== 'undefined' && _mergeSourceIds && _mergeSourceIds.length && typeof finalizeMerge === 'function') {
+      try { await finalizeMerge(savedId); } catch(e) { console.warn('merge cleanup:', e.message); }
     }
     showPage('quotes', null);
   } catch(e) {
