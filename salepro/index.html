@@ -13,7 +13,8 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link rel="stylesheet" href="assets/style.css?v=internal20261108">
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="assets/catalog-drawer.css?v=service20261102"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="assets/travel.css?v=floating20261103"><link rel="stylesheet" href="assets/calendar.css?v=dispatch20261105"></head>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="assets/catalog-drawer.css?v=service20261102"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="assets/travel.css?v=floating20261103"><link rel="stylesheet" href="assets/calendar.css?v=dispatch20261105"><link rel="stylesheet" href="assets/customer-history.css?v=20261108">
+</head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -207,6 +208,12 @@
 
       <!-- NEW QUOTE -->
       <div class="page" id="page-newquote">
+        <button type="button" id="customer-history-toggle" class="customer-history-toggle" aria-expanded="false" aria-controls="customer-history-drawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 17h18v4H3zM5 13l7-7 7 7M12 6v11"/></svg>ประวัติลูกค้า · ดึงรายการเก่า</button>
+        <section id="customer-history-drawer" class="customer-history-drawer" aria-labelledby="customer-history-title" hidden>
+          <header class="history-drawer-header"><div><h2 id="customer-history-title">ประวัติลูกค้าและใบเสนอราคาเดิม</h2><p id="customer-history-summary"></p></div><div class="history-header-actions"><button type="button" id="customer-history-refresh" class="btn btn-sm">โหลดประวัติใหม่</button><button type="button" id="customer-history-close" class="btn btn-sm" aria-label="ปิดลิ้นชักประวัติลูกค้า">✕ ปิด</button></div></header>
+          <p id="customer-history-status" role="status" aria-live="polite"></p>
+          <div class="history-drawer-grid"><section id="customer-history-profile" class="history-profile" aria-label="ข้อมูล Customer Profile"></section><section class="history-quotes-panel"><label for="customer-history-search">ค้นหาเลขใบเสนอราคาเก่า</label><input id="customer-history-search" type="search" placeholder="เช่น JK04-11-2026"><div id="customer-history-quotes"></div></section><section id="customer-history-items" class="history-items-panel" aria-label="เลือกรายการจากใบเสนอราคาเดิม"></section></div>
+        </section>
         <button type="button" id="catalog-drawer-tab" class="catalog-drawer-tab" onclick="openCatalogPicker()" aria-controls="catalog-modal" aria-expanded="false">Catalog · ดูราคา</button>
         <aside id="catalog-modal" class="quote-catalog-drawer" aria-labelledby="catalog-drawer-title" hidden>
           <div class="catalog-drawer-heading"><h3 id="catalog-drawer-title">Catalog อ้างอิงราคา</h3><button type="button" class="btn btn-sm" onclick="closeCatalogDrawer()" aria-label="ปิด Catalog">✕</button></div>
@@ -1607,7 +1614,7 @@
 <script src="js/config.js?v=admin1"></script>
 <script src="js/auth.js?v=idle60-20261104"></script>
 <script src="js/api.js?v=monitor20261107"></script>
-<script src="js/sync.js?v=monitor20261107"></script>
+<script src="js/sync.js?v=history20261108"></script>
 <script src="js/pages/ui.js?v=monitor20261107"></script>
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
 <script src="../shared/travel-cost.js?v=average20261105"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=average20261105"></script><script src="js/pages/quotes.js?v=internal20261108"></script>
@@ -1642,5 +1649,6 @@
   <option value="เอกสารอื่น">
 </datalist>
 <script src="js/pages/service-agreements.js?v=customerprofile1"></script><script src="js/pages/prospects-core.js?v=20261101"></script><script src="js/pages/prospects.js?v=teamprospects20261102"></script><script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/queue-core.js?v=dispatch20261105"></script><script src="../shared/tech-route.js?v=20261105"></script><script src="../shared/work-calendar.js?v=dispatch20261105"></script><script src="js/pages/datetime-picker.js?v=dtpall20261107"></script><script src="js/pages/queue-planner.js?v=dtp20261107"></script><script src="js/pages/queue-dispatch.js?v=20261105"></script><script src="js/pages/calendar.js?v=dispatch20261105"></script>
+<script src="../shared/customer-history-core.js?v=20261108"></script><script src="js/pages/customer-history.js?v=20261108"></script>
 </body>
 </html>

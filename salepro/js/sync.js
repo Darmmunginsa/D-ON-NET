@@ -20,7 +20,7 @@ async function saveSettingItem(key, value) {
 function approvalEmail(value){return String(value||'').trim().toLowerCase();}
 function canApproveQuotation(q){const email=approvalEmail(currentUser?.email);return !!email&&q?.Status==='Pending'&&!!approvalEmail(q.ApproverEmail)&&approvalEmail(q.ApproverEmail)===email;}
 function pendingApprovalsForUser(){return quotesData.filter(q=>q.Status==='Pending'&&(userRoles.isAdmin||canApproveQuotation(q)));}
-function filterQuotesForUser(allQuotes) {
+function filterQuotesForUser(allQuotes, freshSettings) {
   if (!currentUser) return [];
   // Admin and Approver see all quotes
   if (userRoles.isAdmin || userRoles.isApprover) return allQuotes;
@@ -29,7 +29,8 @@ function filterQuotesForUser(allQuotes) {
   return allQuotes.filter(q => {
     const saleEmail = approvalEmail(q.SaleEmail);
     // Match by sale email, or show if no sale email assigned (own quotes)
-    return saleEmail === myEmail || saleEmail === '' || (!!approvalEmail(q.ApproverEmail)&&approvalEmail(q.ApproverEmail)===myEmail) || (typeof _isQuoteShared==='function' && _isQuoteShared(q.id));
+    const shared = Array.isArray(freshSettings) ? freshSettings.some(s => s.Title === 'QuoteShared_' + q.id && s.Value === '1') : (typeof _isQuoteShared==='function' && _isQuoteShared(q.id));
+    return saleEmail === myEmail || saleEmail === '' || (!!approvalEmail(q.ApproverEmail)&&approvalEmail(q.ApproverEmail)===myEmail) || shared;
   });
 }
 
