@@ -19,3 +19,7 @@
 /* ปลายทางวาง (วันในปฏิทิน) */
 .cal-day.cal-drop{outline:2px dashed var(--amber);outline-offset:-2px;background:color-mix(in srgb,var(--surface) 70%,#f59e0b 30%)!important}
 .cal-event[draggable="true"]{cursor:grab}
+
+/* ===== นัดส่วนตัว + Google Calendar (สี marker) ===== */
+.cal-personal{--cal-color:#f472b6}
+.cal-gcal{--cal-color:#22d3ee}
