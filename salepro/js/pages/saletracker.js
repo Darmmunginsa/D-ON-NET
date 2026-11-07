@@ -1865,11 +1865,13 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const F_ADDR = "'Angsana New','Sarabun',serif";                        // ที่อยู่บริษัทหัวเอกสาร: Angsana New
   const copy = CUST_DOC_COPIES[copyKey] || CUST_DOC_COPIES.customer;
   const today = fmtDate(new Date());
-  // เลขเอกสาร: ใบเสร็จใช้ RV แทน IV (ชนิดอื่นคงเดิม)
+  // เลขเอกสาร: คำนำหน้าปรับได้จากตั้งค่าบริษัท (ค่าเริ่มต้น IV/RV/TAX)
+  const _reEsc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const PFX_IV=((co.DocPfxIV||'').trim()||'IV'), PFX_RV=((co.DocPfxRV||'').trim()||'RV'), PFX_TAX=((co.DocPfxTAX||'').trim()||'TAX');
   let docNo = custDocNo(q);
-  if (kind === 'receipt') docNo = docNo.replace(/IV/i, 'RV');
-  // สินค้าเป็น Hardware → เลขเอกสารใช้ TAX แทน IV/RV
-  if (manual && manual.hardware) docNo = docNo.replace(/IV|RV/i, 'TAX');
+  if (kind === 'receipt') docNo = docNo.replace(new RegExp(_reEsc(PFX_IV),'i'), PFX_RV);
+  // สินค้าเป็น Hardware → เลขเอกสารใช้ prefix Hardware แทน IV/RV
+  if (manual && manual.hardware) docNo = docNo.replace(new RegExp(_reEsc(PFX_IV)+'|'+_reEsc(PFX_RV),'i'), PFX_TAX);
   const poRef = po.poNumber || q.PONumber || '-';
   const isReceipt = kind === 'receipt';
   const isTax = kind === 'tax';

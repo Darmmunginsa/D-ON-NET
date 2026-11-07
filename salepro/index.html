@@ -723,6 +723,17 @@
                       </div>
                     </div>
                     <div class="form-group" style="grid-column:1/-1">
+                      <label>คำนำหน้าเลขเอกสาร (prefix) — ปรับเองได้</label>
+                      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+                        <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">ใบกำกับภาษี/ใบส่งของ</div><input id="co-pfx-iv" placeholder="IV" style="font-family:var(--mono);text-transform:uppercase"></div>
+                        <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">ใบเสร็จรับเงิน</div><input id="co-pfx-rv" placeholder="RV" style="font-family:var(--mono);text-transform:uppercase"></div>
+                        <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Hardware</div><input id="co-pfx-tax" placeholder="TAX" style="font-family:var(--mono);text-transform:uppercase"></div>
+                      </div>
+                      <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6">
+                        ระบบจะแทนคำว่า <b>IV</b> ในเลขเอกสาร → เป็นคำนำหน้าที่ตั้ง (ใบเสร็จ→RV, Hardware→TAX) · เว้นว่าง = ใช้ค่าเดิม IV/RV/TAX
+                      </div>
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1">
                       <label>ขนาดฟอนต์หัวบริษัทใน PDF</label>
                       <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
                         <input type="range" id="co-headerfs" min="8" max="20" value="10" step="1" oninput="document.getElementById('co-headerfs-val').textContent=this.value+'px'" style="flex:1;accent-color:var(--accent);cursor:pointer">
