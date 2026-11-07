@@ -463,8 +463,15 @@ function renderItems() {
       if (!it.asHeader) itemNum++;   // หัวข้อกลุ่มไม่กินเลขลำดับ
       // ปุ่มสลับ "ตั้งเป็นหัวข้อกลุ่ม" (H) — ใช้เครื่องมือเพิ่มรายการเดียวกัน
       const hdrBtn = `<button class="action-btn" onclick="toggleItemHeader(${it.id})" title="${it.asHeader?'เปลี่ยนกลับเป็นรายการปกติ':'ตั้งเป็นหัวข้อกลุ่ม (ไม่คิดเงิน)'}" style="font-size:10px;font-weight:800;${it.asHeader?'color:var(--accent2)':'color:var(--muted)'}">H</button>`;
+      const _catState = (it.type==='item' && !it.asHeader && typeof _itemCatalogState === 'function') ? _itemCatalogState(it) : '';
+      const _catBtn = (it.type!=='item' || it.asHeader) ? '' : (_catState==='in'
+        ? `<button class="action-btn" title="มีใน Catalog แล้ว" style="color:var(--green);cursor:default">✓C</button>`
+        : _catState==='pending'
+        ? `<button class="action-btn" title="รอพิจารณานำเข้า Catalog (ที่ PurchasePro)" style="color:var(--amber)">⏳C</button>`
+        : `<button class="action-btn" onclick="sendItemToCatalogReview(${it.id})" title="ส่งรายการนี้เข้าพิจารณานำเข้า Catalog (ที่ PurchasePro)" style="color:var(--accent2);font-weight:700">+C</button>`);
       const itemAction = `<td style="width:54px"><div class="row-actions">${hdrBtn}
             ${!it.asHeader?`<button type="button" class="action-btn" onclick="openServiceCatalogSave(${it.id})" title="เก็บเป็น Service Catalog" aria-label="เก็บเป็น Service Catalog">▣</button>`:''}
+            ${_catBtn}
             <button class="action-btn" onclick="removeItem(${it.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
             <input type="number" class="row-h-input" min="0" value="${it.rowH||''}" placeholder="สูง" title="ความสูงแถว (px)" onchange="setRowHeight(${it.id},this.value)">
           </div></td>`;

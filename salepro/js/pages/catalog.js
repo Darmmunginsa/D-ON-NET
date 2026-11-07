@@ -20,6 +20,41 @@ async function saveCatalogExtra() {
 }
 function catExtra(id) { return CatalogPolicy.extra(catalogData.find(p=>String(p.id)===String(id)),catalogExtra[id]); }
 
+// ── ส่งสินค้าเข้าพิจารณานำเข้า Catalog (รอจัดซื้ออนุมัติที่ PurchasePro) ──
+// เก็บใน Settings: CatalogPending = [ {name,pn,unit,price,cost,vendorId,desc,by...} ]
+function _getCatalogPending() {
+  try { const it = (_settingsCache || []).find(i => i.Title === 'CatalogPending'); return (it && it.Value) ? (JSON.parse(it.Value) || []) : []; }
+  catch(e) { return []; }
+}
+async function _saveCatalogPending(arr) { await saveSettingItem('CatalogPending', JSON.stringify(arr || [])); }
+// รายการนี้มีใน Catalog แล้ว / รอพิจารณาอยู่แล้ว หรือไม่
+function _itemCatalogState(it) {
+  const nm = (it && it.name || '').trim().toLowerCase();
+  if (!nm) return '';
+  if ((catalogData || []).some(c => (c.Title || '').trim().toLowerCase() === nm)) return 'in';
+  if (_getCatalogPending().some(p => (p.name || '').trim().toLowerCase() === nm)) return 'pending';
+  return '';
+}
+async function sendItemToCatalogReview(itemId) {
+  const it = (typeof quoteItems !== 'undefined' ? quoteItems : []).find(x => x.id == itemId);
+  if (!it || it.type !== 'item' || !(it.name || '').trim()) { toast('ใส่ชื่อรายการก่อน', 'error'); return; }
+  const nm = (it.name || '').trim().toLowerCase();
+  if ((catalogData || []).some(c => (c.Title || '').trim().toLowerCase() === nm)) { toast('มีสินค้านี้ใน Catalog อยู่แล้ว', 'info'); return; }
+  const pend = _getCatalogPending();
+  if (pend.some(p => (p.name || '').trim().toLowerCase() === nm)) { toast('รายการนี้รอพิจารณาอยู่แล้ว', 'info'); return; }
+  const priceNum = (isNumeric(it.price) ? +it.price : 0);
+  pend.push({
+    id: 'CP' + Date.now() + Math.floor(Math.random() * 1000),
+    name: it.name || '', pn: it.pn || '', unit: it.unit || '', price: priceNum, cost: +it.cost || 0,
+    vendorId: it.vendorId || '', desc: it.desc || '', category: '',
+    byName: (currentUser && currentUser.displayName) || '', byEmail: (currentUser && currentUser.email) || '',
+    quoteId: String(editingQuoteId || ''), quoteTitle: (document.getElementById('q-no')?.value || ''),
+    client: (document.getElementById('q-client')?.value || ''), ts: new Date().toISOString()
+  });
+  try { await _saveCatalogPending(pend); toast('ส่งเข้าพิจารณานำเข้า Catalog แล้ว — รอจัดซื้ออนุมัติที่ PurchasePro', 'success'); if (typeof renderItems === 'function') renderItems(); }
+  catch(e) { toast('ส่งไม่สำเร็จ: ' + e.message, 'error'); }
+}
+
 function renderCatalog() {
   CatalogBaskets.toolbar();
   const q = (document.getElementById('cat-search')?.value || '').toLowerCase();
