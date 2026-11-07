@@ -981,7 +981,7 @@
 
 <!-- SALE TRACKER MODAL -->
 <div class="overlay" id="sale-tracker-modal">
-  <div class="modal" style="width:720px;max-width:96vw">
+  <div class="modal" style="width:min(96vw,1060px);max-width:96vw">
     <div class="modal-header" style="position:sticky;top:0;z-index:10;background:var(--surface)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       <h3 id="st-title">ติดตามการขาย</h3>
@@ -1012,7 +1012,8 @@
           <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0;margin-top:2px" id="st-user-avatar">?</div>
           <div style="flex:1;display:flex;flex-direction:column;gap:6px">
             <textarea id="st-note-input" placeholder="เพิ่ม note..." style="width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text);font-family:var(--font);outline:none;resize:vertical;min-height:60px" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'"></textarea>
-            <div style="display:flex;justify-content:flex-end">
+            <div style="display:flex;justify-content:flex-end;gap:8px">
+              <button class="btn btn-sm" onclick="addSaleNote(true)" title="เพิ่มเป็น Note สำคัญ (★ ขึ้นกระดิ่งหน้าหลัก)" style="color:var(--amber);border-color:rgba(251,191,36,.4)">★ เพิ่ม Note สำคัญ</button>
               <button class="btn btn-sm btn-primary" onclick="addSaleNote()">+ เพิ่ม Note</button>
             </div>
           </div>
@@ -1617,7 +1618,7 @@
 <script src="js/pages/signature.js?v=admin1"></script>
 <script src="js/pages/company.js?v=monitor20261107"></script>
 <script src="js/pages/pdf.js?v=notespaces20261103"></script>
-<script src="js/pages/saletracker.js?v=monitor20261107"></script>
+<script src="js/pages/saletracker.js?v=sttracker20261107"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>
 <script src="js/pages/belowcost.js?v=admin1"></script>

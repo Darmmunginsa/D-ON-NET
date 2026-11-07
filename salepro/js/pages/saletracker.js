@@ -262,30 +262,50 @@ function renderExpiryTab() {
   const list = _stExpiries();
   const isReadOnly = !!stDealData.closed;
   const typeOpts = (cur) => EXPIRY_TYPES.map(t => '<option ' + (cur===t?'selected':'') + '>' + t + '</option>').join('');
+  // สไตล์กลางของช่องกรอก — ใหญ่ อ่านง่าย กดสะดวก
+  const INP = 'font-size:13px;padding:8px 10px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--font);box-sizing:border-box;width:100%;outline:none';
+  const LBL = 'display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);font-weight:600';
+  const fld = (label, inner) => '<label style="' + LBL + '">' + label + inner + '</label>';
   const rows = list.map(function(e) {
     const st = expiryStatus(e.expiryDate, e.renewed);
-    return '<div style="border:1px solid var(--border);border-radius:9px;background:var(--surface2);padding:10px 12px;margin-bottom:9px">'
-      + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">'
-      + '<select onchange="updateExpiry(\'' + e.id + '\',\'type\',this.value)" style="font-size:12px;max-width:130px">' + typeOpts(e.type) + '</select>'
-      + '<input value="' + escHtml(e.name||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'name\',this.value)" placeholder="ชื่อสินค้า/รุ่น" style="flex:1;min-width:0;font-size:12px">'
-      + '<span style="font-size:11px;color:' + st.color + ';white-space:nowrap;font-weight:600">● ' + st.label + '</span>'
-      + '<button onclick="removeExpiry(\'' + e.id + '\')" title="ลบ" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px">✕</button>'
+    return '<div style="border:1px solid ' + (e.renewed?'var(--green)':'var(--border2)') + ';border-left:4px solid ' + st.color + ';border-radius:11px;background:var(--surface2);padding:14px 16px;margin-bottom:12px">'
+      // แถวหัว: ชนิด + ชื่อ + สถานะ + ลบ
+      + '<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">'
+      + '<select onchange="updateExpiry(\'' + e.id + '\',\'type\',this.value)" style="' + INP + ';width:auto;min-width:140px;font-weight:600">' + typeOpts(e.type) + '</select>'
+      + '<input value="' + escHtml(e.name||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'name\',this.value)" placeholder="ชื่อสินค้า / รุ่น ที่ส่งมอบลูกค้า" style="' + INP + ';flex:1;min-width:0;font-size:14px;font-weight:600">'
+      + '<span style="font-size:12px;color:' + st.color + ';white-space:nowrap;font-weight:700;padding:5px 10px;border-radius:20px;background:' + st.color + '1a">● ' + st.label + '</span>'
+      + '<button onclick="removeExpiry(\'' + e.id + '\')" title="ลบรายการนี้" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:17px;padding:4px">✕</button>'
       + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
-      + '<label style="font-size:11px;color:var(--muted)">Serial <input value="' + escHtml(e.serial||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'serial\',this.value)" placeholder="S/N" style="font-size:11px;max-width:120px;margin-left:3px"></label>'
-      + '<label style="font-size:11px;color:var(--muted)">จำนวน <input type="number" min="0" value="' + (e.qty!=null?e.qty:'') + '" oninput="updateExpiry(\'' + e.id + '\',\'qty\',this.value)" style="font-size:11px;max-width:60px;margin-left:3px"></label>'
-      + '<label style="font-size:11px;color:var(--muted)">วันเริ่ม <input type="date" value="' + (e.startDate||'') + '" onchange="updateExpiry(\'' + e.id + '\',\'startDate\',this.value)" style="font-size:11px;margin-left:3px"></label>'
-      + '<label style="font-size:11px;color:var(--text);font-weight:600">หมดอายุ <input type="date" value="' + (e.expiryDate||'') + '" onchange="updateExpiry(\'' + e.id + '\',\'expiryDate\',this.value)" style="font-size:11px;margin-left:3px"></label>'
-      + '<span style="font-size:11px;color:var(--muted)">อายุ: <button class="btn btn-sm" onclick="setExpiryDuration(\'' + e.id + '\',1,\'y\')" style="font-size:10px;padding:2px 6px">+1ปี</button><button class="btn btn-sm" onclick="setExpiryDuration(\'' + e.id + '\',3,\'y\')" style="font-size:10px;padding:2px 6px">+3ปี</button><button class="btn btn-sm" onclick="setExpiryDuration(\'' + e.id + '\',5,\'y\')" style="font-size:10px;padding:2px 6px">+5ปี</button> หรือ <input type="number" min="0" placeholder="จำนวน" id="exdur-' + e.id + '" style="font-size:11px;max-width:60px"><select id="exunit-' + e.id + '" style="font-size:11px"><option value="d">วัน</option><option value="m">เดือน</option><option value="y" selected>ปี</option></select><button class="btn btn-sm" onclick="setExpiryDurationInput(\'' + e.id + '\')" style="font-size:10px;padding:2px 6px">คำนวณ</button></span>'
-      + '<label style="font-size:11px;color:var(--muted)">เตือนล่วงหน้า <input type="number" min="0" value="' + (e.remindDays!=null?e.remindDays:30) + '" oninput="updateExpiry(\'' + e.id + '\',\'remindDays\',this.value)" style="font-size:11px;max-width:54px;margin-left:3px"> วัน</label>'
+      // แถวข้อมูลหลัก (grid) — Serial / จำนวน / วันเริ่ม / วันหมดอายุ / เตือนล่วงหน้า
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">'
+      + fld('Serial / S/N', '<input value="' + escHtml(e.serial||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'serial\',this.value)" placeholder="S/N" style="' + INP + '">')
+      + fld('จำนวน (เครื่อง)', '<input type="number" min="0" value="' + (e.qty!=null?e.qty:'') + '" oninput="updateExpiry(\'' + e.id + '\',\'qty\',this.value)" placeholder="0" style="' + INP + '">')
+      + fld('วันเริ่ม', '<input type="date" value="' + (e.startDate||'') + '" onchange="updateExpiry(\'' + e.id + '\',\'startDate\',this.value)" style="' + INP + '">')
+      + fld('<span style="color:var(--text)">วันหมดอายุ ⚠</span>', '<input type="date" value="' + (e.expiryDate||'') + '" onchange="updateExpiry(\'' + e.id + '\',\'expiryDate\',this.value)" style="' + INP + ';border-color:var(--amber)">')
+      + fld('เตือนล่วงหน้า (วัน)', '<input type="number" min="0" value="' + (e.remindDays!=null?e.remindDays:30) + '" oninput="updateExpiry(\'' + e.id + '\',\'remindDays\',this.value)" style="' + INP + '">')
       + '</div>'
-      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">'
-      + '<label style="font-size:11px;color:var(--muted);flex:1;min-width:160px">แจ้งเตือนเฉพาะทีมงาน <input value="' + escHtml((e.emails||[]).join(', ')) + '" oninput="updateExpiryEmails(\'' + e.id + '\',this.value)" placeholder="a@x.com, b@y.com" style="font-size:11px;width:100%;margin-top:2px"></label>'
-      + '<label style="font-size:11px"><input type="checkbox" '+(e.publicLookup?'checked':'')+' onchange="setExpiryPublic(\''+e.id+'\',this.checked)"> ให้ลูกค้าค้นประกันบนเว็บไซต์ (หนึ่ง Serial ต่อเครื่อง)</label>'
-      + '<input value="' + escHtml(e.note||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'note\',this.value)" placeholder="หมายเหตุ" style="font-size:11px;flex:1;min-width:140px">'
+      // แถวคำนวณอายุอย่างเร็ว
+      + '<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:9px 11px;background:var(--surface);border-radius:9px">'
+      + '<span style="font-size:12px;color:var(--muted);font-weight:600">คำนวณวันหมดอายุ:</span>'
+      + '<button class="btn btn-sm" onclick="setExpiryDuration(\'' + e.id + '\',1,\'y\')" style="font-size:12px">+1 ปี</button>'
+      + '<button class="btn btn-sm" onclick="setExpiryDuration(\'' + e.id + '\',3,\'y\')" style="font-size:12px">+3 ปี</button>'
+      + '<button class="btn btn-sm" onclick="setExpiryDuration(\'' + e.id + '\',5,\'y\')" style="font-size:12px">+5 ปี</button>'
+      + '<span style="font-size:12px;color:var(--muted)">หรือกำหนดเอง</span>'
+      + '<input type="number" min="0" placeholder="จำนวน" id="exdur-' + e.id + '" style="' + INP + ';width:80px">'
+      + '<select id="exunit-' + e.id + '" style="' + INP + ';width:auto"><option value="d">วัน</option><option value="m">เดือน</option><option value="y" selected>ปี</option></select>'
+      + '<button class="btn btn-sm btn-primary" onclick="setExpiryDurationInput(\'' + e.id + '\')" style="font-size:12px">คำนวณ</button>'
+      + '</div>'
+      // แถวแจ้งเตือน + หมายเหตุ
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+      + fld('แจ้งเตือนเฉพาะทีมงาน (อีเมล)', '<input value="' + escHtml((e.emails||[]).join(', ')) + '" oninput="updateExpiryEmails(\'' + e.id + '\',this.value)" placeholder="a@x.com, b@y.com" style="' + INP + '">')
+      + fld('หมายเหตุ', '<input value="' + escHtml(e.note||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'note\',this.value)" placeholder="รายละเอียดเพิ่มเติม" style="' + INP + '">')
+      + '</div>'
+      // แถวล่าง: ค้นประกัน + ปุ่มต่ออายุ
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">'
+      + '<label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" '+(e.publicLookup?'checked':'')+' onchange="setExpiryPublic(\''+e.id+'\',this.checked)" style="width:16px;height:16px"> ให้ลูกค้าค้นประกันบนเว็บไซต์ (หนึ่ง Serial ต่อเครื่อง)</label>'
       + (e.renewed
-          ? '<button class="btn btn-sm" onclick="updateExpiry(\'' + e.id + '\',\'renewed\',false)" style="font-size:11px">ยกเลิกต่ออายุ</button>'
-          : '<button class="btn btn-sm btn-success" onclick="markExpiryRenewed(\'' + e.id + '\')" style="font-size:11px">✓ ต่ออายุแล้ว</button>')
+          ? '<button class="btn btn-sm" onclick="updateExpiry(\'' + e.id + '\',\'renewed\',false)" style="font-size:13px">ยกเลิกต่ออายุ</button>'
+          : '<button class="btn btn-sm btn-success" onclick="markExpiryRenewed(\'' + e.id + '\')" style="font-size:13px;padding:8px 16px">✓ ต่ออายุแล้ว</button>')
       + '</div></div>';
   }).join('');
   host.innerHTML = (isReadOnly ? '' : '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center"><button class="btn btn-sm btn-primary" onclick="addExpiryRow()">+ เพิ่มรายการ</button><button class="btn btn-sm" onclick="pullExpiryFromQuote()">⟲ ดึงจากใบเสนอราคา</button><button class="btn btn-sm btn-success" style="margin-left:auto" onclick="saveExpiryManual()">💾 บันทึก</button></div>')
@@ -512,15 +532,16 @@ function formatDateTime(ts) {
 
 
 
-async function addSaleNote() {
+async function addSaleNote(important) {
   const input = document.getElementById('st-note-input');
   const text = (input?.value||'').trim();
   if (!text) { toast('กรุณาพิมพ์ note ก่อน','error'); return; }
   stDealData.notes = stDealData.notes || [];
-  stDealData.notes.push({ id:Date.now(), user:currentUser?.displayName||currentUser?.email||'User', text, ts:new Date().toISOString(), type:'note' });
+  stDealData.notes.push({ id:Date.now(), user:currentUser?.displayName||currentUser?.email||'User', text, ts:new Date().toISOString(), type:'note', important: !!important });
   input.value = '';
   renderSTTimeline();
   await saveSTDealData();
+  if (important) { toast('เพิ่ม Note สำคัญแล้ว ★', 'success'); if (typeof renderImportantBell === 'function') renderImportantBell(); }
 }
 
 function deleteSTNote(id) {
