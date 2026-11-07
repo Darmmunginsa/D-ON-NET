@@ -1327,7 +1327,23 @@ function addCDManualRow(type) {
 
 // ยอดรวมโหมด Manual (เฉพาะแถว item)
 function _cdManualSum() { const _num=v=>{const s=String(v==null?'':v).trim(); if(s===''||!/^-?[\d,]*\.?\d*$/.test(s))return 0; const n=parseFloat(s.replace(/,/g,'')); return isFinite(n)?n:0;}; return (_docManual().rows||[]).reduce((s,r)=> s + ((r.t==='group'||r.t==='note')?0:_num(r.amount)), 0); }
-function _cdWarnHtml() { const man=_cdManualSum(); const fmt2=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); return '<span style="color:#15803d">Σ รวมรายการ (ก่อน VAT) = <b>'+fmt2(man)+'</b> บาท · VAT 7% = '+fmt2(man*0.07)+' · รวมสุทธิ '+fmt2(man*1.07)+'</span>'; }
+function _cdWarnHtml() {
+  const man=_cdManualSum();
+  const fmt2=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const base='<span style="color:#15803d">Σ รวมรายการ (ก่อน VAT) = <b>'+fmt2(man)+'</b> บาท · VAT 7% = '+fmt2(man*0.07)+' · รวมสุทธิ '+fmt2(man*1.07)+'</span>';
+  // เทียบกับยอดจริงของใบเสนอราคา — ไม่ตรงให้เตือน
+  const ref=+((_cdQCache&&_cdQCache.TotalAmount)||0);
+  if(ref>0){
+    const net=man, gross=man*1.07;
+    const ok=(Math.abs(gross-ref)<=1)||(Math.abs(net-ref)<=1);
+    if(!ok){
+      return '<span style="color:#b91c1c;font-weight:600">⚠ ยอดไม่ตรงกับใบเสนอราคา</span> '
+        +'<span style="color:#b91c1c">(ใบเสนอราคา = <b>'+fmt2(ref)+'</b> บาท · เอกสารนี้รวมสุทธิ '+fmt2(gross)+')</span> '
+        +'<button class="btn btn-sm" onclick="fillCDFromQuote()" style="border:1px solid var(--amber);background:none;color:var(--amber);font-size:11px;margin-left:4px">⟲ ดึงราคาจากใบเสนอราคาให้ตรง</button>';
+    }
+  }
+  return base;
+}
 function _cdUpdateWarn() { const el=document.getElementById('cd-man-warn'); if(el)el.innerHTML=_cdWarnHtml(); }
 
 // ── นำเข้ารายการ: วางจากตาราง (Excel) ──
@@ -1577,7 +1593,7 @@ function _cdSeedRowsFromItems(){
   const items=_cdItemsCache||[];
   if(!items.length) return [{t:'item',no:'',pn:'',name:'',desc:'',qty:'',unit:'',price:'',amount:''}];
   return items.map(function(it){
-    const q=parseFloat(it.Quantity||0), p=parseFloat(it.UnitPrice||0), d=parseFloat(it.DiscountPct||0)/100;
+    const q=parseFloat(it.Quantity||0), p=parseFloat((it._cdPrice!=null?it._cdPrice:it.UnitPrice)||0), d=parseFloat(it.DiscountPct||0)/100;
     const amt=q*p*(1-d);
     return { t:'item', no:'', pn:(it.PartNumber||it.PartNo||it.Code||it.ProductCode||''),
       name:(it.Title||it.Description||''), desc:((it.Description&&it.Title)?it.Description:''),
@@ -1782,6 +1798,13 @@ async function printCustomerDoc(kind, copy) {
   if (typeof loadCustomers === 'function') { try { await loadCustomers(); } catch(e) {} }
   else if (typeof loadCustomerCodes === 'function') { loadCustomerCodes(); }
   _cdItemsCache = await getQuoteItemsForST();
+  // แนบราคาจริงจากใบเสนอราคา (QuoteItemExtra.price มาก่อน UnitPrice) — กันราคาข้อความ/ต่องวด/แก้เองหาย
+  try {
+    const _allRows=(await getListItems(CONFIG.lists.quoteItems)).filter(i=>String(i.QuoteID)===String(stQuoteId));
+    const _ex=(typeof getQuoteItemExtra==='function')?(getQuoteItemExtra(stQuoteId)||[]):[];
+    let _k=0;
+    _allRows.forEach((row,fi)=>{ if(typeof isMarkerItem==='function'&&isMarkerItem(row))return; const ex=_ex[fi]||{}; const raw=(ex&&ex.price!==undefined&&ex.price!=='')?ex.price:row.UnitPrice; const pn=parseFloat(String(raw).replace(/,/g,'')); const t=_cdItemsCache[_k++]; if(t)t._cdPrice=isNaN(pn)?0:pn; });
+  } catch(e){ console.warn('cd price align', e.message); }
   _cdQCache = q;
   openCDPreview(kind, copy);   // เปิดพรีวิวแยกซ้าย-ขวา (editor | เอกสารจริง)
 }
