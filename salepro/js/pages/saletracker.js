@@ -2355,8 +2355,11 @@ async function cancelQuote(id) {
 }
 
 async function confirmCancelQuote() {
-  const reason = (document.getElementById('cancel-reason')?.value || '').trim();
-  if (!reason) { toast('กรุณาระบุเหตุผลการยกเลิก', 'error'); return; }
+  const cat = (document.getElementById('cancel-reason-cat')?.value || '').trim();
+  const detail = (document.getElementById('cancel-reason')?.value || '').trim();
+  if (!cat) { toast('กรุณาเลือกหมวดเหตุผลที่แพ้/ยกเลิก', 'error'); return; }
+  // เหตุผลที่เก็บ = "[หมวด] รายละเอียด" (หมวดอยู่ต้นสุดเสมอ เพื่อให้สถิติจับหมวดได้)
+  const reason = detail ? ('[' + cat + '] ' + detail) : ('[' + cat + ']');
   if (!cancellingQuoteId) return;
   const q = quotesData.find(x => x.id === cancellingQuoteId);
   if (!q) return;
@@ -2365,6 +2368,7 @@ async function confirmCancelQuote() {
     // อัปเดตเฉพาะ Status (คอลัมน์ที่มีจริง) — เก็บเหตุผลใน Settings list แทน (ไม่มีคอลัมน์ CancelReason)
     await updateListItem(CONFIG.lists.quotations, cancellingQuoteId, { Status: 'Cancelled' });
     try { await putSettingValue('CancelReason_' + cancellingQuoteId, reason); } catch(e) { console.warn('save cancel reason:', e.message); }
+    try { await putSettingValue('LoseReason_' + cancellingQuoteId, cat); } catch(e) { console.warn('save lose cat:', e.message); }
     q.Status = 'Cancelled';
     q.CancelReason = reason;
     q.CancelledReason = reason;

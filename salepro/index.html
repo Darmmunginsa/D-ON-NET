@@ -12,7 +12,7 @@
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<link rel="stylesheet" href="assets/style.css?v=g12">
+<link rel="stylesheet" href="assets/style.css?v=g13">
 <link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="assets/catalog-drawer.css?v=service20261102"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="assets/travel.css?v=floating20261103"><link rel="stylesheet" href="assets/calendar.css?v=dispatch20261105"></head>
 <body class="cyber-app">
 
@@ -94,6 +94,10 @@
         <div class="nav-item" onclick="showPage('forecast',this)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-5 3 3 5-7"/></svg>
           Sale Forecast
+        </div>
+        <div class="nav-item" onclick="showPage('saleresult',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 118 2.83"/><path d="M22 12A10 10 0 0012 2v10z"/></svg>
+          ผลการขาย (Win/Lose)
         </div>
         <div class="nav-item" onclick="showPage('contracts',this)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
@@ -507,6 +511,14 @@
         </div>
         <div id="act-summary" style="margin-bottom:10px;font-size:13px;color:var(--muted)"></div>
         <div id="act-table"></div>
+      </div>
+      <div class="page" id="page-saleresult">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <div style="font-size:13px;color:var(--muted)">สรุปผลการปิดการขาย ชนะ/แพ้ สำหรับนำเสนอผู้บริหาร</div>
+          <select id="sr-year" onchange="renderSaleResult()" style="font-size:13px;margin-left:auto"></select>
+          <button class="btn btn-sm" onclick="loadSaleResultPage()">🔄 รีเฟรช</button>
+        </div>
+        <div id="saleresult-body"></div>
       </div>
       <div class="page" id="page-projects">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
@@ -1468,9 +1480,25 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <div>การยกเลิกจะส่ง Email แจ้งผู้อนุมัติ และฝ่ายจัดซื้อ (ถ้ามีการแจ้งจัดซื้อแล้ว) — <strong>ไม่สามารถยกเลิกการกระทำนี้ได้</strong></div>
       </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>หมวดเหตุผลที่แพ้/ยกเลิก <span style="color:var(--red)">*</span></label>
+        <select id="cancel-reason-cat" style="width:100%">
+          <option value="">— เลือกหมวด —</option>
+          <option value="ราคาสูงกว่าคู่แข่ง">💸 ราคาสูงกว่าคู่แข่ง</option>
+          <option value="งบไม่พอ / ไม่อนุมัติงบ">📉 งบไม่พอ / ไม่อนุมัติงบ</option>
+          <option value="ลูกค้าเลื่อน/ยกเลิกโครงการ">⏸ ลูกค้าเลื่อน/ยกเลิกโครงการ</option>
+          <option value="เลือกผู้ขายรายอื่น">🤝 เลือกผู้ขายรายอื่น</option>
+          <option value="สเปก/สินค้าไม่ตรงความต้องการ">🧩 สเปก/สินค้าไม่ตรงความต้องการ</option>
+          <option value="ส่งมอบ/ระยะเวลาไม่ทัน">⏱ ส่งมอบ/ระยะเวลาไม่ทัน</option>
+          <option value="เงื่อนไขการชำระเงิน">💳 เงื่อนไขการชำระเงิน</option>
+          <option value="ติดต่อลูกค้าไม่ได้/ไม่ตอบกลับ">📵 ติดต่อลูกค้าไม่ได้/ไม่ตอบกลับ</option>
+          <option value="ออกใบผิด/ทำซ้ำ (ไม่ใช่การแพ้)">♻️ ออกใบผิด/ทำซ้ำ (ไม่ใช่การแพ้)</option>
+          <option value="อื่นๆ">… อื่นๆ</option>
+        </select>
+      </div>
       <div class="form-group" style="margin-bottom:0">
-        <label>เหตุผลการยกเลิก <span style="color:var(--red)">*</span></label>
-        <textarea id="cancel-reason" placeholder="ระบุเหตุผล เช่น ลูกค้าขอยกเลิก / ราคาไม่ตรง / โปรเจคยกเลิก..." style="min-height:100px"></textarea>
+        <label>รายละเอียดเพิ่มเติม</label>
+        <textarea id="cancel-reason" placeholder="ระบุรายละเอียด เช่น คู่แข่งถูกกว่า 8%, ลูกค้าขอเลื่อนปีหน้า..." style="min-height:90px"></textarea>
       </div>
     </div>
     <div class="modal-footer">
@@ -1510,6 +1538,7 @@
 <script src="js/pages/procurement.js?v=admin1"></script>
 <script src="js/pages/projects.js?v=g1"></script>
 <script src="js/pages/expiry.js?v=g1"></script>
+<script src="js/pages/saleresult.js?v=monitor20261107"></script>
 <script src="js/pages/activity.js?v=monitor20261107"></script>
 <script src="js/pages/contracts.js?v=customerprofile1"></script>
 <script src="js/app.js?v=admin1"></script>
