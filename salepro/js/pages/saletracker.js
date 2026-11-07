@@ -1852,12 +1852,12 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   // SOLD TO = ชื่อไทยจากทะเบียนลูกค้า (จับคู่จากชื่อไทย/EN) ถ้าหาไม่เจอใช้ชื่อบนใบ
   const DOC_CLIENT = ((typeof customerThaiNameByAny === 'function' && customerThaiNameByAny(q.ClientName, q.CustomerTaxID)) || q.ClientName || '');
   const DOC_ADDR   = (q.CustomerAddress || '');   // ADDRESS = ภาษาไทยเสมอ
-  // ── หัวบริษัท Fix ตายตัว (ยกเว้นโลโก้ดึงจาก Company Settings) ──
-  const CO_NAME_TH = 'บริษัท ดี ออน เน็ต จำกัด';
-  const CO_NAME_EN = 'D ON NET.,CO.LTD';
-  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = 'เลขที่ 78 หมู่ 11 ตำบล ผาเลือด อำเภอ ท่าปลา จังหวัด อุตรดิตถ์ 53190';
-  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = 'No. 78, Moo 11, Pha Lueat Subdistrict, Tha Pla District, Uttaradit Province';
-  const CO_TEL = '065-262-9886', CO_TAXID = '0105559006113';
+  // ── หัวบริษัท: ดึงจาก "ตั้งค่าบริษัท" (co) — ถ้าเว้นว่างใช้ค่าดีฟอลต์ ──
+  const CO_NAME_TH = (co.CompanyName||'').trim() || 'บริษัท ดี ออน เน็ต จำกัด';
+  const CO_NAME_EN = (co.CompanyNameEn||'').trim() || 'D ON NET.,CO.LTD';
+  const CO_ADDR_TH_L = 'สำนักงานใหญ่', CO_ADDR_TH_V = (co.Address||'').trim() || 'เลขที่ 78 หมู่ 11 ตำบล ผาเลือด อำเภอ ท่าปลา จังหวัด อุตรดิตถ์ 53190';
+  const CO_ADDR_EN_L = 'HEAD OFFICE', CO_ADDR_EN_V = (co.AddressEn||'').trim() || 'No. 78, Moo 11, Pha Lueat Subdistrict, Tha Pla District, Uttaradit Province';
+  const CO_TEL = (co.Phone||'').trim() || '065-262-9886', CO_TAXID = (co.TaxID||'').trim() || '0105559006113';
   const F_TH = "'Sarabun','Segoe UI',sans-serif";                        // ฟอนต์เดิมทั้งเอกสาร (Sarabun)
   const F_EN = "'Sarabun','Segoe UI',sans-serif";
   const F_NUM = "'Sarabun','Segoe UI',sans-serif";
