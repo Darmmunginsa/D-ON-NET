@@ -84,6 +84,8 @@ async function syncAll(){
     _settingsCache.forEach(i=>{ if((i.Title||'').startsWith('Purchase_')){ try{ purchaseExt[i.Title.slice(9)]=_migStage(JSON.parse(i.Value)||{}); }catch(e){} } });
     await loadMailTemplates();
     loadPOCompany();   // ตั้งค่าบริษัท (โลโก้/ชื่อ/ที่อยู่) จาก Settings
+    if(typeof loadPOApprovalTiers==='function') try{ loadPOApprovalTiers(); }catch(e){}   // ระดับการอนุมัติ PO
+    if(typeof renderPendingBadge==='function') try{ renderPendingBadge(); }catch(e){}       // badge จำนวน PO รออนุมัติ
     // โหลดใบเสนอราคา (ไซต์เดียวกัน) เพื่อเทียบกำไร
     try{ const qs=await getListItems(CONFIG.lists.quotations); quotesById={}; qs.forEach(q=>{ quotesById[String(q.id)]=q; }); }catch(e){ quotesById={}; }
     // โหลดรายการในใบเสนอราคา (ราคาขายรายชิ้น) เพื่อคิดกำไรเฉพาะรายการที่ดึงมาทำ
@@ -113,8 +115,10 @@ function showPage(id,el){
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
-  document.getElementById('page-title').textContent={dashboard:'ภาพรวม',purchases:'งานจัดซื้อ',catalog:'Catalog สินค้า',vendors:'Vendor',settings:'ตั้งค่าบริษัท'}[id]||id;
+  document.getElementById('page-title').textContent={dashboard:'ภาพรวม',purchases:'งานจัดซื้อ',catalog:'Catalog สินค้า',vendors:'Vendor',settings:'ตั้งค่าบริษัท',approvals:'รออนุมัติ PO'}[id]||id;
   if(id==='settings' && typeof renderCompanyForm==='function') renderCompanyForm();
+  if(id==='settings' && typeof renderPOTiers==='function') setTimeout(renderPOTiers,50);
+  if(id==='approvals' && typeof renderApprovals==='function') renderApprovals();
 }
 function buildFilterOptions(){
   const sel=document.getElementById('po-filter');
@@ -862,7 +866,7 @@ function pbVendorTotal(vid){ return pbItems(vid).reduce((s,it)=>s+(+it.qty||0)*(
 
 function renderProjectBoard(){
   const d=_pb();
-  let h=_projBriefPanel()+_projWaiverCard()+_projItemsEditor();
+  let h=_projBriefPanel()+_projWaiverCard()+(typeof _poApprovalPanel==='function'?_poApprovalPanel():'')+_projItemsEditor();
   h+='<div class="card" style="margin-bottom:14px"><div class="card-head">🏢 Vendor ในโครงการ — แต่ละเจ้าเดินงานแยกกัน จบทีละเจ้า</div><div style="padding:11px 13px">';
   const ip='background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:6px 9px;font-size:13px;color:var(--text)';
   h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><select id="pb-add-vendor" style="'+ip+';min-width:200px">'+vendorOptions('')+'</select>'
@@ -955,8 +959,7 @@ function _pbStepBody(vid, step){
     return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px">เลขที่ PO</span>'
       +'<input value="'+esc(vd.poNo||'')+'" oninput="setPONo(\''+vid+'\',this.value)" placeholder="PO..." style="'+ip+';max-width:150px">'
       +'<button class="btn btn-sm" onclick="genPONo(\''+vid+'\')">ออกเลขอัตโนมัติ</button>'
-      +'<button class="btn btn-sm" onclick="printPO(\''+vid+'\',true)" title="พรีวิวร่าง — ไม่มีตราประทับ">👁 Preview</button>'
-      +'<button class="btn btn-sm btn-primary" onclick="printPO(\''+vid+'\')">🖨 พิมพ์ PO</button>'
+      +_poPrintButtons(vid)
       +'<label class="btn btn-sm" style="cursor:pointer">📎 แนบ PO ลงนาม<input type="file" style="display:none" onchange="uploadPODoc(\''+vid+'\',\'signed\',this)"></label>'+(vd.signedUrl?docThumb(vd.signedUrl,vd.signedName||'PO ลงนาม',{small:true}):'')
       +(typeof sendBackVendor==='function'?'<button class="btn btn-sm" onclick="sendBackVendor(\''+vid+'\')" title="ส่ง PO ที่ลงนามกลับให้ Vendor ทางอีเมล">📧 ส่งกลับ Vendor</button>':'')
       +(vd.sentAt?'<span style="font-size:11px;color:var(--green)">✓ ส่งกลับแล้ว '+fmtDate((vd.sentAt+'').split('T')[0])+'</span>':'')
@@ -1492,11 +1495,11 @@ function renderPOStage(){
         <div class="form-group" style="margin-bottom:8px"><label>${mode==='item'?'②':''} ไฟล์ที่ลงนามแล้ว (เซน)</label><div style="display:flex;gap:8px;align-items:center"><input type="file" onchange="uploadPODoc('${vid}','signed',this)"><span style="font-size:11px;color:var(--muted)">${vd.signedUrl?docThumb(vd.signedUrl,vd.signedName||'ไฟล์ลงนาม',{small:true}):'ยังไม่อัปโหลด'}</span></div></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
           <span style="font-size:11px;color:${vd.sentAt?'var(--green)':'var(--muted)'}">${vd.sentAt?'✓ ส่งกลับแล้ว '+fmtDate(vd.sentAt):'ยังไม่ส่งกลับ'}</span>
-          <div style="display:flex;gap:8px"><button class="btn btn-sm" data-ro="keep" onclick="printPO('${vid}',true)" title="พรีวิวร่าง — ไม่มีตราประทับ">👁 Preview</button><button class="btn btn-sm" data-ro="keep" onclick="printPO('${vid}')">🖨 พิมพ์ PO</button><button class="btn btn-primary btn-sm" onclick="sendBackVendor('${vid}')">📧 ส่งกลับ Vendor</button></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${_poPrintButtons(vid)}<button class="btn btn-primary btn-sm" onclick="sendBackVendor('${vid}')">📧 ส่งกลับ Vendor</button></div>
         </div>
       </div></div>`;
   }).join('');
-  return head+cards;
+  return (typeof _poApprovalPanel==='function'?_poApprovalPanel():'')+head+cards;
 }
 // ── #4 พิมพ์ใบสั่งซื้อ (PO) ส่ง Vendor ──
 let COMPANY = { name:'บริษัท ดี ออน เน็ต จำกัด', nameEn:'D On Net Co.,Ltd.', address:'สำนักงานใหญ่ : เลขที่ 78 หมู่ที่ 11 ตำบลผาเลือด อำเภอท่าปลา จังหวัดอุตรดิตถ์ 53190', taxId:'535569001005', phone:'091-5192945', fax:'-', logo:'', stamp:'', approverSign:'' };
@@ -2048,6 +2051,239 @@ function renderPOEditor(vid){
   h+=brkItems.map((rec,i)=>'<div style="border-top:1px solid #e2e8f0;padding:4px 0"><div style="font-size:12px"><b>'+(i+1)+'.</b> '+esc((rec.name||'-')).slice(0,60)+'</div><div style="margin-top:2px">'+marksAfter(i)+' '+brkBtn(i)+'</div></div>').join('');
   return h;
 }
+// ════════ ระบบอนุมัติ PO (ApproveSetting ตามวงเงิน + email + รออนุมัติ) ════════
+function _poApproved(){ const a=(editingPO&&editingPO.stageData&&editingPO.stageData.approval)||null; return !!(a&&a.status==='approved'); }
+function _poPrintButtons(vid){
+  const appr=_poApproved();
+  let h='<button class="btn btn-sm" data-ro="keep" onclick="printPO(\''+vid+'\',true)" title="ดูตัวอย่าง (ไม่มีตราประทับ)">👁 Preview</button>';
+  if(appr) h+=' <button class="btn btn-primary btn-sm" data-ro="keep" onclick="printPO(\''+vid+'\',false)" title="พิมพ์ใบสั่งซื้อตัวจริง (มีตราประทับ)">🖨 พิมพ์ PO</button>';
+  else h+=' <span style="font-size:11px;color:var(--amber)">🔒 พิมพ์ PO ตัวจริง (มีตรา) ได้หลังอนุมัติ</span>';
+  return h;
+}
+const DEFAULT_PO_TIERS=[
+  {id:1,name:'หัวหน้าจัดซื้อ',minAmt:0,maxAmt:99999,approverName:'หัวหน้าจัดซื้อ',approverEmail:''},
+  {id:2,name:'ผู้จัดการ',minAmt:100000,maxAmt:499999,approverName:'ผู้จัดการ',approverEmail:''},
+  {id:3,name:'กรรมการผู้จัดการ',minAmt:500000,maxAmt:999999999,approverName:'กรรมการผู้จัดการ',approverEmail:''}
+];
+let poApprovalTiers=[...DEFAULT_PO_TIERS];
+function loadPOApprovalTiers(){
+  try{ const it=(_settingsCache||[]).find(i=>i.Title==='POApprovalTiers'); if(it&&it.Value){ const a=JSON.parse(it.Value); if(Array.isArray(a)&&a.length) poApprovalTiers=a; } }catch(e){}
+}
+function getPOApproverForAmount(amt){ return poApprovalTiers.filter(t=>amt>=(+t.minAmt||0)&&amt<=(+t.maxAmt||999999999)).sort((a,b)=>b.minAmt-a.minAmt)[0]||poApprovalTiers[0]; }
+function renderPOTiers(){
+  const tb=document.getElementById('po-tiers-body'); if(!tb)return;
+  const ip='background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--text);width:100%';
+  tb.innerHTML=poApprovalTiers.map((t,i)=>`<tr>
+    <td><input value="${esc(t.name||'')}" oninput="updatePOTier(${t.id},'name',this.value)" style="${ip}"></td>
+    <td><input type="number" value="${t.minAmt}" oninput="updatePOTier(${t.id},'minAmt',+this.value)" style="${ip};text-align:right"></td>
+    <td><input type="number" value="${t.maxAmt===999999999?'':t.maxAmt}" placeholder="ไม่จำกัด" oninput="updatePOTier(${t.id},'maxAmt',this.value?+this.value:999999999)" style="${ip};text-align:right"></td>
+    <td><input value="${esc(t.approverName||'')}" oninput="updatePOTier(${t.id},'approverName',this.value)" style="${ip}"></td>
+    <td><input value="${esc(t.approverEmail||'')}" oninput="updatePOTier(${t.id},'approverEmail',this.value)" placeholder="email@..." style="${ip}"></td>
+    <td style="text-align:center"><button class="btn btn-sm" onclick="removePOTier(${t.id})" style="color:var(--red)">✕</button></td></tr>`).join('');
+}
+function updatePOTier(id,f,v){ const t=poApprovalTiers.find(x=>x.id===id); if(t)t[f]=v; }
+function addPOTier(){ const mx=Math.max(0,...poApprovalTiers.map(t=>t.id)); poApprovalTiers.push({id:mx+1,name:'ระดับใหม่',minAmt:0,maxAmt:999999999,approverName:'',approverEmail:''}); renderPOTiers(); }
+function removePOTier(id){ if(poApprovalTiers.length<=1){toast('ต้องมีอย่างน้อย 1 ระดับ','error');return;} poApprovalTiers=poApprovalTiers.filter(t=>t.id!==id); renderPOTiers(); }
+async function savePOTiers(){ try{ await putSetting('POApprovalTiers',JSON.stringify(poApprovalTiers)); toast('บันทึกระดับอนุมัติ PO แล้ว','success'); }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); } }
+
+function _poApprovalAmount(){
+  if(editingPO && editingPO.type==='project'){ const d=_pb(); return (d.projVendors||[]).reduce((s,vid)=>s+((typeof pbVendorTotal==='function')?pbVendorTotal(vid):0),0); }
+  return (typeof poValue==='function')?poValue(editingPO):0;
+}
+function _poApprovalData(){
+  let cost=0; const vendors=[];
+  const isProj = editingPO && editingPO.type==='project';
+  const vids = isProj ? ((_pb().projVendors||[]).map(String)) : ((typeof poVendorList==='function')?poVendorList():[]);
+  vids.forEach(vid=>{ const v=getVendorById(vid);
+    let vt=0, lines=[];
+    if(isProj){ (pbItems(vid)||[]).filter(x=>(x.name||'').trim()).forEach(it=>{ const price=+it.price||0, qn=+it.qty||0; vt+=price*qn; lines.push({name:it.name||'',qty:qn,unit:it.unit||'',price:price,total:price*qn}); }); }
+    else { const items=(typeof poItemsForVendor==='function')?poItemsForVendor(vid):[]; items.forEach(({it,idx})=>{ const price=(typeof vendorItemPrice==='function')?(+vendorItemPrice(vid,idx)||0):(+it.cost||0); const qn=+it.qty||0; vt+=price*qn; lines.push({name:it.name||'',qty:qn,unit:it.unit||'',price:price,total:price*qn}); }); }
+    const vname=(v&&v.name)||(String(vid)===String(editingPO.vendorId||'')?(editingPO.vendorName||''):'')||(vid&&!/^\d+$/.test(String(vid))?String(vid):'')||'(ยังไม่ได้เลือก Vendor)';
+    cost+=vt; vendors.push({name:vname,email:v?v.email:'',total:vt,poNo:(typeof poVendorDocs==='function'?(poVendorDocs(vid).poNo||''):''),lines:lines});
+  });
+  const total=_poApprovalAmount()||cost;
+  let saleNet=null, margin=null, marginPct=null;
+  try{ const q=(editingPO.quoteId&&typeof quotesById!=='undefined')?quotesById[String(editingPO.quoteId)]:null; if(q&&+q.TotalAmount){ saleNet=(+q.TotalAmount)/1.07; margin=saleNet-cost; marginPct=saleNet>0?Math.round(margin/saleNet*100):null; } }catch(e){}
+  return {vendors,cost,total,saleNet,margin,marginPct};
+}
+function _poM(n){ return '฿'+Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function buildPOApprovalHTML(approver, reason){
+  const d=_poApprovalData();
+  const FONT='font-family:Tahoma,\'Segoe UI\',sans-serif';
+  const infoRow=(label,val,strong)=>`<tr><td style="padding:6px 0;${FONT};font-size:13px;color:#8a8f98;width:130px;vertical-align:top">${label}</td><td style="padding:6px 0;${FONT};font-size:13px;color:#1a1a2e;${strong?'font-weight:700':''}">${val}</td></tr>`;
+  const kpi=(label,val,sub,bg,fg)=>`<td width="33%" valign="top" style="padding:4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:10px"><tr><td style="padding:12px 14px;${FONT}"><div style="font-size:11px;color:#8a8f98">${label}</div><div style="font-size:16px;font-weight:700;color:${fg};margin-top:3px">${val}</div>${sub?`<div style="font-size:12px;color:${fg};font-weight:600;margin-top:1px">${sub}</div>`:''}</td></tr></table></td>`;
+  const mColor=d.marginPct==null?'#555':(d.marginPct>=20?'#16a34a':d.marginPct>=10?'#d97706':'#dc2626');
+  let kpis='<tr>'+kpi('ยอดสั่งซื้อรวม (ต้นทุน)',_poM(d.total),'','#f4f5f7','#1a1a2e');
+  if(d.saleNet!=null) kpis+=kpi('ยอดขาย (ก่อน VAT)',_poM(d.saleNet),'','#f4f5f7','#555');
+  if(d.margin!=null) kpis+=kpi('กำไรคาดการณ์',_poM(d.margin),'Margin '+d.marginPct+'%','#fff7ed',mColor);
+  kpis+='</tr>';
+  const sectionHead=t=>`<tr><td style="background:#f4f5f7;padding:8px 14px;${FONT};font-size:12px;color:#374151;font-weight:700;border-top:1px solid #e5e7eb;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;border-radius:8px 8px 0 0">${t}</td></tr>`;
+  const vRows=d.vendors.map(v=>`<tr><td style="padding:7px 12px;${FONT};font-size:12px;color:#1a1a2e;border-top:1px solid #eef0f3">${esc(v.name)}${v.poNo?' · '+esc(v.poNo):''}</td><td align="right" style="padding:7px 12px;${FONT};font-size:12px;color:#1a1a2e;font-weight:700;border-top:1px solid #eef0f3">${_poM(v.total)}</td></tr>`).join('');
+  const itemRows=d.vendors.flatMap(v=>v.lines).slice(0,14).map(l=>`<tr><td style="padding:6px 12px;${FONT};font-size:12px;color:#1a1a2e;border-top:1px solid #eef0f3">${esc(l.name)}</td><td align="center" style="padding:6px 12px;${FONT};font-size:12px;color:#555;border-top:1px solid #eef0f3">${l.qty} ${esc(l.unit)}</td><td align="right" style="padding:6px 12px;${FONT};font-size:12px;color:#555;border-top:1px solid #eef0f3">${_poM(l.price)}</td><td align="right" style="padding:6px 12px;${FONT};font-size:12px;color:#1a1a2e;border-top:1px solid #eef0f3">${_poM(l.total)}</td></tr>`).join('');
+  const boxWrap=(inner)=>`<tr><td style="padding:0 0 16px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:0 0 8px 8px">${inner}</table></td></tr>`;
+  const PAL=[['#1d4ed8','#eff6ff'],['#15803d','#f0fdf4'],['#b45309','#fff7ed'],['#7c3aed','#f5f3ff'],['#be185d','#fdf2f8'],['#0f766e','#f0fdfa'],['#b91c1c','#fef2f2']];
+  const projBlocks=d.vendors.map(function(v,i){ var c=PAL[i%PAL.length];
+    var th='<tr style="background:'+c[1]+'"><td style="padding:6px 12px;'+FONT+';font-size:11px;color:#555">รายการ</td><td align="center" style="padding:6px 12px;'+FONT+';font-size:11px;color:#555">จำนวน</td><td align="right" style="padding:6px 12px;'+FONT+';font-size:11px;color:#555">ราคา/หน่วย</td><td align="right" style="padding:6px 12px;'+FONT+';font-size:11px;color:#555">รวม</td></tr>';
+    var rows=(v.lines||[]).map(function(l){ return '<tr><td style="padding:6px 12px;'+FONT+';font-size:12px;color:#1a1a2e;border-top:1px solid '+c[0]+'22">'+esc(l.name)+'</td><td align="center" style="padding:6px 12px;'+FONT+';font-size:12px;color:#444;border-top:1px solid '+c[0]+'22">'+l.qty+' '+esc(l.unit)+'</td><td align="right" style="padding:6px 12px;'+FONT+';font-size:12px;color:#444;border-top:1px solid '+c[0]+'22">'+_poM(l.price)+'</td><td align="right" style="padding:6px 12px;'+FONT+';font-size:12px;color:#1a1a2e;border-top:1px solid '+c[0]+'22">'+_poM(l.total)+'</td></tr>'; }).join('')||'<tr><td colspan="4" style="padding:8px 12px;'+FONT+';font-size:12px;color:#888">— ไม่มีรายการ —</td></tr>';
+    return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;border:1px solid '+c[0]+';border-radius:8px;overflow:hidden">'
+      +'<tr><td style="background:'+c[0]+';padding:9px 14px;'+FONT+'"><span style="color:#fff;font-size:13px;font-weight:700">🏢 '+esc(v.name)+'</span>'+(v.poNo?'<span style="color:#ffffffcc;font-size:11px"> · '+esc(v.poNo)+'</span>':'')+'</td><td align="right" style="background:'+c[0]+';padding:9px 14px;'+FONT+';color:#fff;font-size:13px;font-weight:700">'+_poM(v.total)+'</td></tr>'
+      +'<tr><td colspan="2" style="padding:0"><table width="100%" cellpadding="0" cellspacing="0">'+th+rows+'</table></td></tr>'
+      +'</table>';
+  }).join('');
+  const isProj = editingPO && editingPO.type==='project';
+  return ''
+  +`<div style="${FONT};background:#eceef1;padding:20px 0">`
+  +'<table role="presentation" align="center" width="640" cellpadding="0" cellspacing="0" style="width:640px;max-width:96%;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e3e6ea">'
+  +`<tr><td bgcolor="#c2660c" style="background:#c2660c;padding:22px 28px;${FONT}"><div style="color:#ffffff;font-size:18px;font-weight:700">🔔 คำขออนุมัติการสั่งซื้อ (PO)</div><div style="color:#fde6cf;font-size:12px;margin-top:3px">รายงานประกอบการตัดสินใจ · PurchasePro</div></td></tr>`
+  +'<tr><td style="padding:22px 28px">'
+  +'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">'
+  +infoRow('งาน/โครงการ',esc(editingPO.quoteTitle||editingPO.projectName||'-'),true)
+  +infoRow('ลูกค้า',esc(editingPO.client||'-'))
+  +infoRow('ผู้ขอซื้อ',esc((currentUser&&(currentUser.displayName||currentUser.email))||'-'))
+  +infoRow('ผู้อนุมัติ',esc(approver.approverName||'-')+' <span style="color:#8a8f98">('+esc(approver.name||'')+')</span>')
+  +'</table>'
+  +(reason?('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px"><tr><td style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;'+FONT+'"><div style="font-size:12px;color:#b45309;font-weight:700;margin-bottom:2px">⟳ ส่งขออนุมัติใหม่ (เคยอนุมัติแล้ว)</div><div style="font-size:12px;color:#7c2d12">เหตุผล: '+esc(reason)+'</div></td></tr></table>'):'')
+  +'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px">'+kpis+'</table>'
+  +(function(){ var sub=d.cost||0, vat=Math.round(sub*0.07*100)/100, grand=sub+vat; var tr=function(l,v,b){return '<tr><td style="padding:5px 12px;'+FONT+';font-size:12px;color:'+(b?'#1a1a2e':'#8a8f98')+';'+(b?'font-weight:700':'')+'">'+l+'</td><td align="right" style="padding:5px 12px;'+FONT+';font-size:12px;color:#1a1a2e;'+(b?'font-weight:700':'')+'">'+_poM(v)+'</td></tr>';};
+     return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px"><tr><td style="padding:0"><table role="presentation" align="right" width="300" cellpadding="0" cellspacing="0" style="width:300px;border:1px solid #e5e7eb;border-radius:8px">'
+     +tr('ยอดสั่งซื้อ (ก่อน VAT)',sub)+tr('VAT 7%',vat)
+     +'<tr><td colspan="2" style="border-top:1px solid #e5e7eb;font-size:0;line-height:0">&nbsp;</td></tr>'
+     +tr('รวมทั้งสิ้น',grand,true)+'</table></td></tr></table>'; })()
+  +(isProj
+      ? ('<div style="'+FONT+';font-size:12px;color:#374151;font-weight:700;margin-bottom:8px">🏢 รายการสั่งซื้อแยกตาม Vendor</div>'+projBlocks)
+      : ((vRows?('<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'+sectionHead('🏢 ยอดต่อ Vendor')+boxWrap(vRows)+'</table>'):'')
+        +(itemRows?('<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'+sectionHead('📦 รายการสั่งซื้อ')+boxWrap('<tr><td style="padding:6px 12px;'+FONT+';font-size:11px;color:#8a8f98;background:#fcfcfd">รายการ</td><td align="center" style="padding:6px 12px;'+FONT+';font-size:11px;color:#8a8f98;background:#fcfcfd">จำนวน</td><td align="right" style="padding:6px 12px;'+FONT+';font-size:11px;color:#8a8f98;background:#fcfcfd">ราคา/หน่วย</td><td align="right" style="padding:6px 12px;'+FONT+';font-size:11px;color:#8a8f98;background:#fcfcfd">รวม</td></tr>'+itemRows)+'</table>'):'')))
+  +'<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:6px 0 0"><a href="https://darmmunginsa.github.io/D-ON-NET/purchasepro/" style="display:inline-block;background:#c2660c;color:#ffffff;text-decoration:none;padding:12px 30px;border-radius:8px;font-size:13px;font-weight:700;'+FONT+'">เข้าระบบ PurchasePro เพื่ออนุมัติ →</a></td></tr></table>'
+  +'</td></tr>'
+  +`<tr><td bgcolor="#f7f8fa" style="background:#f7f8fa;padding:13px 28px;text-align:center;border-top:1px solid #e5e7eb;${FONT}"><div style="font-size:11px;color:#9ca3af">D On Net · อีเมลนี้ส่งอัตโนมัติจาก PurchasePro</div></td></tr>`
+  +'</table></div>';
+}
+function _poApprovalPanel(){
+  const amt=_poApprovalAmount();
+  const ap=getPOApproverForAmount(amt);
+  const st=(sd().approval)||null;
+  let statusHtml, actions;
+  if(st&&st.status==='approved'){ statusHtml='<span style="color:var(--green);font-weight:600">✓ อนุมัติแล้ว</span>'+(st.decidedBy?' <span style="font-size:11px;color:var(--muted)">โดย '+esc(st.decidedBy)+'</span>':''); actions='<button class="btn btn-sm" onclick="resendPOApprovalWithReason()" title="ส่งขออนุมัติใหม่ (ต้องระบุเหตุผล)">✉ ส่งขออนุมัติใหม่</button>'; }
+  else if(st&&st.status==='pending'){ statusHtml='<span style="color:var(--amber);font-weight:600">⏳ รออนุมัติ</span>'+(st.at?' <span style="font-size:11px;color:var(--muted)">ส่งเมื่อ '+fmtDate((st.at+'').split("T")[0])+'</span>':''); actions='<button class="btn btn-sm btn-primary" onclick="sendPOApprovalRequest()">✉ ส่งซ้ำ</button> <button class="btn btn-sm" style="border:1px solid var(--green);color:var(--green)" onclick="markPOApproved()">✓ อนุมัติ</button> <button class="btn btn-sm" style="color:var(--red)" onclick="markPORejected()">✕ ไม่อนุมัติ</button>'; }
+  else if(st&&st.status==='rejected'){ statusHtml='<span style="color:var(--red);font-weight:600">✕ ไม่อนุมัติ</span>'+(st.note?' <span style="font-size:11px;color:var(--muted)">'+esc(st.note)+'</span>':''); actions='<button class="btn btn-sm btn-primary" onclick="sendPOApprovalRequest()">✉ ส่งขออนุมัติใหม่</button>'; }
+  else { statusHtml='<span style="color:var(--muted)">ยังไม่ขออนุมัติ</span>'; actions='<button class="btn btn-sm btn-primary" onclick="sendPOApprovalRequest()">📧 ส่งขออนุมัติ</button>'; }
+  const noMail=(!ap||!ap.approverEmail)?' <span style="color:var(--red);font-size:11px">⚠ ยังไม่ได้ตั้งอีเมลผู้อนุมัติ (ตั้งค่า → ระดับการอนุมัติ PO)</span>':'';
+  return `<div class="card" style="border:1px solid var(--amber);background:rgba(245,158,11,.06);margin-bottom:14px"><div style="padding:11px 14px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="font-size:13px"><b>อนุมัติการสั่งซื้อ</b> · มูลค่า <b>${fmt(amt)}</b> → ผู้อนุมัติ: <b>${esc(ap?ap.approverName:'-')}</b> <span style="font-size:11px;color:var(--muted)">${esc(ap?ap.approverEmail:'')}</span>${noMail}</div>
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap">${statusHtml} ${actions}</div>
+    </div></div></div>`;
+}
+async function resendPOApprovalWithReason(){
+  const reason=(prompt('ใบนี้อนุมัติไปแล้ว — ระบุเหตุผลที่ต้องส่งขออนุมัติใหม่ (เช่น ปรับราคา / เพิ่ม-ลดรายการ / เปลี่ยน Vendor):','')||'').trim();
+  if(!reason){ toast('กรุณาระบุเหตุผลการส่งขออนุมัติใหม่','error'); return; }
+  return sendPOApprovalRequest(reason);
+}
+async function sendPOApprovalRequest(reason){
+  const amt=_poApprovalAmount();
+  const ap=getPOApproverForAmount(amt);
+  if(!ap||!ap.approverEmail||!ap.approverEmail.includes('@')){ toast('ยังไม่ได้ตั้งอีเมลผู้อนุมัติ — ไปที่ ตั้งค่า → ระดับการอนุมัติ PO','error'); return; }
+  try{
+    toast('กำลังส่งอีเมลขออนุมัติ...','info');
+    const subject='[ขออนุมัติ PO] '+(editingPO.quoteTitle||editingPO.projectName||'')+' — '+(editingPO.client||'');
+    const html=buildPOApprovalHTML(ap, reason);
+    await _sendMailGraph(ap.approverEmail,subject,html);
+    sd().approval={status:'pending',approverName:ap.approverName,approverEmail:ap.approverEmail,amount:amt,at:new Date().toISOString(),by:(currentUser&&(currentUser.displayName||currentUser.email))||'',byEmail:(currentUser&&currentUser.email)||'',resendReason:reason||''};
+    if(typeof savePurchase==='function') await savePurchase();
+    renderStageBody(); if(typeof renderPendingBadge==='function')renderPendingBadge();
+    toast('ส่งอีเมลขออนุมัติถึง '+ap.approverName+' แล้ว','success');
+    if(typeof logActivity==='function') logActivity(reason?'ส่งขออนุมัติ PO ใหม่':'ขออนุมัติ PO', (editingPO.quoteTitle||editingPO.projectName||''), 'ยอด '+(Number(amt)||0).toLocaleString()+' บาท → '+ap.approverName+(reason?(' · เหตุผล: '+reason):''), {amount:Number(amt)||0, approver:ap.approverEmail});
+  }catch(e){ toast('ส่งไม่สำเร็จ: '+e.message,'error'); }
+}
+function buildPOResultHTML(rec, ap, status, note){
+  const F="font-family:Tahoma,'Segoe UI',sans-serif";
+  const ok=status==='approved';
+  const head=ok?'#15803d':'#b91c1c';
+  const title=ok?'✅ PO ได้รับการอนุมัติแล้ว':'❌ PO ไม่ได้รับการอนุมัติ';
+  const row=(l,v)=>'<tr><td style="padding:6px 0;'+F+';font-size:13px;color:#8a8f98;width:130px">'+l+'</td><td style="padding:6px 0;'+F+';font-size:13px;color:#1a1a2e">'+v+'</td></tr>';
+  return ''
+   +'<div style="'+F+';background:#eceef1;padding:20px 0"><table role="presentation" align="center" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:96%;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e3e6ea">'
+   +'<tr><td bgcolor="'+head+'" style="background:'+head+';padding:20px 26px;'+F+'"><div style="color:#fff;font-size:17px;font-weight:700">'+title+'</div><div style="color:#ffffffcc;font-size:12px;margin-top:3px">PurchasePro</div></td></tr>'
+   +'<tr><td style="padding:20px 26px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+   +row('งาน/โครงการ',esc(rec.quoteTitle||rec.projectName||'-'))
+   +row('ลูกค้า',esc(rec.client||'-'))
+   +row('มูลค่า','฿'+Number((ap&&ap.amount)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}))
+   +row('ผลการพิจารณา',(ok?'<b style="color:#15803d">อนุมัติ</b>':'<b style="color:#b91c1c">ไม่อนุมัติ</b>')+' โดย '+esc((ap&&ap.decidedBy)||'-'))
+   +(note?row('หมายเหตุ',esc(note)):'')
+   +'</table>'
+   +'<div style="'+F+';font-size:12px;color:#8a8f98;margin-top:14px">'+(ok?'ดำเนินการออก PO / ส่ง Vendor ได้ตามปกติ':'กรุณาตรวจทบทวนและส่งขออนุมัติใหม่หากต้องการ')+'</div>'
+   +'</td></tr>'
+   +'<tr><td bgcolor="#f7f8fa" style="background:#f7f8fa;padding:12px 26px;text-align:center;border-top:1px solid #e5e7eb;'+F+'"><div style="font-size:11px;color:#9ca3af">D On Net · อีเมลนี้ส่งอัตโนมัติจาก PurchasePro</div></td></tr>'
+   +'</table></div>';
+}
+async function _emailPOApprovalResult(id, ap, status, note){
+  try{
+    let to=(ap&&ap.byEmail)||'';
+    if((!to||!to.includes('@')) && ap&&ap.by&&String(ap.by).includes('@')) to=ap.by;
+    if(!to||!to.includes('@')){ if(typeof toast==='function') toast('บันทึกผลแล้ว แต่ไม่พบอีเมลผู้ขอ (คำขอนี้ส่งก่อนอัปเดต) — ให้ผู้ขอส่งขออนุมัติใหม่เพื่อแจ้งผลได้','info'); return; }
+    const rec=(procurements||[]).find(x=>String(x.id)===String(id))||{};
+    const subject='[ขออนุมัติ PO] '+(rec.quoteTitle||rec.projectName||'')+' — '+(rec.client||'');
+    const html=buildPOResultHTML(rec, ap, status, note);
+    await _sendMailGraph(to,'RE: '+subject,html);
+  }catch(e){ console.warn('PO result mail:',e.message); }
+}
+function _pendingApprovals(){
+  return getPurchases().filter(p=>{ const a=p.stageData&&p.stageData.approval; return a&&a.status==='pending'; });
+}
+function renderPendingBadge(){
+  const el=document.getElementById('appr-navcount'); if(!el)return;
+  const n=_pendingApprovals().length;
+  el.innerHTML = n ? (' <span style="background:var(--amber);color:#1a1a2e;font-size:10px;font-weight:700;border-radius:9px;padding:1px 7px">'+n+'</span>') : '';
+}
+function renderApprovals(){
+  renderPendingBadge();
+  const body=document.getElementById('approvals-body'); if(!body)return;
+  const list=_pendingApprovals().sort((a,b)=>String((b.stageData.approval||{}).at||'').localeCompare(String((a.stageData.approval||{}).at||'')));
+  if(!list.length){ body.innerHTML='<tr><td colspan=7 style="text-align:center;padding:28px;color:var(--muted)">ไม่มีรายการรออนุมัติ</td></tr>'; return; }
+  body.innerHTML=list.map(p=>{ const a=p.stageData.approval||{}; const at=(a.at||'').split('T')[0];
+    return '<tr>'
+      +'<td style="font-weight:500">'+esc(p.quoteTitle||p.projectName||'(ไม่มีชื่อ)')+(p.type==='project'?' <span class="badge" style="background:#4f8ef722;color:#4f8ef7;font-size:10px">โครงการ</span>':'')+'</td>'
+      +'<td>'+esc(p.client||'-')+'</td>'
+      +'<td style="text-align:right;font-family:var(--mono)">'+fmt(+a.amount||0)+'</td>'
+      +'<td>'+esc(a.approverName||'-')+'</td>'
+      +'<td style="color:var(--muted);font-size:12px">'+esc(a.by||'-')+'</td>'
+      +'<td style="color:var(--muted);font-size:12px">'+(at?fmtDate(at):'-')+'</td>'
+      +'<td style="white-space:nowrap">'
+      +'<button class="btn btn-sm" onclick="openPO(\''+p.id+'\')" title="เปิดดูรายละเอียด">👁 เปิดดู</button> '
+      +'<button class="btn btn-sm btn-primary" onclick="approvePending(\''+p.id+'\')">✓ อนุมัติ</button> '
+      +'<button class="btn btn-sm" style="color:var(--red)" onclick="rejectPending(\''+p.id+'\')">✕</button>'
+      +'</td></tr>';
+  }).join('');
+}
+async function _setPendingStatus(id, status, note){
+  const ext=purchaseExt[String(id)]; if(!ext){ toast('ไม่พบงาน','error'); return false; }
+  ext.stageData=ext.stageData||{};
+  ext.stageData.approval=Object.assign({},ext.stageData.approval,{status:status,note:note||'',decidedBy:(currentUser&&(currentUser.displayName||currentUser.email))||'',decidedAt:new Date().toISOString()});
+  try{ await putSetting('Purchase_'+id, JSON.stringify(ext)); return true; }
+  catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); return false; }
+}
+async function approvePending(id){
+  if(!confirm('ยืนยันอนุมัติ PO นี้?')) return;
+  if(await _setPendingStatus(id,'approved','')){ toast('อนุมัติแล้ว — กำลังแจ้งผู้ขอ...','success'); if(String(editingPO&&editingPO.id)===String(id)&&editingPO.stageData){ editingPO.stageData.approval=purchaseExt[String(id)].stageData.approval; } await _emailPOApprovalResult(id, purchaseExt[String(id)].stageData.approval, 'approved',''); renderApprovals(); if(typeof logActivity==='function'){ const _p=(typeof getPurchases==='function'?getPurchases():[]).find(x=>String(x.id)===String(id)); logActivity('อนุมัติ PO', _p?.quoteTitle||String(id), ''); } }
+}
+async function rejectPending(id){
+  const note=(prompt('เหตุผลที่ไม่อนุมัติ (ถ้ามี):','')||'').trim();
+  if(await _setPendingStatus(id,'rejected',note)){ toast('บันทึก: ไม่อนุมัติ — กำลังแจ้งผู้ขอ...','success'); await _emailPOApprovalResult(id, purchaseExt[String(id)].stageData.approval, 'rejected', note); renderApprovals(); if(typeof logActivity==='function'){ const _p=(typeof getPurchases==='function'?getPurchases():[]).find(x=>String(x.id)===String(id)); logActivity('ไม่อนุมัติ PO', _p?.quoteTitle||String(id), 'เหตุผล: '+(note||'-')); } }
+}
+async function markPOApproved(){
+  sd().approval=Object.assign({},sd().approval,{status:'approved',decidedBy:(currentUser&&(currentUser.displayName||currentUser.email))||'',decidedAt:new Date().toISOString()});
+  if(typeof savePurchase==='function') await savePurchase(); renderStageBody(); toast('อนุมัติแล้ว — กำลังแจ้งผู้ขอ...','success');
+  if(typeof logActivity==='function') logActivity('อนุมัติ PO', editingPO.quoteTitle||editingPO.projectName||'', '');
+  await _emailPOApprovalResult(editingPO.id, sd().approval, 'approved', ''); if(typeof renderPendingBadge==="function")renderPendingBadge();
+}
+async function markPORejected(){
+  const note=(prompt('เหตุผลที่ไม่อนุมัติ (ถ้ามี):','')||'').trim();
+  sd().approval=Object.assign({},sd().approval,{status:'rejected',note:note,decidedBy:(currentUser&&(currentUser.displayName||currentUser.email))||'',decidedAt:new Date().toISOString()});
+  if(typeof savePurchase==='function') await savePurchase(); renderStageBody(); toast('บันทึกผล: ไม่อนุมัติ — กำลังแจ้งผู้ขอ...','success');
+  if(typeof logActivity==='function') logActivity('ไม่อนุมัติ PO', editingPO.quoteTitle||editingPO.projectName||'', 'เหตุผล: '+(note||'-'));
+  await _emailPOApprovalResult(editingPO.id, sd().approval, 'rejected', note); if(typeof renderPendingBadge==="function")renderPendingBadge();
+}
+
 function printPO(vid, draft){   // เปิดพรีวิว + เครื่องมือจัดหน้า (draft=true → พรีวิวร่าง ไม่มีตราประทับ)
   _poEditVid=vid;
   const old=document.getElementById('_docOverlay'); if(old)old.remove();
