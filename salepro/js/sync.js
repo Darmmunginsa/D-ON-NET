@@ -29,7 +29,7 @@ function filterQuotesForUser(allQuotes) {
   return allQuotes.filter(q => {
     const saleEmail = approvalEmail(q.SaleEmail);
     // Match by sale email, or show if no sale email assigned (own quotes)
-    return saleEmail === myEmail || saleEmail === '' || (!!approvalEmail(q.ApproverEmail)&&approvalEmail(q.ApproverEmail)===myEmail);
+    return saleEmail === myEmail || saleEmail === '' || (!!approvalEmail(q.ApproverEmail)&&approvalEmail(q.ApproverEmail)===myEmail) || (typeof _isQuoteShared==='function' && _isQuoteShared(q.id));
   });
 }
 

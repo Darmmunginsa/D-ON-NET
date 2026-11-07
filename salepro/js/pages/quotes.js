@@ -18,10 +18,43 @@ function canEditQuote(q) {
   if (!currentUser) return false;
   // Admin can edit all quotes
   if (userRoles.isAdmin) return true;
+  // ใบที่ "แชร์" ให้ทีมช่วยกันสร้าง → ทุกคนแก้ได้
+  if (_isQuoteShared(q.id)) return true;
   // Owner can edit their own quotes
   const myEmail = (currentUser.email||'').toLowerCase();
   const saleEmail = (q.SaleEmail||'').toLowerCase();
   return saleEmail === myEmail;
+}
+// เจ้าของใบ (หรือ Admin) — ใช้ตัดสินสิทธิ์กดปุ่มแชร์
+function isQuoteOwner(q) {
+  if (!currentUser) return false;
+  if (userRoles.isAdmin) return true;
+  return (q.SaleEmail||'').toLowerCase() === (currentUser.email||'').toLowerCase();
+}
+// ใบนี้ถูกแชร์ให้ทีมแก้ร่วมหรือยัง (เก็บใน Settings: QuoteShared_<id>)
+function _isQuoteShared(id) {
+  try { return typeof getSettingValue === 'function' && getSettingValue('QuoteShared_' + id) === '1'; } catch(e) { return false; }
+}
+// แชร์/ยกเลิกแชร์ใบเสนอราคา — แชร์แล้วเปลี่ยนเลขที่กลับเป็น QT เพื่อให้เป็นใบทีม
+async function shareQuote(id) {
+  const q = quotesData.find(x => String(x.id) === String(id));
+  if (!q) return;
+  if (_isQuoteShared(id)) {
+    if (!confirm('ยกเลิกการแชร์ใบนี้? (เพื่อนร่วมทีมจะแก้ไม่ได้อีก)')) return;
+    try { await putSettingValue('QuoteShared_' + id, '0'); toast('ยกเลิกแชร์แล้ว', 'success'); renderQuotes(); }
+    catch(e) { toast('ไม่สำเร็จ: ' + e.message, 'error'); }
+    return;
+  }
+  const newNo = (q.Title || '').replace(/^[^\d]+/, 'QT');
+  if (!confirm('แชร์ใบนี้ให้เพื่อนร่วมทีมช่วยกันสร้าง?\nเลขที่ใบจะเปลี่ยนเป็น ' + newNo + ' (ใช้ QT)')) return;
+  try {
+    toast('กำลังแชร์...', 'info');
+    if (newNo && newNo !== q.Title) { await updateListItem(CONFIG.lists.quotations, id, { Title: newNo }); q.Title = newNo; }
+    await putSettingValue('QuoteShared_' + id, '1');
+    if (typeof logActivity === 'function') logActivity('แชร์ใบเสนอราคา', q.Title||'', 'ให้ทีมแก้ไขร่วม');
+    toast('แชร์แล้ว — ทีมช่วยกันแก้ไขได้ · เลขที่: ' + (q.Title||''), 'success');
+    renderQuotes();
+  } catch(e) { toast('แชร์ไม่สำเร็จ: ' + e.message, 'error'); }
 }
 
 let _quoteSort = { key: 'date', dir: 'desc' };   // default: ใบล่าสุดอยู่บน
@@ -128,7 +161,7 @@ function buildQuoteRow(q, isChild, depth) {
       <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${fmtDate(q.QuoteDate)}</td>
       <td style="font-family:var(--mono);font-size:12px">${fmt(q.TotalAmount||0)}</td>
       <td style="${isChild?'color:var(--muted)':''}">${isChild ? '' : (q.PaymentMethod||'')}</td>
-      <td>${statusBadge(q.Status)}</td>
+      <td>${statusBadge(q.Status)}${_isQuoteShared(q.id)?'<span class="badge" style="margin-left:4px;background:rgba(52,211,153,.14);color:var(--green);font-size:9px">👥 แชร์</span>':''}</td>
       <td>${payBadge(q)}</td>
       <td style="white-space:nowrap;vertical-align:middle">
         <button class="action-btn" onclick="openApproveModal('${q.id}')" title="ดูรายละเอียด">
@@ -154,6 +187,7 @@ function buildQuoteRow(q, isChild, depth) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
         </button>` : ''}
         ${(typeof openRecurringModal==='function' && q.Status!=='Cancelled') ? `<button class="action-btn" style="color:${(typeof hasRecurring==='function'&&hasRecurring(q.id))?'var(--green)':'var(--muted)'}" onclick="openRecurringModal('${q.id}')" title="${(typeof hasRecurring==='function'&&hasRecurring(q.id))?'ตั้งออกซ้ำอัตโนมัติอยู่ — กดเพื่อแก้ไข':'ตั้งออกใบเสนอราคาซ้ำอัตโนมัติ (รายเดือน/รายปี)'}">🔁</button>` : ''}
+        ${(isQuoteOwner(q) && q.Status!=='Closed' && q.Status!=='Cancelled' && q.Status!=='PO Received') ? `<button class="action-btn" style="color:${_isQuoteShared(q.id)?'var(--green)':'var(--muted)'}" onclick="shareQuote('${q.id}')" title="${_isQuoteShared(q.id)?'แชร์อยู่ (ทีมแก้ได้) — กดเพื่อยกเลิกแชร์':'แชร์ให้ทีมช่วยกันสร้าง — เลขที่เป็น QT'}">👥</button>` : ''}
       </td>
       <td>${renderTrackerBtn(q)}</td>
     </tr>`;
