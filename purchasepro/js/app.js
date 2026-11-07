@@ -955,6 +955,7 @@ function _pbStepBody(vid, step){
     return '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-size:12px">เลขที่ PO</span>'
       +'<input value="'+esc(vd.poNo||'')+'" oninput="setPONo(\''+vid+'\',this.value)" placeholder="PO..." style="'+ip+';max-width:150px">'
       +'<button class="btn btn-sm" onclick="genPONo(\''+vid+'\')">ออกเลขอัตโนมัติ</button>'
+      +'<button class="btn btn-sm" onclick="printPO(\''+vid+'\',true)" title="พรีวิวร่าง — ไม่มีตราประทับ">👁 Preview</button>'
       +'<button class="btn btn-sm btn-primary" onclick="printPO(\''+vid+'\')">🖨 พิมพ์ PO</button>'
       +'<label class="btn btn-sm" style="cursor:pointer">📎 แนบ PO ลงนาม<input type="file" style="display:none" onchange="uploadPODoc(\''+vid+'\',\'signed\',this)"></label>'+(vd.signedUrl?docThumb(vd.signedUrl,vd.signedName||'PO ลงนาม',{small:true}):'')
       +(typeof sendBackVendor==='function'?'<button class="btn btn-sm" onclick="sendBackVendor(\''+vid+'\')" title="ส่ง PO ที่ลงนามกลับให้ Vendor ทางอีเมล">📧 ส่งกลับ Vendor</button>':'')
@@ -1491,7 +1492,7 @@ function renderPOStage(){
         <div class="form-group" style="margin-bottom:8px"><label>${mode==='item'?'②':''} ไฟล์ที่ลงนามแล้ว (เซน)</label><div style="display:flex;gap:8px;align-items:center"><input type="file" onchange="uploadPODoc('${vid}','signed',this)"><span style="font-size:11px;color:var(--muted)">${vd.signedUrl?docThumb(vd.signedUrl,vd.signedName||'ไฟล์ลงนาม',{small:true}):'ยังไม่อัปโหลด'}</span></div></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
           <span style="font-size:11px;color:${vd.sentAt?'var(--green)':'var(--muted)'}">${vd.sentAt?'✓ ส่งกลับแล้ว '+fmtDate(vd.sentAt):'ยังไม่ส่งกลับ'}</span>
-          <div style="display:flex;gap:8px"><button class="btn btn-sm" data-ro="keep" onclick="printPO('${vid}')">🖨 พิมพ์ PO</button><button class="btn btn-primary btn-sm" onclick="sendBackVendor('${vid}')">📧 ส่งกลับ Vendor</button></div>
+          <div style="display:flex;gap:8px"><button class="btn btn-sm" data-ro="keep" onclick="printPO('${vid}',true)" title="พรีวิวร่าง — ไม่มีตราประทับ">👁 Preview</button><button class="btn btn-sm" data-ro="keep" onclick="printPO('${vid}')">🖨 พิมพ์ PO</button><button class="btn btn-primary btn-sm" onclick="sendBackVendor('${vid}')">📧 ส่งกลับ Vendor</button></div>
         </div>
       </div></div>`;
   }).join('');
@@ -1797,7 +1798,7 @@ function openPOPasteImport(vid){
 }
 
 // สร้าง HTML ใบสั่งซื้อ (หลายหน้า, footer ยึดล่าง, เลขหน้า)
-function buildPOHtml(vid){
+function buildPOHtml(vid, draft){
   const v=getVendorById(vid)||{name:'-'}; const vd=poVendorDocs(vid);
   const NAVY='#17356b';
   const fmt2=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1900,10 +1901,10 @@ function buildPOHtml(vid){
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:24px;text-align:center;font-size:11px">'
     +'<div><div style="height:54px"></div><div style="border-top:1px dotted #999;padding-top:6px;color:#555">ผู้สั่งซื้อ<br>วันที่ ......./......./.......</div></div>'
     +'<div style="position:relative">'
-    +(COMPANY.approverSign?'<div style="height:54px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><img src="'+COMPANY.approverSign+'" style="max-height:46px;max-width:150px;object-fit:contain"></div>':'<div style="height:54px"></div>')
+    +((!draft&&COMPANY.approverSign)?'<div style="height:54px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px"><img src="'+COMPANY.approverSign+'" style="max-height:46px;max-width:150px;object-fit:contain"></div>':'<div style="height:54px"></div>')
     +'<div style="border-top:1px dotted #999;padding-top:6px;color:#555">ผู้มีอำนาจอนุมัติ<br>วันที่ ......./......./.......</div>'
-    +(COMPANY.stamp?(function(){ var sw=+vd.stampW||132, sr=+vd.stampRot||0, sx=+vd.stampX||0, sy=+vd.stampY||0;
-        return '<img src="'+COMPANY.stamp+'" style="position:absolute;left:50%;top:50%;transform:translate(calc(-50% + '+sx+'px), calc(-50% + '+sy+'px)) rotate('+sr+'deg);width:'+sw+'px;height:auto;opacity:0.9;pointer-events:none">'; })():'')   // ตราประทับวงกลมโปร่งใส — ปรับขนาด/หมุน/เลื่อนได้จากพรีวิว
+    +((!draft&&COMPANY.stamp)?(function(){ var sw=+vd.stampW||132, sr=+vd.stampRot||0, sx=+vd.stampX||0, sy=+vd.stampY||0;
+        return '<img src="'+COMPANY.stamp+'" style="position:absolute;left:50%;top:50%;transform:translate(calc(-50% + '+sx+'px), calc(-50% + '+sy+'px)) rotate('+sr+'deg);width:'+sw+'px;height:auto;opacity:0.9;pointer-events:none">'; })():'')   // ตราประทับ — ซ่อนในโหมดพรีวิว (ร่าง)
     +'</div>'
     +'</div>';
   // แบ่งหน้าตาม token 'break'
@@ -1929,7 +1930,8 @@ function buildPOHtml(vid){
     +'.po-page:last-child{page-break-after:auto}thead{display:table-header-group}tr{page-break-inside:avoid}'
     +'@media screen{body{background:#e5e7eb}.po-page{width:210mm;max-width:100%;margin:0 auto 10px;box-shadow:0 2px 14px rgba(0,0,0,.18)}}'
     +'@media print{@page{size:A4;margin:0}button{display:none!important}.po-page{box-shadow:none;margin:0}}'
-    +'</style></head><body>'+pagesHtml+'</body></html>';
+    +(draft?'.po-draft-tag{position:fixed;top:6mm;right:6mm;z-index:9;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;letter-spacing:1px}@media print{.po-draft-tag{position:absolute}}':'')
+    +'</style></head><body>'+(draft?'<div class="po-draft-tag">DRAFT · ฉบับร่าง (ไม่มีตราประทับ)</div>':'')+pagesHtml+'</body></html>';
 }
 // พรีวิว PO ในแอป + เครื่องมือจัดหน้า (แทรกบรรทัด/ขึ้นหน้า) + ปุ่มพิมพ์เปิดแท็บใหม่
 let _poEditVid=null, _poNoteT=null;
@@ -2046,26 +2048,27 @@ function renderPOEditor(vid){
   h+=brkItems.map((rec,i)=>'<div style="border-top:1px solid #e2e8f0;padding:4px 0"><div style="font-size:12px"><b>'+(i+1)+'.</b> '+esc((rec.name||'-')).slice(0,60)+'</div><div style="margin-top:2px">'+marksAfter(i)+' '+brkBtn(i)+'</div></div>').join('');
   return h;
 }
-function printPO(vid){   // เปิดพรีวิว + เครื่องมือจัดหน้า
+function printPO(vid, draft){   // เปิดพรีวิว + เครื่องมือจัดหน้า (draft=true → พรีวิวร่าง ไม่มีตราประทับ)
   _poEditVid=vid;
   const old=document.getElementById('_docOverlay'); if(old)old.remove();
   const ov=document.createElement('div'); ov.id='_docOverlay';
   ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,0.62);display:flex;flex-direction:column;padding:10px 12px;gap:8px';
   const bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px';
-  bar.innerHTML='<div style="color:#fff;font-size:13px;font-weight:600">พรีวิว / จัดหน้าใบสั่งซื้อ</div>';
+  bar.innerHTML='<div style="color:#fff;font-size:13px;font-weight:600">'+(draft?'👁 พรีวิว (ร่าง — ไม่มีตราประทับ)':'พรีวิว / จัดหน้าใบสั่งซื้อ')+'</div>';
   const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px';
-  const printBtn=document.createElement('button'); printBtn.textContent='🖨 พิมพ์ / บันทึก PDF'; printBtn.style.cssText='padding:8px 18px;background:#17356b;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer';
+  const printBtn=document.createElement('button'); printBtn.textContent=draft?'🖨 พิมพ์ร่าง':'🖨 พิมพ์ / บันทึก PDF'; printBtn.style.cssText='padding:8px 18px;background:#17356b;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer';
   const closeBtn=document.createElement('button'); closeBtn.textContent='✕ ปิด'; closeBtn.style.cssText='padding:8px 16px;background:#fff;color:#334155;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;cursor:pointer';
   btns.appendChild(printBtn); btns.appendChild(closeBtn); bar.appendChild(btns); ov.appendChild(bar);
   const wrap=document.createElement('div'); wrap.style.cssText='flex:1;min-height:0;display:flex;gap:10px';
-  const ed=document.createElement('div'); ed.id='_poEditor'; ed.style.cssText='width:340px;flex-shrink:0;background:#fff;border-radius:8px;padding:12px;overflow:auto';
+  // โหมดร่างไม่ต้องมีเครื่องมือจัดตราประทับ (เพราะไม่แสดงตรา)
+  const ed=document.createElement('div'); ed.id='_poEditor'; ed.style.cssText='width:340px;flex-shrink:0;background:#fff;border-radius:8px;padding:12px;overflow:auto'; if(draft) ed.style.display='none';
   ed.innerHTML=renderPOEditor(vid);
-  const f=document.createElement('iframe'); f.id='_poFrame'; f.style.cssText='flex:1;min-width:0;border:none;border-radius:8px;background:#fff;box-shadow:0 12px 44px rgba(0,0,0,0.45)'; f.srcdoc=buildPOHtml(vid);
+  const f=document.createElement('iframe'); f.id='_poFrame'; f.style.cssText='flex:1;min-width:0;border:none;border-radius:8px;background:#fff;box-shadow:0 12px 44px rgba(0,0,0,0.45)'; f.srcdoc=buildPOHtml(vid, draft);
   wrap.appendChild(ed); wrap.appendChild(f); ov.appendChild(wrap);
   document.body.appendChild(ov);
   function close(){ ov.remove(); _poEditVid=null; document.removeEventListener('keydown',onKey); }
   function onKey(e){ if(e.key==='Escape'){ e.stopPropagation(); close(); } }
-  printBtn.onclick=function(){ const w=window.open('','_blank'); if(!w){ if(typeof toast==='function')toast('เบราว์เซอร์บล็อกป๊อปอัป — โปรดอนุญาตแล้วลองใหม่','error'); return; } w.document.open(); w.document.write(buildPOHtml(vid)); w.document.close(); setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} },500); };
+  printBtn.onclick=function(){ const w=window.open('','_blank'); if(!w){ if(typeof toast==='function')toast('เบราว์เซอร์บล็อกป๊อปอัป — โปรดอนุญาตแล้วลองใหม่','error'); return; } w.document.open(); w.document.write(buildPOHtml(vid, draft)); w.document.close(); setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} },500); };
   closeBtn.onclick=close;
   document.addEventListener('keydown',onKey);
 }
