@@ -74,6 +74,8 @@ async function syncAll(){
       if((i.Title||'').startsWith('DealStatus_')) _settingsCache=_settingsCache.filter(x=>x.Title!==i.Title);
       if(!_settingsCache.some(x=>x.Title===i.Title)) _settingsCache.push({...i,_srcList:CONFIG.lists.settings});
     });
+    // CC แจ้งเตือนกลาง (อ่านจาก CompanyExtra.DefaultCC ที่ตั้งใน SalePro — Sheet เดียวกัน)
+    try{ const _ce=_settingsCache.find(i=>i.Title==='CompanyExtra'); if(_ce&&_ce.Value&&typeof _parseEmailList==='function'){ const _o=JSON.parse(_ce.Value)||{}; _defaultCCEmails=_parseEmailList(_o.DefaultCC); } }catch(e){}
     const procItem = _settingsCache.find(i=>i.Title==='Procurements');
     procurements = (procItem&&procItem.Value)?(JSON.parse(procItem.Value)||[]):[];
     const venItem = _settingsCache.find(i=>i.Title==='Vendors');

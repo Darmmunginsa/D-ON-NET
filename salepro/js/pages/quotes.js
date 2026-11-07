@@ -1591,6 +1591,7 @@ async function saveQuote(status) {
     const editBanner = document.getElementById('edit-banner');
     if (editBanner) editBanner.style.display = 'none';
     toast(`บันทึก ${fields.Title} สำเร็จ${status==='Pending'?' — ส่งอนุมัติแล้ว':''}`, 'success');
+    if (typeof logActivity === 'function') logActivity(existIdx >= 0 ? 'แก้ไขใบเสนอราคา' : 'สร้างใบเสนอราคา', fields.Title, (existIdx>=0?'แก้ไข':'สร้าง') + ' มูลค่า ' + (Number(fields.TotalAmount)||0).toLocaleString() + ' บาท' + (status==='Pending'?' · ส่งอนุมัติ':''), { value: Number(fields.TotalAmount)||0, status: status });
     // ส่ง Email แจ้ง Approver เมื่อส่งอนุมัติ
     if (status === 'Pending') {
       const newQ = quotesData.find(x => x.id === quoteId) || { ...fields, id: quoteId };

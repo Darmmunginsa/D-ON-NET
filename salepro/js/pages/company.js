@@ -1,13 +1,15 @@
 // ============================================================
 // COMPANY SETTINGS
 // ============================================================
-let companySettings = { CompanyName:'', CompanyNameEn:'', TaxID:'', Phone:'', Fax:'', Email:'', Address:'', AddressEn:'', PrimaryColor:'#1a3a5c', FooterText:'', LogoURL:'', SignatureURL:'', LogoBase64:'', SignatureBase64:'', HeaderFontSize:10, DocNoFormat:'', HeaderNameImage:'', HeaderNameW:0, HeaderNameH:0 };
+let companySettings = { CompanyName:'', CompanyNameEn:'', TaxID:'', Phone:'', Fax:'', Email:'', Address:'', AddressEn:'', PrimaryColor:'#1a3a5c', FooterText:'', LogoURL:'', SignatureURL:'', LogoBase64:'', SignatureBase64:'', HeaderFontSize:10, DocNoFormat:'', HeaderNameImage:'', HeaderNameW:0, HeaderNameH:0, DefaultCC:'' };
 // ข้อมูลหัวเอกสารเพิ่มเติม (ชื่อ/ที่อยู่ EN + Fax) — เก็บใน Settings JSON เลี่ยงเพิ่มคอลัมน์ Company list
 function loadCompanyExtra() {
-  try { const it = (_settingsCache || []).find(i => i.Title === 'CompanyExtra'); if (it && it.Value) { const o = JSON.parse(it.Value)||{}; companySettings.CompanyNameEn=o.CompanyNameEn||''; companySettings.AddressEn=o.AddressEn||''; companySettings.Fax=o.Fax||''; companySettings.DocNoFormat=o.DocNoFormat||''; companySettings.HeaderNameImage=o.HeaderNameImage||''; companySettings.HeaderNameW=+o.HeaderNameW||0; companySettings.HeaderNameH=+o.HeaderNameH||0; } } catch(e) {}
+  try { const it = (_settingsCache || []).find(i => i.Title === 'CompanyExtra'); if (it && it.Value) { const o = JSON.parse(it.Value)||{}; companySettings.CompanyNameEn=o.CompanyNameEn||''; companySettings.AddressEn=o.AddressEn||''; companySettings.Fax=o.Fax||''; companySettings.DocNoFormat=o.DocNoFormat||''; companySettings.HeaderNameImage=o.HeaderNameImage||''; companySettings.HeaderNameW=+o.HeaderNameW||0; companySettings.HeaderNameH=+o.HeaderNameH||0; companySettings.DefaultCC=o.DefaultCC||''; } } catch(e) {}
+  try { if (typeof _defaultCCEmails !== 'undefined' && typeof _parseEmailList === 'function') _defaultCCEmails = _parseEmailList(companySettings.DefaultCC); } catch(e) {}
 }
 async function saveCompanyExtra() {
-  const value = JSON.stringify({ CompanyNameEn:companySettings.CompanyNameEn||'', AddressEn:companySettings.AddressEn||'', Fax:companySettings.Fax||'', DocNoFormat:companySettings.DocNoFormat||'', HeaderNameImage:companySettings.HeaderNameImage||'', HeaderNameW:+companySettings.HeaderNameW||0, HeaderNameH:+companySettings.HeaderNameH||0 });
+  const value = JSON.stringify({ CompanyNameEn:companySettings.CompanyNameEn||'', AddressEn:companySettings.AddressEn||'', Fax:companySettings.Fax||'', DocNoFormat:companySettings.DocNoFormat||'', HeaderNameImage:companySettings.HeaderNameImage||'', HeaderNameW:+companySettings.HeaderNameW||0, HeaderNameH:+companySettings.HeaderNameH||0, DefaultCC:companySettings.DefaultCC||'' });
+  try { if (typeof _defaultCCEmails !== 'undefined' && typeof _parseEmailList === 'function') _defaultCCEmails = _parseEmailList(companySettings.DefaultCC); } catch(e) {}
   const items = _settingsCache || await getListItems(CONFIG.lists.settings);
   const ex = items.find(i => i.Title === 'CompanyExtra');
   if (ex) { await updateListItem(CONFIG.lists.settings, ex.id, { Value: value }); ex.Value = value; }
@@ -45,6 +47,7 @@ function renderCompanySettingsForm() {
     document.getElementById('co-address').value = s.Address||'';
     const _aen=document.getElementById('co-address-en'); if(_aen) _aen.value=s.AddressEn||'';
     const _dnf=document.getElementById('co-docno-format'); if(_dnf) _dnf.value=s.DocNoFormat||'';
+    const _dcc=document.getElementById('co-default-cc'); if(_dcc) _dcc.value=s.DefaultCC||'';
     document.getElementById('co-footer').value = s.FooterText||'';
     document.getElementById('co-color').value = s.PrimaryColor||'#1a3a5c';
     document.getElementById('co-color-label').textContent = s.PrimaryColor||'#1a3a5c';
@@ -212,6 +215,7 @@ async function saveCompanySettings() {
     companySettings.AddressEn = document.getElementById('co-address-en')?.value || '';
     companySettings.Fax = document.getElementById('co-fax')?.value || '';
     companySettings.DocNoFormat = document.getElementById('co-docno-format')?.value.trim() || '';
+    companySettings.DefaultCC = document.getElementById('co-default-cc')?.value.trim() || '';
     // ภาพชื่อบริษัท (หัวเอกสาร) + ขนาด กว้าง/สูง (HeaderNameImage ถูกเก็บตอน preview แล้ว)
     companySettings.HeaderNameW = +(document.getElementById('coname-w')?.value) || 0;
     companySettings.HeaderNameH = +(document.getElementById('coname-h')?.value) || 0;

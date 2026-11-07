@@ -107,6 +107,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
           Approve Settings
         </div>
+        <div class="nav-item nav-admin-only" onclick="showPage('activity',this)" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+          ประวัติการใช้งาน (Log)
+        </div>
       </div>
     </nav>
     <div class="user-section">
@@ -473,6 +477,37 @@
         <div id="expiry-summary" style="margin-bottom:12px"></div>
         <div id="expiry-dashboard"></div>
       </div>
+      <div class="page" id="page-activity">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:12px">บันทึกกิจกรรมสำคัญทั้งระบบ (SalePro + PurchasePro)</div>
+        <div class="card" style="padding:12px 14px;margin-bottom:14px">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+            <div style="flex:1;min-width:200px">
+              <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">ค้นหา</label>
+              <input id="act-search" oninput="renderActivityLog()" placeholder="🔍 ผู้ใช้ / เลขที่ / รายละเอียด" style="width:100%;font-size:13px;padding:8px 10px;box-sizing:border-box">
+            </div>
+            <div style="width:130px">
+              <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">แอป</label>
+              <select id="act-app" onchange="renderActivityLog()" style="width:100%;font-size:13px;padding:8px"><option value="">ทุกแอป</option><option>SalePro</option><option>PurchasePro</option></select>
+            </div>
+            <div style="width:160px">
+              <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">ประเภท</label>
+              <select id="act-type" onchange="renderActivityLog()" style="width:100%;font-size:13px;padding:8px"><option value="">ทุกประเภท</option></select>
+            </div>
+            <div style="width:140px">
+              <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">ตั้งแต่วันที่</label>
+              <input id="act-from" type="date" onchange="renderActivityLog()" style="width:100%;font-size:13px;padding:7px 8px;box-sizing:border-box">
+            </div>
+            <div style="width:140px">
+              <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">ถึงวันที่</label>
+              <input id="act-to" type="date" onchange="renderActivityLog()" style="width:100%;font-size:13px;padding:7px 8px;box-sizing:border-box">
+            </div>
+            <button class="btn btn-sm" onclick="loadActivityPage()">🔄 รีเฟรช</button>
+            <button class="btn btn-sm btn-primary" onclick="exportActivityCSV()">⬇ Export CSV</button>
+          </div>
+        </div>
+        <div id="act-summary" style="margin-bottom:10px;font-size:13px;color:var(--muted)"></div>
+        <div id="act-table"></div>
+      </div>
       <div class="page" id="page-projects">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
           <div style="font-size:12px;color:var(--muted)">โครงการที่ต้องใช้ผู้รับเหมา/Vendor หลายเจ้า — สร้างแล้วส่งให้ทีมจัดซื้อหา Vendor แต่ละสายงาน</div>
@@ -657,6 +692,13 @@
                     <div class="form-group"><label>เบอร์โทรศัพท์</label><input id="co-phone" placeholder="02-xxx-xxxx"></div>
                     <div class="form-group"><label>Fax</label><input id="co-fax" placeholder="02-xxx-xxxx"></div>
                     <div class="form-group"><label>Email</label><input id="co-email" placeholder="info@company.com"></div>
+                    <div class="form-group" style="grid-column:1/-1">
+                      <label>📧 Email แจ้งเตือนกลาง (CC ทุกเมลของระบบ)</label>
+                      <input id="co-default-cc" placeholder="manager@company.com; admin@company.com">
+                      <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6">
+                        ทุกอีเมลที่ระบบส่ง (ขออนุมัติ · แจ้งเตือนหมดอายุ · ติดตาม ฯลฯ) จะ CC มาที่นี่ด้วย · ใส่หลายอีเมลคั่นด้วย <b>;</b> หรือ <b>,</b> · เว้นว่าง = ไม่ CC
+                      </div>
+                    </div>
                     <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ (ไทย)</label><textarea id="co-address" placeholder="ที่อยู่บริษัท..." style="min-height:72px"></textarea></div>
                     <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ (อังกฤษ) — สำหรับหัวเอกสาร</label><textarea id="co-address-en" placeholder="HEAD OFFICE address (English)..." style="min-height:60px"></textarea></div>
                     <div class="form-group" style="grid-column:1/-1">
@@ -1448,26 +1490,27 @@
 <script src="../shared/service-plan.js?v=service1"></script>
 <script src="js/config.js?v=admin1"></script>
 <script src="js/auth.js?v=idle60-20261104"></script>
-<script src="js/api.js?v=g2"></script>
+<script src="js/api.js?v=monitor20261107"></script>
 <script src="js/sync.js?v=approval20261102"></script>
-<script src="js/pages/ui.js?v=calendar20261103"></script>
+<script src="js/pages/ui.js?v=monitor20261107"></script>
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
-<script src="../shared/travel-cost.js?v=average20261105"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=average20261105"></script><script src="js/pages/quotes.js?v=queue20261105"></script>
-<script src="js/pages/approve.js?v=approval20261102"></script>
+<script src="../shared/travel-cost.js?v=average20261105"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=average20261105"></script><script src="js/pages/quotes.js?v=monitor20261107"></script>
+<script src="js/pages/approve.js?v=monitor20261107"></script>
 <script src="js/pages/payment.js?v=cancel20261103"></script>
 <script src="js/pages/catalog.js?v=drawer20261102"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
 <script src="js/pages/settings.js?v=approval20261102"></script>
 <script src="js/pages/customers.js?v=taxcrm20261103"></script>
 <script src="js/pages/signature.js?v=admin1"></script>
-<script src="js/pages/company.js?v=admin1"></script>
+<script src="js/pages/company.js?v=monitor20261107"></script>
 <script src="js/pages/pdf.js?v=notespaces20261103"></script>
-<script src="js/pages/saletracker.js?v=sourcefix20261103"></script>
+<script src="js/pages/saletracker.js?v=monitor20261107"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>
 <script src="js/pages/belowcost.js?v=admin1"></script>
 <script src="js/pages/procurement.js?v=admin1"></script>
 <script src="js/pages/projects.js?v=g1"></script>
 <script src="js/pages/expiry.js?v=g1"></script>
+<script src="js/pages/activity.js?v=monitor20261107"></script>
 <script src="js/pages/contracts.js?v=customerprofile1"></script>
 <script src="js/app.js?v=admin1"></script>
 <script src="js/tour.js?v=admin1"></script>

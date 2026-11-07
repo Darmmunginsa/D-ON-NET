@@ -182,6 +182,10 @@ function sendEmail(req) {
   var isHtml = /<[a-z][\s\S]*>/i.test(req.body || '');
   var opts = { name: req.fromName || 'SalePro' };        // ชื่อผู้ส่ง = ผู้ที่ล็อกอิน (ถ้าส่งมา)
   if (req.replyTo) opts.replyTo = req.replyTo;            // ตอบกลับไปหาผู้ที่ล็อกอินโดยตรง
+  // CC แจ้งเตือนกลาง (กรองเฉพาะอีเมลถูกต้อง)
+  var ccList = String(req.cc || '').split(/[;,\n]+/).map(function (s) { return s.trim(); })
+    .filter(function (s) { return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(s); });
+  if (ccList.length) opts.cc = ccList.join(',');
   if (isHtml) opts.htmlBody = req.body;
   var atts = (req.attachments || []).filter(function (a) { return a && (a.base64 || a.contentBytes); });
   if (atts.length) {

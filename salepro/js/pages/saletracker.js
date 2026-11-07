@@ -2376,6 +2376,7 @@ async function confirmCancelQuote() {
     }
     closeModal('cancel-quote-modal');
     toast('ยกเลิกใบเสนอราคา ' + q.Title + ' เรียบร้อยแล้ว', 'success');
+    if (typeof logActivity === 'function') logActivity('ยกเลิกใบเสนอราคา', q.Title, 'เหตุผล: ' + (reason||'-'));
     // ส่ง Email — Pending แจ้ง Approver, Approved แจ้ง Approver + จัดซื้อ
     renderDash(); renderQuotes(); renderPayment(); renderApprove(); updateBadge();
     await sendCancelNotification(q, reason);

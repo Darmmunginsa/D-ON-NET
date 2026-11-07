@@ -110,6 +110,7 @@ async function doApprove(status) {
     renderDash(); renderQuotes(); renderApprove(); renderPayment(); updateBadge();
     closeModal('approve-modal');
     toast(`${status==='Approved'?'✓ อนุมัติ':'✗ ปฏิเสธ'}เรียบร้อย`, 'success');
+    if (typeof logActivity === 'function') { const _qa = quotesData.find(x=>x.id===currentApproveId); logActivity(status==='Approved'?'อนุมัติใบเสนอราคา':'ปฏิเสธใบเสนอราคา', _qa?.Title||'', status==='Rejected'?('เหตุผล: '+(comment||'-')):(comment||''), { status: status }); }
     // ส่ง Email แจ้ง Sale เมื่ออนุมัติ / แจ้ง Sale+Approver เมื่อปฏิเสธ
     const qNotif = quotesData.find(x => x.id === currentApproveId);
     if (qNotif) sendApprovalResultEmail(qNotif, status, comment).catch(e => console.warn('Result email failed:', e.message));

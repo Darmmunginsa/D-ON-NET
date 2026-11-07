@@ -90,6 +90,22 @@ async function createListItem(list, fields) {
   const d = await _call({ action: 'create', list, fields: _coerceFields(fields) });
   return d.item || { id: d.id, ...fields };
 }
+// ── Activity Logs (แท็บ "ActivityLogs" ใน Sheet — Value=JSON ต่อแถว) ──
+async function logActivity(type, ref, detail, meta) {
+  try {
+    const u = (typeof currentUser !== 'undefined' && currentUser) ? currentUser : {};
+    const rec = {
+      ts: new Date().toISOString(), app: 'PurchasePro',
+      user: u.displayName || u.email || '', email: (u.email || '').toLowerCase(),
+      type: type || '', ref: ref || '', detail: detail || '', meta: meta || null
+    };
+    const title = (type || 'event') + (ref ? (' · ' + ref) : '');
+    const _q = (typeof _quietWrite !== 'undefined') ? _quietWrite : false;
+    if (typeof _quietWrite !== 'undefined') _quietWrite = true;
+    try { await createListItem('ActivityLogs', { Title: title.slice(0, 255), Value: JSON.stringify(rec) }); }
+    finally { if (typeof _quietWrite !== 'undefined') _quietWrite = _q; }
+  } catch (e) { console.warn('logActivity:', e.message); }
+}
 async function updateListItem(list, itemId, fields) {
   return _call({ action: 'update', list, id: itemId, fields: _coerceFields(fields) });
 }
@@ -129,6 +145,11 @@ function _buildRawEmail(from, fromName, to, subject, body, attachments){
   }
   return _mimeB64(mime).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
+// CC แจ้งเตือนกลางทั้งระบบ (ตั้งที่ SalePro → ตั้งค่าบริษัท → CompanyExtra.DefaultCC; Sheet เดียวกัน)
+var _defaultCCEmails = [];
+function _parseEmailList(s) {
+  return String(s || '').split(/[;,\s]+/).map(x => x.trim()).filter(x => /@/.test(x));
+}
 // Workflow mail uses the existing Apps Script sender; reply goes to the operator.
 async function _sendMail(to, subject, body, attachments) {
   const user = typeof currentUser !== 'undefined' ? currentUser : null;
@@ -137,7 +158,9 @@ async function _sendMail(to, subject, body, attachments) {
     const recipients = String(to || '').split(/[;,\n]+/).map(s => s.trim()).filter(Boolean);
     if (!recipients.length || recipients.some(email => !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email))) throw new Error('กรุณาตรวจสอบอีเมลผู้รับ');
     const files = (attachments || []).filter(a => a && (a.base64 || a.contentBytes)).map(a => ({name:a.name || 'attachment',contentType:a.contentType || 'application/octet-stream',base64:a.base64 || a.contentBytes}));
-    const response = await _call({action:'sendEmail',to:recipients.join(','),subject:subject || '',body:body || '',attachments:files,fromName:user.displayName || 'D On Net',replyTo:user.email});
+    const _toLc = recipients.map(e => e.toLowerCase());
+    const _cc = (_defaultCCEmails || []).filter(e => e && _toLc.indexOf(e.toLowerCase()) < 0);
+    const response = await _call({action:'sendEmail',to:recipients.join(','),cc:_cc.join(','),subject:subject || '',body:body || '',attachments:files,fromName:user.displayName || 'D On Net',replyTo:user.email});
     if (!response || response.ok !== true) throw new Error('เซิร์ฟเวอร์ยังไม่ยืนยันการส่งอีเมล');
     return response.result || {};
   } catch (error) {

@@ -1,7 +1,7 @@
 // ============================================================
 // PAGES
 // ============================================================
-const pageTitles = {dashboard:'Dashboard',quotes:'ใบเสนอราคา',newquote:'สร้างใบเสนอราคาใหม่',approve:'รออนุมัติ',payment:'ติดตามการชำระเงิน',catalog:'Catalog สินค้า',settings:'Approve Settings',prospects:'เป้าหมายลูกค้า',customers:'ลูกค้า (CRM)',company:'ตั้งค่าบริษัท',forecast:'Sale Forecast',vendor:'Vendor',contracts:'ทะเบียนสัญญา',projects:'โครงการ (Project)',expiry:'แจ้งเตือนหมดอายุ'};
+const pageTitles = {dashboard:'Dashboard',quotes:'ใบเสนอราคา',newquote:'สร้างใบเสนอราคาใหม่',approve:'รออนุมัติ',payment:'ติดตามการชำระเงิน',catalog:'Catalog สินค้า',settings:'Approve Settings',prospects:'เป้าหมายลูกค้า',customers:'ลูกค้า (CRM)',company:'ตั้งค่าบริษัท',forecast:'Sale Forecast',vendor:'Vendor',contracts:'ทะเบียนสัญญา',projects:'โครงการ (Project)',expiry:'แจ้งเตือนหมดอายุ',activity:'ประวัติการใช้งาน (Log)'};
 
 function showPage(id, el) {
   if(id==='calendar'&&typeof SaleCalendar!=='undefined')SaleCalendar.load();
@@ -23,6 +23,7 @@ function showPage(id, el) {
   if (id === 'contracts') { loadContracts().then(renderContracts); }
   if (id === 'projects') { loadProjectsPage(); }
   if (id === 'expiry') { loadExpiryPage(); }
+  if (id === 'activity') { if (typeof loadActivityPage === 'function') loadActivityPage(); }
   if (id === 'vendor') { loadVendors(); }
   if (id === 'catalog') { Promise.all([loadCatalogExtra(), (typeof loadVendors==='function'?loadVendors():null)]).then(renderCatalog); }
   if (id === 'company') {
