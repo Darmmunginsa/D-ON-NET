@@ -2435,18 +2435,125 @@ async function _approvalThreadMid(q) {
   }
   return mid;
 }
+// ── รายงานประกอบการตัดสินใจอนุมัติ (กำไร/หน่วย · margin รวม · ขายต่ำกว่าทุน · ประวัติลูกค้า) ──
+async function _collectApprovalInsight(q) {
+  const out = { lines: [], sell: 0, cost: 0, profit: 0, marginPct: 0, belowCost: [], client: null };
+  try {
+    const all = await getListItems(CONFIG.lists.quoteItems);
+    const items = all.filter(i => String(i.QuoteID) === String(q.id));
+    const extra = (typeof getQuoteItemExtra === 'function') ? (getQuoteItemExtra(q.id) || []) : [];
+    items.forEach((it, idx) => {
+      const t = it.Title || '';
+      if (t.startsWith('__GROUP__') || t === '__BLANK__' || t === '__PAGEBREAK__' || t === '__NOTE__') return;
+      const ex = extra[idx] || {};
+      const rawPrice = (ex.price !== undefined && ex.price !== '') ? ex.price : it.UnitPrice;
+      const priceN = (typeof isNumeric === 'function' ? isNumeric(rawPrice) : !isNaN(+rawPrice)) ? +rawPrice : null;
+      const qtyRaw = (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : it.Quantity;
+      const qty = (!isNaN(parseFloat(qtyRaw))) ? parseFloat(qtyRaw) : 0;
+      const disc = +it.DiscountPct || 0;
+      const cost = +ex.cost || 0;
+      const line = { name: t, qty: qty, unit: it.Unit || '', priceNum: priceN, cost: cost, disc: disc, net: null, profitUnit: null, lineProfit: null, marginPct: null };
+      if (priceN != null) {
+        const net = priceN * (1 - disc/100);
+        line.net = net; line.profitUnit = net - cost; line.lineProfit = (net - cost) * qty;
+        line.marginPct = net > 0 ? (net - cost)/net*100 : 0;
+        out.sell += net * qty; out.cost += cost * qty;
+        if (cost > 0 && net < cost) out.belowCost.push(line);
+      }
+      out.lines.push(line);
+    });
+  } catch(e) { console.warn('insight items:', e.message); }
+  try {
+    const snap = (typeof getSettingValue === 'function') ? getSettingValue('QuoteMargin_' + q.id) : '';
+    if (snap) { const o = JSON.parse(snap); if (out.sell <= 0 && +o.sell) out.sell = +o.sell; if (out.cost <= 0 && +o.cost) out.cost = +o.cost; }
+  } catch(e) {}
+  out.profit = out.sell - out.cost;
+  out.marginPct = out.sell > 0 ? Math.round(out.profit/out.sell*100) : 0;
+  try {
+    const cn = (q.ClientName || '').trim().toLowerCase();
+    if (cn && Array.isArray(quotesData) && typeof _srClassify === 'function') {
+      let win=0, lose=0, wonVal=0;
+      quotesData.forEach(x => { if (String(x.id)===String(q.id)) return; if ((x.ClientName||'').trim().toLowerCase()!==cn) return;
+        const c=_srClassify(x); if(c==='win'){win++;wonVal+=+x.TotalAmount||0;} else if(c==='lose')lose++; });
+      const dec = win+lose;
+      out.client = { win, lose, wonVal, rate: dec? Math.round(win/dec*100) : null, total: win+lose };
+    }
+  } catch(e) {}
+  return out;
+}
+function _apMoney(n){ return '฿' + Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function _apEsc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+async function buildApprovalReportHTML(q) {
+  const d = await _collectApprovalInsight(q);
+  const F = "font-family:Tahoma,'Segoe UI',sans-serif";
+  const tag = (q.Tag || '').trim();
+  const mColor = d.marginPct >= 20 ? '#16a34a' : d.marginPct >= 10 ? '#d97706' : '#dc2626';
+  const infoRow = (label, val, strong) => '<tr><td style="padding:6px 0;' + F + ';font-size:13px;color:#8a8f98;width:130px;vertical-align:top">' + label + '</td><td style="padding:6px 0;' + F + ';font-size:13px;color:#1a1a2e;' + (strong ? 'font-weight:700' : '') + '">' + val + '</td></tr>';
+  const kpi = (label, val, sub, bg, fg) => '<td width="33%" valign="top" style="padding:4px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + bg + ';border-radius:10px"><tr><td style="padding:12px 14px;' + F + '"><div style="font-size:11px;color:#8a8f98">' + label + '</div><div style="font-size:16px;font-weight:700;color:' + fg + ';margin-top:3px">' + val + '</div>' + (sub ? '<div style="font-size:12px;color:' + fg + ';font-weight:600;margin-top:1px">' + sub + '</div>' : '') + '</td></tr></table></td>';
+  const sectionHead = t => '<tr><td colspan="9" style="background:#f4f5f7;padding:8px 12px;' + F + ';font-size:12px;color:#374151;font-weight:700;border:1px solid #e5e7eb;border-bottom:none;border-radius:8px 8px 0 0">' + t + '</td></tr>';
+  const priced = d.lines.filter(l => l.priceNum != null).sort((a,b)=>(b.lineProfit||0)-(a.lineProfit||0));
+  const shown = priced.slice(0, 12);
+  const td = (v, align, color, w) => '<td align="' + (align||'left') + '" style="padding:7px 8px;' + F + ';font-size:12px;color:' + (color||'#1a1a2e') + ';border-top:1px solid #eef0f3' + (w?';font-weight:600':'') + '">' + v + '</td>';
+  const itemRows = shown.map(l => {
+    const mc = (l.marginPct==null)?'#8a8f98':(l.marginPct>=20?'#16a34a':l.marginPct>=10?'#d97706':'#dc2626');
+    return '<tr>' + td(_apEsc(l.name)) + td((l.qty||'') + ' ' + _apEsc(l.unit), 'center', '#555') + td(_apMoney(l.net), 'right') + td(_apMoney(l.cost), 'right', '#8a8f98') + td(_apMoney(l.profitUnit), 'right', (l.profitUnit<0?'#dc2626':'#1a1a2e')) + td(_apMoney(l.lineProfit), 'right', (l.lineProfit<0?'#dc2626':'#16a34a'), true) + td((l.marginPct==null?'—':(Math.round(l.marginPct)+'%')), 'right', mc) + '</tr>';
+  }).join('');
+  const thc = t => '<td align="' + (t.a||'left') + '" style="padding:6px 8px;' + F + ';font-size:11px;color:#8a8f98;background:#fcfcfd">' + t.t + '</td>';
+  const itemHead = [{t:'รายการ'},{t:'จำนวน',a:'center'},{t:'ราคา/หน่วย',a:'right'},{t:'ทุน/หน่วย',a:'right'},{t:'กำไร/หน่วย',a:'right'},{t:'กำไรรวม',a:'right'},{t:'%',a:'right'}].map(thc).join('');
+  const noCostNote = d.lines.some(l=>l.priceNum!=null && !(l.cost>0)) ? '<div style="' + F + ';font-size:11px;color:#d97706;margin:6px 0 16px">⚠ บางรายการยังไม่ได้ระบุต้นทุน — กำไรจริงอาจต่ำกว่าที่แสดง</div>' : '<div style="height:16px"></div>';
+  const belowBox = d.belowCost.length ? ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px"><tr><td style="border:1px solid #fecaca;background:#fef2f2;border-radius:8px;padding:10px 14px;' + F + '"><div style="font-size:12px;color:#991b1b;font-weight:700;margin-bottom:4px">⚠ ขายต่ำกว่าทุน ' + d.belowCost.length + ' รายการ</div><div style="font-size:12px;color:#7f1d1d;line-height:1.6">' + d.belowCost.slice(0,6).map(l=>_apEsc(l.name)+' ('+_apMoney(l.profitUnit)+'/หน่วย)').join('<br>') + '</div></td></tr></table>') : '';
+  let clientBox = '';
+  if (d.client && d.client.total > 0) {
+    const c = d.client;
+    clientBox = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px"><tr><td style="background:#f4f5f7;padding:8px 12px;' + F + ';font-size:12px;color:#374151;font-weight:700;border:1px solid #e5e7eb;border-bottom:none;border-radius:8px 8px 0 0">📊 ประวัติการขายกับลูกค้ารายนี้</td></tr>'
+      + '<tr><td style="padding:12px 14px;' + F + ';font-size:13px;color:#1a1a2e;line-height:1.8;border:1px solid #e5e7eb;border-radius:0 0 8px 8px">'
+      + 'ชนะ <b style="color:#16a34a">' + c.win + '</b> · แพ้ <b style="color:#dc2626">' + c.lose + '</b>'
+      + (c.rate!=null? ' · อัตราชนะ <b>' + c.rate + '%</b>' : '')
+      + '<br>มูลค่าที่เคยปิดได้รวม <b>' + _apMoney(c.wonVal) + '</b></td></tr></table>';
+  }
+  let kpis = '<tr>' + kpi('ยอดขาย (ก่อน VAT)', _apMoney(d.sell), '', '#f4f5f7', '#1a1a2e') + kpi('ต้นทุนรวม', _apMoney(d.cost), '', '#f4f5f7', '#555') + kpi('กำไรขั้นต้น', _apMoney(d.profit), 'Margin ' + d.marginPct + '%', '#ecfdf5', mColor) + '</tr>';
+  return ''
+    + '<div style="' + F + ';background:#eceef1;padding:20px 0">'
+    + '<table role="presentation" align="center" width="640" cellpadding="0" cellspacing="0" style="width:640px;max-width:96%;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e3e6ea">'
+    + '<tr><td bgcolor="#1f4e79" style="background:#1f4e79;padding:22px 28px;' + F + '"><div style="color:#ffffff;font-size:18px;font-weight:700">🔔 ใบเสนอราคารออนุมัติ</div><div style="color:#cfe0f0;font-size:12px;margin-top:3px">รายงานประกอบการตัดสินใจ · SalePro</div></td></tr>'
+    + '<tr><td style="padding:22px 28px">'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px">'
+    + infoRow('ใบเสนอราคา', _apEsc(q.Title||'-'), true)
+    + infoRow('ลูกค้า', _apEsc(q.ClientName||'-'))
+    + (tag ? infoRow('โปรเจกต์', _apEsc(tag)) : '')
+    + infoRow('ผู้จัดทำ', _apEsc(q.SaleName||q.SaleEmail||'-'))
+    + infoRow('มูลค่ารวม (รวม VAT)', _apMoney(q.TotalAmount||0), true)
+    + '</table>'
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:12px">' + kpis + '</table>'
+    + belowBox
+    + (itemRows ? ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+        + sectionHead('📦 กำไรรายรายการ')
+        + '<tr><td colspan="9" style="padding:0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb">'
+        + '<tr>' + itemHead + '</tr>' + itemRows + '</table></td></tr></table>' + noCostNote) : '')
+    + clientBox
+    + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:6px 0 0"><a href="https://darmmunginsa.github.io/D-ON-NET/salepro/" style="display:inline-block;background:#1f4e79;color:#ffffff;text-decoration:none;padding:12px 30px;border-radius:8px;font-size:13px;font-weight:700;' + F + '">เข้าระบบเพื่ออนุมัติ / ปฏิเสธ →</a></td></tr></table>'
+    + '</td></tr>'
+    + '<tr><td bgcolor="#f7f8fa" style="background:#f7f8fa;padding:13px 28px;text-align:center;border-top:1px solid #e5e7eb;' + F + '"><div style="font-size:11px;color:#9ca3af">D On Net · อีเมลนี้ส่งอัตโนมัติจาก SalePro</div></td></tr>'
+    + '</table></div>';
+}
+
 async function sendApprovalRequestEmail(q, attachment) {
   const to = q.ApproverEmail || '';
   if (!to || !to.includes('@')) return;
   const subject = _approvalSubject(q);
   const tag = (q.Tag || '').trim();
-  const body = '🔔 มีใบเสนอราคารออนุมัติ (แนบไฟล์ PDF ใบเสนอราคาไว้ด้านล่าง)\n\n'
-    + 'ใบเสนอราคา : ' + (q.Title||'') + '\n'
-    + 'ลูกค้า      : ' + (q.ClientName||'') + '\n'
-    + (tag ? 'โปรเจกต์   : ' + tag + '\n' : '')
-    + 'มูลค่ารวม   : ' + fmt(q.TotalAmount||0) + '\n'
-    + 'ผู้จัดทำ    : ' + (q.SaleName||q.SaleEmail||'') + '\n\n'
-    + 'กรุณาเข้าสู่ระบบ SalePro เพื่ออนุมัติหรือปฏิเสธใบเสนอราคา';
+  let body;
+  try { body = await buildApprovalReportHTML(q); }
+  catch(e) {
+    console.warn('build approval report failed, fallback text:', e.message);
+    body = '🔔 มีใบเสนอราคารออนุมัติ\n\n'
+      + 'ใบเสนอราคา : ' + (q.Title||'') + '\n'
+      + 'ลูกค้า      : ' + (q.ClientName||'') + '\n'
+      + (tag ? 'โปรเจกต์   : ' + tag + '\n' : '')
+      + 'มูลค่ารวม   : ' + fmt(q.TotalAmount||0) + '\n'
+      + 'ผู้จัดทำ    : ' + (q.SaleName||q.SaleEmail||'') + '\n\n'
+      + 'กรุณาเข้าสู่ระบบ SalePro เพื่ออนุมัติหรือปฏิเสธใบเสนอราคา';
+  }
   // ถ้าใบนี้เคยส่งอนุมัติแล้ว (มีเธรดเดิม) → ส่งรอบใหม่เป็น reply เพื่อให้อยู่เธรดเดียวกัน
   try {
     const mid = await _approvalThreadMid(q);

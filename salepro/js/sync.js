@@ -74,6 +74,7 @@ async function syncAll() {
     }
     if (typeof loadCompanyExtra === 'function') loadCompanyExtra();   // ชื่อ/ที่อยู่ EN + Fax หัวเอกสาร
     await loadApprovalTiers(); // ใช้ _settingsCache ที่เซ็ตไว้แล้ว
+    if (typeof loadApprovalPolicy === 'function') loadApprovalPolicy();   // เงื่อนไข Margin + Sale อนุมัติเอง
     await loadUserRoles(); // Re-evaluate using the freshly loaded settings/tiers before filtering quotes.
     // cache payments ไว้ใน memory
     paymentsCache = null; // invalidate cache เพื่อโหลดใหม่เมื่อจำเป็น

@@ -56,15 +56,77 @@ function updateTier(id, field, val) { const t = approvalTiers.find(x => x.id ===
 function addApprovalTier() { const maxId = Math.max(...approvalTiers.map(t => t.id), 0); approvalTiers.push({id:maxId+1,name:'ระดับใหม่',minAmt:0,maxAmt:999999999,approverName:'',approverEmail:''}); renderTiers(); }
 function removeTier(id) { if (approvalTiers.length<=1){toast('ต้องมีอย่างน้อย 1 ระดับ','error');return;} approvalTiers=approvalTiers.filter(t=>t.id!==id); renderTiers(); }
 
+// ── เงื่อนไขอนุมัติ: วงเงิน + Margin % (Sale อนุมัติเองได้ถ้าไม่เกินเกณฑ์) ──
+let approvalPolicy = { selfMaxAmount: 0, marginMinPct: 0 };
+function loadApprovalPolicy() {
+  try {
+    const it = (_settingsCache || []).find(i => i.Title === 'ApprovalPolicy');
+    if (it && it.Value) { const o = JSON.parse(it.Value) || {}; approvalPolicy = { selfMaxAmount: +o.selfMaxAmount || 0, marginMinPct: +o.marginMinPct || 0 }; }
+  } catch(e) { approvalPolicy = { selfMaxAmount: 0, marginMinPct: 0 }; }
+}
+function renderApprovalPolicy() {
+  const a = document.getElementById('pol-self-max'); const b = document.getElementById('pol-margin-min');
+  if (a) a.value = approvalPolicy.selfMaxAmount || '';
+  if (b) b.value = approvalPolicy.marginMinPct || '';
+}
+async function saveApprovalPolicy() {
+  approvalPolicy = {
+    selfMaxAmount: +(document.getElementById('pol-self-max')?.value) || 0,
+    marginMinPct: +(document.getElementById('pol-margin-min')?.value) || 0
+  };
+  try { await saveSettingItem('ApprovalPolicy', JSON.stringify(approvalPolicy)); toast('บันทึกเงื่อนไข Margin แล้ว', 'success'); if (typeof updateApproverBox === 'function') updateApproverBox(); }
+  catch(e) { toast('บันทึกไม่สำเร็จ: ' + e.message, 'error'); }
+}
+// margin % ของใบ (จาก snapshot QuoteMargin_<id>) — คืน null ถ้าไม่มีข้อมูลต้นทุน
+function getQuoteMarginPct(q) {
+  try {
+    const it = (_settingsCache || []).find(i => i.Title === 'QuoteMargin_' + q.id);
+    if (it && it.Value) { const o = JSON.parse(it.Value); const sell = +o.sell || 0, cost = +o.cost || 0; if (sell > 0) return Math.round((sell - cost) / sell * 100); }
+  } catch(e) {}
+  return null;
+}
+// ใบนี้ให้ Sale อนุมัติเองได้ไหม: ยอด <= วงเงิน และ margin% >= ขั้นต่ำ
+function isQuoteSelfApprovable(q) {
+  const cap = +approvalPolicy.selfMaxAmount || 0;
+  if (cap <= 0) return false;
+  if ((+q.TotalAmount || 0) > cap) return false;
+  const mp = getQuoteMarginPct(q);
+  const need = +approvalPolicy.marginMinPct || 0;
+  if (need > 0) { if (mp == null) return false; if (mp < need) return false; }
+  return true;
+}
+
 function updateApproverBox() {
   const box = document.getElementById('approver-box');
   if (!box) return;
   const t = calcTotals();
+  // margin% สด จากรายการ (ต้นทุน×จำนวน เทียบยอดก่อน VAT)
+  let liveMargin = null;
+  try {
+    if (typeof quoteItems !== 'undefined' && Array.isArray(quoteItems)) {
+      let cost = 0;
+      quoteItems.forEach(it => { if (it && it.type === 'item') { const qn = parseFloat(it.qty); cost += (+it.cost || 0) * (isNaN(qn) ? 0 : qn); } });
+      if (t.after > 0) liveMargin = Math.round((t.after - cost) / t.after * 100);
+    }
+  } catch(e) {}
+  const cap = +(approvalPolicy.selfMaxAmount || 0);
+  const need = +(approvalPolicy.marginMinPct || 0);
+  const selfOK = cap > 0 && t.grand <= cap && (need <= 0 || (liveMargin != null && liveMargin >= need));
+  const mTxt = liveMargin != null ? ` · Margin ${liveMargin}%` : '';
+  if (selfOK) {
+    box.innerHTML = `<div style="display:flex;align-items:center;gap:10px">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;flex-shrink:0">✓</div>
+      <div><div style="font-size:12px;font-weight:500;color:var(--green)">Sale อนุมัติเองได้</div>
+      <div style="font-size:11px;color:var(--muted)">ยอดไม่เกิน ${fmt(cap)}${mTxt} — ผ่านเกณฑ์</div></div>
+    </div>`;
+    return;
+  }
   const approver = getApproverForAmount(t.grand);
+  const reason = (cap > 0 && need > 0 && liveMargin != null && liveMargin < need && t.grand <= cap) ? ' (Margin ต่ำกว่าเกณฑ์)' : '';
   box.innerHTML = `<div style="display:flex;align-items:center;gap:10px">
     <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--purple));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;flex-shrink:0">${(approver.approverName||'?')[0]}</div>
-    <div><div style="font-size:12px;font-weight:500;color:var(--text)">${approver.approverName||'(ยังไม่ได้ตั้งค่า)'}</div>
-    <div style="font-size:11px;color:var(--muted)">${approver.approverEmail||''} · ${approver.name}</div></div>
+    <div><div style="font-size:12px;font-weight:500;color:var(--text)">${approver.approverName||'(ยังไม่ได้ตั้งค่า)'}${reason}</div>
+    <div style="font-size:11px;color:var(--muted)">${approver.approverEmail||''} · ${approver.name}${mTxt}</div></div>
     <div style="margin-left:auto;font-size:11px;color:var(--muted)">วงเงิน ${fmt(approver.minAmt)}${approver.maxAmt===999999999?'+':' – '+fmt(approver.maxAmt)}</div>
   </div>`;
 }

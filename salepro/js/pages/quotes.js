@@ -1559,6 +1559,13 @@ async function saveQuote(status) {
       else { for (const r of _rows) await createListItem(CONFIG.lists.quoteItems, r); }   // fallback
     }
     await saveQuoteItemExtra(quoteId, itemExtra);
+    // snapshot กำไร/ต้นทุน (ใช้กับ margin% เงื่อนไขอนุมัติ + Sale Result)
+    try {
+      let _totCost = 0;
+      (quoteItems||[]).forEach(it => { if (it && it.type === 'item') { const qn = parseFloat(it.qty); _totCost += (+it.cost||0) * (isNaN(qn)?0:qn); } });
+      const _tt = calcTotals();
+      await putSettingValue('QuoteMargin_' + quoteId, JSON.stringify({ cost: Math.round(_totCost*100)/100, sell: Math.round((_tt.after||0)*100)/100 }));
+    } catch(e) { console.warn('save margin:', e.message); }
     // บันทึกขนาดฟอนต์ 4 zone + อายุใบเสนอราคา ของใบนี้ (รายใบ)
     await saveQuoteZoneFonts(quoteId);
     await saveQuoteValidity(quoteId, document.getElementById('q-validity').value || '');

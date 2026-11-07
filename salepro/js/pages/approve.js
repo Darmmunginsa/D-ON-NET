@@ -36,7 +36,8 @@ function openApproveModal(id) {
   // Check if current user is the designated approver
   const myEmail = (currentUser?.email || '').toLowerCase();
   const approverEmail = (q.ApproverEmail || '').toLowerCase();
-  const isApprover = canApproveQuotation(q);
+  const selfOK = (typeof isQuoteSelfApprovable === 'function') && isQuoteSelfApprovable(q);
+  const isApprover = canApproveQuotation(q) || selfOK;
   const isPending = q.Status === 'Pending';
 
   document.getElementById('am-title').textContent = q.Title || '';
@@ -57,7 +58,7 @@ function openApproveModal(id) {
     ${isPending && isApprover ? `
     <div style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.2);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--green);display:flex;align-items:center;gap:8px">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-      คุณเป็นผู้อนุมัติที่กำหนดไว้ — สามารถอนุมัติหรือปฏิเสธได้
+      ${selfOK && !canApproveQuotation(q) ? 'ใบนี้อยู่ในเกณฑ์ที่ Sale อนุมัติเองได้ (ยอด/Margin ผ่านเกณฑ์) — สามารถอนุมัติได้' : 'คุณเป็นผู้อนุมัติที่กำหนดไว้ — สามารถอนุมัติหรือปฏิเสธได้'}
     </div>` : ''}
     <div class="form-group"><label>หมายเหตุผู้อนุมัติ <span style="color:var(--red);font-weight:400">(กรณีปฏิเสธ ต้องระบุเหตุผล)</span></label><textarea id="approve-comment" placeholder="ระบุเหตุผล... (จำเป็นเมื่อปฏิเสธ)" style="min-height:80px"></textarea></div>`;
 
@@ -79,7 +80,8 @@ function openApproveModal(id) {
 async function doApprove(status) {
   if (!currentApproveId || !['Approved','Rejected'].includes(status)) return;
   // Double-check permission
-  const canApprove = canApproveQuotation(quotesData.find(q=>q.id===currentApproveId));
+  const _qd = quotesData.find(q=>q.id===currentApproveId);
+  const canApprove = canApproveQuotation(_qd) || (typeof isQuoteSelfApprovable === 'function' && isQuoteSelfApprovable(_qd));
   if (!canApprove) { toast('คุณไม่มีสิทธิ์อนุมัติใบนี้', 'error'); return; }
   const comment = document.getElementById('approve-comment')?.value || '';
   if (status === 'Rejected' && !comment.trim()) {
@@ -122,8 +124,9 @@ async function quickApprove(id, status) {
   if (!q) return;
   const myEmail = (currentUser?.email || '').toLowerCase();
   const approverEmail = (q.ApproverEmail || '').toLowerCase();
-  if (!canApproveQuotation(q)) {
-    toast(`เฉพาะ ${q.ApproverName||q.ApproverEmail||'ผู้อนุมัติที่ระบุในใบสถานะ Pending'} เท่านั้นที่อนุมัติได้`, 'error');
+  const selfOK = (typeof isQuoteSelfApprovable === 'function') && isQuoteSelfApprovable(q);
+  if (!canApproveQuotation(q) && !selfOK) {
+    toast(`ใบนี้ต้องให้ ${q.ApproverName||q.ApproverEmail||'ผู้อนุมัติที่ระบุ'} อนุมัติ (ยอด/Margin เกินเกณฑ์อนุมัติเอง)`, 'error');
     return;
   }
   // ปฏิเสธต้องระบุเหตุผล — เปิด modal ให้กรอกก่อน (กดปฏิเสธในนั้นอีกครั้ง)

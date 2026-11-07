@@ -792,6 +792,31 @@
           </div>
         </div>
 
+        <!-- เงื่อนไข Margin + สิทธิ์ Sale อนุมัติเอง -->
+        <div class="card" style="margin-bottom:14px">
+          <div class="card-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+            <h3>เงื่อนไขอนุมัติด้วย Margin (นอกเหนือจากยอดขาย)</h3>
+          </div>
+          <div style="padding:16px">
+            <div style="background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.2);border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--green);line-height:1.6">
+              <strong>วิธีใช้:</strong> ถ้าใบเสนอราคา <b>ยอดไม่เกินวงเงิน</b> ที่ตั้ง <b>และ Margin ไม่ต่ำกว่า %</b> ที่กำหนด → <b>Sale คนไหนก็อนุมัติเองได้</b> (ไม่ต้องส่งหัวหน้า)<br>
+              ถ้าเกินวงเงิน <b>หรือ</b> Margin ต่ำกว่าเกณฑ์ → ต้องส่งให้ผู้อนุมัติตามลำดับวงเงินด้านบน
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:560px">
+              <div class="form-group"><label>วงเงินที่ Sale อนุมัติเองได้ ไม่เกิน (บาท)</label><input id="pol-self-max" type="number" min="0" placeholder="เช่น 50000" style="text-align:right"></div>
+              <div class="form-group"><label>Margin ขั้นต่ำที่อนุมัติเองได้ (%)</label><input id="pol-margin-min" type="number" min="0" max="100" placeholder="เช่น 15" style="text-align:right"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px">ตั้งวงเงิน = 0 เพื่อปิดการอนุมัติเอง (ทุกใบต้องส่งผู้อนุมัติเหมือนเดิม)</div>
+            <div style="display:flex;justify-content:flex-end;margin-top:12px">
+              <button class="btn btn-primary" onclick="saveApprovalPolicy()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                บันทึกเงื่อนไข Margin
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- ผู้อนุมัติขายต่ำกว่าทุน -->
         <div class="card" style="margin-bottom:14px">
           <div class="card-header">
@@ -1519,14 +1544,14 @@
 <script src="js/config.js?v=admin1"></script>
 <script src="js/auth.js?v=idle60-20261104"></script>
 <script src="js/api.js?v=monitor20261107"></script>
-<script src="js/sync.js?v=approval20261102"></script>
+<script src="js/sync.js?v=monitor20261107"></script>
 <script src="js/pages/ui.js?v=monitor20261107"></script>
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
 <script src="../shared/travel-cost.js?v=average20261105"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=average20261105"></script><script src="js/pages/quotes.js?v=monitor20261107"></script>
 <script src="js/pages/approve.js?v=monitor20261107"></script>
 <script src="js/pages/payment.js?v=cancel20261103"></script>
 <script src="js/pages/catalog.js?v=drawer20261102"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
-<script src="js/pages/settings.js?v=approval20261102"></script>
+<script src="js/pages/settings.js?v=monitor20261107"></script>
 <script src="js/pages/customers.js?v=taxcrm20261103"></script>
 <script src="js/pages/signature.js?v=admin1"></script>
 <script src="js/pages/company.js?v=monitor20261107"></script>

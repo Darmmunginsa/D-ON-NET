@@ -17,7 +17,7 @@ function showPage(id, el) {
   if (id === 'newquote') { if (!editingQuoteId) initNewQuote(); setTimeout(updateApproverBox, 200); setTimeout(initNqFab, 0); setTimeout(function(){ autoGrowAll(document.getElementById('page-newquote')); }, 60); }
   if (id === 'approve') renderApprove();
   if (id === 'payment') renderPayment();
-  if (id === 'settings') { if(typeof TravelQuote!=='undefined')TravelQuote.openSettings(); setTimeout(renderTiers, 50); setTimeout(() => { if (typeof renderBelowCostApproverSetting==='function') renderBelowCostApproverSetting(); }, 50); }
+  if (id === 'settings') { if(typeof TravelQuote!=='undefined')TravelQuote.openSettings(); setTimeout(renderTiers, 50); setTimeout(() => { if (typeof renderApprovalPolicy==='function') renderApprovalPolicy(); if (typeof renderBelowCostApproverSetting==='function') renderBelowCostApproverSetting(); }, 50); }
   if (id === 'customers') { loadCustomers().then(renderCustomers); }
   if (id === 'forecast') { loadForecast(); }
   if (id === 'contracts') { loadContracts().then(renderContracts); }
