@@ -1,6 +1,6 @@
 # SalePro Local-first, phase 1
 
-New quote Drafts commit to IndexedDB before showing success. Input changes debounce for one second; the Draft button commits immediately. The drawer combines local Drafts with existing server Drafts. Catalog and Customer Profile are warm-start read caches; their writes remain online. Existing server quotation edits, approvals, numbering, payments and deletion continue online.
+New quote Drafts commit to IndexedDB before showing success. Draft creation and edits persist only when the user clicks Save Draft (or explicitly submits for approval). Opening a new quote, typing, rendering items, switching accounts and logging out do not create or update Draft records automatically. The drawer combines local Drafts with existing server Drafts. Catalog and Customer Profile are warm-start read caches; their writes remain online. Existing server quotation edits, approvals, numbering, payments and deletion continue online.
 
 Storage is partitioned by backend URL and signed-in email. Tokens are never stored in IndexedDB. Login still requires the existing Google authentication. The app has no offline login or service-worker installation in this phase. Browser storage is a working copy, not an independent permanent backup.
 
