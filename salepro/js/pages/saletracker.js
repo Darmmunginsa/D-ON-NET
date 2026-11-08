@@ -2201,7 +2201,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
     +'@media screen{.cd-page{width:210mm;max-width:100%;margin:0 auto 10px;box-shadow:0 2px 14px rgba(0,0,0,.18)}}'
     +'@media print{body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4;margin:0}button{display:none!important}.no-print{display:none!important}.cd-page{box-shadow:none;margin:0}}</style>'
     +'</head><body>'+pagesHtml
-    +'<div class="no-print" style="text-align:center;margin:4px auto 18px;max-width:210px"><button onclick="window.print()" style="padding:8px 24px;background:'+NAVY+';color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">🖨 พิมพ์ / บันทึก PDF</button></div>'
+    +(kind==='billing'?'':'<div class="no-print" style="text-align:center;margin:4px auto 18px;max-width:210px"><button onclick="window.print()" style="padding:8px 24px;background:'+NAVY+';color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">🖨 พิมพ์ / บันทึก PDF</button></div>')
     // ปรับความยาวชื่อบริษัท 2 แถวให้เสมอกัน (ทุกหน้า): ยืด letter-spacing ของอังกฤษให้เท่าความกว้างของไทย
     +'<script>(function(){function eq(){var ths=document.querySelectorAll("._cnTh"),ens=document.querySelectorAll("._cnEn");for(var k=0;k<ths.length;k++){var th=ths[k],en=ens[k];if(!th||!en)continue;en.style.letterSpacing="0px";var t=th.getBoundingClientRect().width,e=en.getBoundingClientRect().width,n=(en.textContent||"").length;if(n>1){var ls=(t-e)/(n-1);if(ls<-0.6)ls=-0.6;if(ls>6)ls=6;en.style.letterSpacing=ls+"px";}}}if(document.fonts&&document.fonts.ready){document.fonts.ready.then(eq);}eq();setTimeout(eq,120);})();<\/script>'
     +'</body></html>';
