@@ -1,6 +1,12 @@
 # SalePro billing notes
 
-The tracker and payment list show a disabled **✓ วางบิลแล้ว** control (with the billing number in its tooltip) after successful issue. Merely selecting a quotation does not mark it complete. Cancelling the active note releases this state on refresh. Queue actions in the quotation list similarly show a disabled check when an appointment or non-cancelled technician job already exists. Calendar editing remains available; new-appointment open/save also recheck current server records. Successful queue writes update the local Settings view immediately. A cancelled appointment unlocks the source unless a technician job still records that it was dispatched/completed.
+## Periods and workflow baskets
+
+Month/year filters default to the current month and can be cleared independently or with **ทุกเดือน / ทุกปี**. Pending quotations use `QuoteDate`; saved notes use their document `date`, including when they were physically submitted in a later month. Basket counts follow the period and visible source permissions: **รอวางบิล**, **ออกใบแล้ว**, **วางบิลแล้ว**, **ยกเลิก**, **ทั้งหมด**. Source quotations assigned to any active note remain excluded even when that note is outside the selected period.
+
+After issue, the issuer/Admin can explicitly confirm physical submission with its actual date and optional receiving person/department. This sets `status: submitted` and preserves totals, original sources and payment records. Existing issued notes remain **ออกใบแล้ว**; they are never assumed to have been delivered. Cancellation remains separately available and retains the submission metadata. This uses the existing Settings row and needs no backend deployment.
+
+The tracker and payment list show a disabled completion control (with the billing number in its tooltip) after successful issue. Merely selecting a quotation does not mark it complete. Cancelling the active note releases this state on refresh. Queue actions in the quotation list similarly show a disabled check when an appointment or non-cancelled technician job already exists. Calendar editing remains available; new-appointment open/save also recheck current server records. Successful queue writes update the local Settings view immediately. A cancelled appointment unlocks the source unless a technician job still records that it was dispatched/completed.
 
 ## Shared PO document editor and copies
 

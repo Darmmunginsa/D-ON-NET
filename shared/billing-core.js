@@ -57,5 +57,7 @@
   return {...doc.totals,net,vat,total,paid,balance};
  }
  function copiesHTML(original,copy){const content=html=>{const body=html.match(/<body[^>]*>([\s\S]*)<\/body>/i);if(!body)throw Error('รูปแบบเอกสารไม่ถูกต้อง');return body[1].replace(/<div class="no-print"[^>]*>[\s\S]*?<\/div>/gi,'');};return original.replace(/<body[^>]*>[\s\S]*<\/body>/i,'<body>'+content(original)+content(copy)+'</body>');}
- root.BillingCore={cents,customerKey,poNumbers,reason,build,layoutTotals,copiesHTML};
+ function workflowState(doc){return doc.status==='cancelled'?'cancelled':doc.status==='submitted'?'submitted':'issued';}
+ function inPeriod(value,year='',month=''){if(!year&&!month)return true;const match=String(value||'').match(/^(\d{4})-(\d{2})-\d{2}/);return !!match&&(!year||match[1]===String(year))&&(!month||match[2]===String(month).padStart(2,'0'));}
+ root.BillingCore={cents,customerKey,poNumbers,reason,build,layoutTotals,copiesHTML,workflowState,inPeriod};
 })(globalThis);
