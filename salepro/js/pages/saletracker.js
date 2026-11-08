@@ -264,6 +264,15 @@ async function loadExpirySourceDetails(){
 }
 async function copyExpiryDetail(button){const area=button.closest('.expiry-detail-copy')?.querySelector('textarea');if(!area)return;try{await navigator.clipboard.writeText(area.value);toast('คัดลอกรายละเอียดแล้ว','success');}catch(_){area.focus();area.select();toast('เลือกข้อความให้แล้ว กด Ctrl+C เพื่อคัดลอก','info');}}
 function _stExpiries() { if (!Array.isArray(stDealData.expiries)) stDealData.expiries = []; return stDealData.expiries; }
+let expiryManualSaved = '[]';
+function refreshExpirySaveButton(){
+  const button=document.getElementById('st-expiry-save');if(!button)return;
+  const dirty=JSON.stringify(_stExpiries())!==expiryManualSaved;
+  button.style.background=dirty?'#c2410c':'#15803d';
+  button.style.borderColor=dirty?'#fb923c':'#22c55e';
+  button.style.color='#fff';
+  button.textContent=dirty?'💾 บันทึก · มีการแก้ไข':'✓ บันทึกแล้ว';
+}
 // สถานะอายุ: คืน {days, label, color}  (days = เหลือกี่วัน ติดลบ=เลยกำหนด)
 function expiryStatus(expiryDate, renewed) {
   if (renewed) return { days: null, label: '✓ ต่ออายุแล้ว', color: 'var(--green)' };
@@ -329,11 +338,12 @@ function renderExpiryTab() {
           : '<button class="btn btn-sm btn-success" onclick="markExpiryRenewed(\'' + e.id + '\')" style="font-size:13px;padding:8px 16px">✓ ต่ออายุแล้ว</button>')
       + '</div></div>';
   }).join('');
-  host.innerHTML = (isReadOnly ? '' : '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center"><button class="btn btn-sm btn-primary" onclick="addExpiryRow()">+ เพิ่มรายการ</button><button class="btn btn-sm" onclick="pullExpiryFromQuote()">⟲ ดึงจากใบเสนอราคา</button><button class="btn btn-sm btn-success" style="margin-left:auto" onclick="saveExpiryManual()">💾 บันทึก</button></div>')
+  host.innerHTML = (isReadOnly ? '' : '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center"><button class="btn btn-sm btn-primary" onclick="addExpiryRow()">+ เพิ่มรายการ</button><button class="btn btn-sm" onclick="pullExpiryFromQuote()">⟲ ดึงจากใบเสนอราคา</button><button id="st-expiry-save" class="btn btn-sm" style="margin-left:auto" onclick="saveExpiryManual()">💾 บันทึก</button></div>')
     + (rows || '<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px">ยังไม่มีรายการติดตามวันหมดอายุ</div>');
+  refreshExpirySaveButton();
 }
 let _expirySaveT = null;
-function _expirySaveSoon() { clearTimeout(_expirySaveT); _expirySaveT = setTimeout(function(){ saveSTDealData(); }, 600); }
+function _expirySaveSoon() { refreshExpirySaveButton(); clearTimeout(_expirySaveT); _expirySaveT = setTimeout(function(){ saveSTDealData(); }, 600); }
 function addExpiryRow() { _stExpiries().push({ id: 'ex'+_nextItemId(), type:'License', name:'', serial:'', startDate:'', expiryDate:'', qty:'', note:'', emails:(currentUser&&currentUser.email?[currentUser.email]:[]), remindDays:30, remindSentAt:null, renewed:false }); renderExpiryTab(); saveSTDealData(); }
 function removeExpiry(id) { stDealData.expiries = _stExpiries().filter(e => e.id !== id); renderExpiryTab(); saveSTDealData(); }
 function updateExpiry(id, field, val) { const e = _stExpiries().find(x => x.id === id); if (!e) return;
@@ -351,7 +361,15 @@ function updateExpiryEmails(id, val) { const e = _stExpiries().find(x => x.id ==
 function _addPeriod(ds, n, unit) { const base = ds ? new Date(ds+'T00:00:00') : new Date(); if (isNaN(base)) return ''; const d = new Date(base); if(unit==='y') d.setFullYear(d.getFullYear()+n); else if(unit==='m') d.setMonth(d.getMonth()+n); else d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function setExpiryDuration(id, n, unit) { const e = _stExpiries().find(x => x.id === id); if (!e) return; e.expiryDate = _addPeriod(e.startDate, +n||0, unit); e.remindSentAt = null; renderExpiryTab(); saveSTDealData(); }
 function setExpiryDurationInput(id) { const n = +(document.getElementById('exdur-'+id)?.value||0); const unit = document.getElementById('exunit-'+id)?.value||'y'; if(!n){ toast('ใส่จำนวนก่อน','error'); return; } setExpiryDuration(id, n, unit); }
-async function saveExpiryManual() { try { await saveSTDealData(); toast('บันทึกรายการหมดอายุแล้ว ✓', 'success'); } catch(e) { toast('บันทึกไม่สำเร็จ: '+e.message, 'error'); } }
+async function saveExpiryManual() {
+  const quote=String(stQuoteId),snapshot=JSON.stringify(_stExpiries());
+  clearTimeout(_expirySaveT);
+  try {
+    await saveSTDealData(true);
+    if(String(stQuoteId)===quote){expiryManualSaved=snapshot;refreshExpirySaveButton();}
+    toast('บันทึกรายการหมดอายุแล้ว ✓', 'success');
+  } catch(e) { refreshExpirySaveButton();toast('บันทึกไม่สำเร็จ: '+e.message, 'error'); }
+}
 function markExpiryRenewed(id) { updateExpiry(id,'renewed',true); }
 async function pullExpiryFromQuote() {
   try {
@@ -2237,6 +2255,7 @@ function openSaleTrackerModal(id) {
   const q = quotesData.find(x => x.id === id);
   if (!q) return;
   stDealData = parseDealStatus(getStoredDealStatus(q.id) || q.DealStatus);
+  expiryManualSaved=JSON.stringify(stDealData.expiries||[]);
   stPendingDocs = []; stCurrentSlipFile = null;
   const techList = document.getElementById('tech-job-list'); if (techList) techList.innerHTML = '';
   // Clear pending docs UI
