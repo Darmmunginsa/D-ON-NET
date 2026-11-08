@@ -84,21 +84,23 @@ function _coerceFields(fields) {
 
 // ── CRUD (list = ชื่อแท็บจาก CONFIG.lists) ──
 async function getListItems(list) {
-  const d = await _call({ action: 'list', list });
+  const actor=currentUser?.email,d = await _call({ action: 'list', list });
+  if(typeof LocalFirst!=='undefined')await LocalFirst.remember(list,d.items,actor);
   return d.items || [];
 }
 // อ่านหลายแท็บในครั้งเดียว → { listName: items[] }  (ลด round-trip ตอน sync)
 // ถ้า Apps Script ยังไม่รองรับ (ยังไม่ redeploy) → fallback โหลดทีละตัว
 async function getListItemsMulti(lists) {
-  try { const d = await _call({ action: 'multiList', lists }); if (d && d.lists) return d.lists; }
+  try { const actor=currentUser?.email,d = await _call({ action: 'multiList', lists }); if (d && d.lists) {if(typeof LocalFirst!=='undefined')await Promise.all(Object.entries(d.lists).map(([name,rows])=>LocalFirst.remember(name,rows,actor)));return d.lists;} }
   catch (e) { console.warn('multiList ไม่รองรับ → fallback:', e.message); }
   const out = {};
   for (const l of lists) { out[l] = await getListItems(l).catch(() => []); }
   return out;
 }
 async function createListItem(list, fields) {
-  const d = await _call({ action: 'create', list, fields: _coerceFields(fields) });
-  return d.item || { id: d.id, ...fields };
+  const actor=currentUser?.email,d = await _call({ action: 'create', list, fields: _coerceFields(fields) });
+  const row=d.item || {id:d.id,...fields};if(typeof LocalFirst!=='undefined')await LocalFirst.cacheWrite(list,row.id,row,false,actor);
+  return row;
 }
 // ── Activity Logs (แท็บ "ActivityLogs" ใน Sheet — เก็บ Value=JSON ต่อแถว) ──
 async function logActivity(type, ref, detail, meta) {
@@ -127,10 +129,12 @@ async function createListItemsBulk(list, rowsArray) {
   return out;
 }
 async function updateListItem(list, itemId, fields) {
-  return _call({ action: 'update', list, id: itemId, fields: _coerceFields(fields) });
+  const actor=currentUser?.email,result=await _call({ action: 'update', list, id: itemId, fields: _coerceFields(fields) });
+  if(typeof LocalFirst!=='undefined')await LocalFirst.cacheWrite(list,itemId,fields,false,actor);return result;
 }
 async function deleteListItem(list, itemId) {
-  return _call({ action: 'delete', list, id: itemId });
+  const actor=currentUser?.email,result=await _call({ action: 'delete', list, id: itemId });
+  if(typeof LocalFirst!=='undefined')await LocalFirst.cacheWrite(list,itemId,{},true,actor);return result;
 }
 async function deleteWhere(list, field, value) {
   const d = await _call({ action: 'deleteWhere', list, field, value });

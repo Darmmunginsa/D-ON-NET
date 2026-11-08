@@ -114,6 +114,7 @@ async function afterLogin() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-screen').style.display = 'flex';
     initNewQuote();
+    if(typeof LocalFirst!=='undefined')await LocalFirst.initialize();
     // โหลดสิทธิ์ก่อน sync — ให้การกรองใบเสนอราคา (Admin/Approver เห็นทุกใบ) ถูกต้องตั้งแต่เข้าโปรแกรม
     await loadUserRoles();
     await syncAll();
@@ -150,6 +151,7 @@ async function afterLogin() {
 }
 
 async function logout() {
+  if(typeof LocalFirst!=='undefined'){try{await LocalFirst.pause();}catch(e){toast('ยังบันทึก Draft ในเครื่องไม่สำเร็จ: '+e.message,'error');return;}}
   AuthSession.clear();
   currentUser = null;
   try { AppStorage.removeItem('guser'); } catch(e) {}

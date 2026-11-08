@@ -215,6 +215,7 @@ async function saveQuoteDefaults(note, terms) {
   catch(e) { console.warn('save quote defaults', e.message); }
 }
 function initNewQuote() {
+  if(typeof LocalFirst!=='undefined')LocalFirst.reset();
   if(typeof TravelQuote!=='undefined')TravelQuote.reset();
   _dupSourceId = null;   // ใบใหม่เปล่า ไม่ผูกความสัมพันธ์
   if (typeof _mergeSourceIds !== 'undefined') _mergeSourceIds = null;   // ไม่ใช่ใบรวม
@@ -415,6 +416,7 @@ function lineTotal(it) {
 }
 
 function renderItems() {
+  if(typeof LocalFirst!=='undefined')LocalFirst.editorChanged();
   const existingIds = [...document.querySelectorAll('#items-body tr[data-id]')].map(r => +r.dataset.id);
   const newIds = quoteItems.map(i => i.id);
   const needFullRender = existingIds.join(',') !== newIds.join(',');
@@ -1105,6 +1107,7 @@ document.getElementById('g-disc')?.addEventListener('input', calcTotals);
 // EDIT QUOTE
 // ============================================================
 async function editQuote(id) {
+  if(typeof LocalFirst!=='undefined')LocalFirst.reset();
   const q = quotesData.find(x => x.id === id);
   if (q && q.Status === 'Pending') { toast('ใบนี้กำลังรออนุมัติ — แก้ไข/ส่งซ้ำไม่ได้ (ดูตัวอย่าง PDF ได้)', 'error'); return; }
   if (!q) return;
@@ -1541,13 +1544,23 @@ function cancelEdit() {
 }
 
 let _quoteSaveBusy=false;
-async function saveQuote(status){if(_quoteSaveBusy)return;_quoteSaveBusy=true;try{return await _saveQuoteImpl(status);}finally{_quoteSaveBusy=false;}}
+async function saveQuote(status,options={}){
+  if(_quoteSaveBusy)return;_quoteSaveBusy=true;
+  try{
+    if(status==='Draft'&&!options.online&&!editingQuoteId&&typeof LocalFirst!=='undefined'&&LocalFirst.ready())return await LocalFirst.save(true);
+    if((status==='Pending'||status==='Approved'||options.online)&&typeof LocalFirst!=='undefined'&&LocalFirst.activeId())await LocalFirst.beforeSubmit();
+    const id=await _saveQuoteImpl(status);
+    if(id&&(status==='Pending'||status==='Approved'||options.online)&&typeof LocalFirst!=='undefined'&&LocalFirst.activeId())await LocalFirst.submitted(id);
+    return id;
+  }catch(e){toast(e.message,'error');}finally{_quoteSaveBusy=false;}
+}
 async function _saveQuoteImpl(status) {
   if (!currentUser) { toast('กรุณา Login ก่อน', 'error'); return; }
   if(typeof TravelQuote!=='undefined'){try{TravelQuote.validate();}catch(e){toast(e.message,'error');return;}}
   const t = calcTotals();
   const fields = {
     Title: document.getElementById('q-no').value,
+    ...(typeof LocalFirst!=='undefined'&&LocalFirst.activeId()?{LocalDraftId:LocalFirst.activeId()}:{}),
     ClientName: document.getElementById('q-client').value || '(ไม่ระบุ)',
     ContactPerson: document.getElementById('q-contact').value,
     Phone: document.getElementById('q-phone').value,
@@ -1615,6 +1628,7 @@ async function _saveQuoteImpl(status) {
     } else {
       // CREATE new quote
       const created = await createListItem(CONFIG.lists.quotations, fields);
+      if(created._localDraftReused)throw Error('Draft นี้ถูกส่งจากอีกแท็บแล้ว กรุณากด Sync และตรวจใบรออนุมัติ');
       quoteId = created.id;
       // ผูกความสัมพันธ์ถ้าใบนี้มาจาก "สร้างใหม่จากใบเก่า"
       if (_dupSourceId) { try { await saveQuoteParent(quoteId, _dupSourceId); } catch(e) {} _dupSourceId = null; }
@@ -1708,6 +1722,8 @@ async function _saveQuoteImpl(status) {
       try { await finalizeMerge(savedId); } catch(e) { toast('ใบรวมบันทึกแล้ว แต่ยังล้างต้นฉบับไม่ครบ: '+e.message,'error'); }
     }
     showPage('quotes', null);
+    if(status==='Draft'&&typeof DraftDrawer!=='undefined')DraftDrawer.open(false);
+    return savedId;
   } catch(e) {
     toast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
   }

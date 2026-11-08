@@ -93,7 +93,7 @@ async function requestBelowCostApproval() {
   // ต้องบันทึกใบก่อน เพื่อให้มี quoteId ใช้อ้างอิง
   if (!editingQuoteId) {
     toast('กำลังบันทึก Draft ก่อนขออนุมัติ...', 'info');
-    await saveQuote('Draft');               // saveQuote เคลียร์ editingQuoteId หลังเสร็จ → ใช้ค่าที่เก็บไว้
+    await saveQuote('Draft',{online:true});               // saveQuote เคลียร์ editingQuoteId หลังเสร็จ → ใช้ค่าที่เก็บไว้
   }
   const qid = editingQuoteId || _lastSavedQuoteId;
   if (!qid) { toast('ไม่พบใบเสนอราคา (บันทึกก่อน)', 'error'); return; }

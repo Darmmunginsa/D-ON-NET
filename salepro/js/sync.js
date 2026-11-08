@@ -85,7 +85,8 @@ async function syncAll() {
     quotesData.forEach(qq => { const v = getStoredDealStatus(qq.id); if (v) qq.DealStatus = v; });
     // overlay Tag / ชื่อ Project จาก Settings list (เก็บแยก ไม่อยู่บน quotation item)
     quotesData.forEach(qq => { const t = (typeof getQuoteTag === 'function') ? getQuoteTag(qq.id) : ''; if (t) qq.Tag = t; });
-    try { await loadCatalogExtra(); } catch(e) {}   // ข้อมูลเสริมสินค้า (ต้นทุน/Vendor)
+    catalogExtraLoaded=false;
+    try { await loadCatalogExtra(); if(typeof LocalFirst!=='undefined')await LocalFirst.remember('CatalogExtra',[catalogExtra]); } catch(e) {}   // ข้อมูลเสริมสินค้า (ต้นทุน/Vendor)
     await BasketPersistence.retry([_bkKey('QuoteBaskets'),_bkKey('QuoteBasketMap')],saveSettingItem);
     loadBaskets(); // Reload after settings arrive, even if first render created empty arrays.
     renderDash();

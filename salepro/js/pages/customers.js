@@ -7,7 +7,7 @@ let customerCodes = {};   // { [customerId]: 'E003' } — เก็บใน Set
 let customerFaxes = {};   // { [customerId]: 'Fax' } — เก็บใน Settings เช่นกัน
 
 async function loadCustomers() {
-  try { customersData = await getListItems(CONFIG.lists.customers); } catch(e) { customersData = []; }
+  try { customersData = await getListItems(CONFIG.lists.customers); } catch(e) { console.warn('ใช้ข้อมูลลูกค้าล่าสุดในเครื่อง:',e.message); }
   loadCustomerCodes();
   loadCustomerFaxes();
 }

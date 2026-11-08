@@ -1,4 +1,12 @@
 /************************************************************
+ * SalePro — Apps Script ฉบับเต็ม (รวมทุกไฟล์ในไฟล์เดียว)
+ * ประกอบจาก: Code.gs + ServicePlan.gs + ServiceAutomation.gs + ContractNumbering.gs
+ * มีระบบออกเลขใบเสนอราคาแบบ 'รอ Approve' (Draft ยังไม่ออกเลข) + CC อีเมลกลาง
+ * วิธีใช้: วางทับไฟล์เดียวใน Apps Script (ลบไฟล์ .gs อื่นทิ้งให้เหลือไฟล์นี้ไฟล์เดียว)
+ *          แล้ว Deploy > Manage deployments > Edit > New version
+ ************************************************************/
+
+/************************************************************
  * SalePro — Google Apps Script backend (Sheets + Drive + Gmail)
  * แทนที่ SharePoint/Graph เดิม โดยคง "ชั้นข้อมูล" ให้ front-end เรียกเหมือนเดิม
  *
@@ -73,6 +81,7 @@ function createRow(name, fields) {
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var sh = _sheet(name);
+    if(name==='Quotations'&&fields&&fields.LocalDraftId){var priorDraft=listRows(name).filter(function(q){return q.LocalDraftId===fields.LocalDraftId;})[0];if(priorDraft){priorDraft._localDraftReused=true;return priorDraft;}}
     fields = prepareQuotationNumberFields(name,prepareContractNumberFields(name,fields||{},null),null);
     var keys = Object.keys(fields);
     var hdr = _ensureCols(sh, [ID_COL].concat(keys));
@@ -215,7 +224,9 @@ function uploadFile(req) {
 
 function handle(req) {
   var a = req.action;
-  if(a==='serviceCapabilities')return {ok:true,serviceAutomationVersion:1,privateVisitUploads:true,contractNumbering:true,quotationNumbering:true};
+  if(a==='localDraftSync')return localDraftSync(req);
+  if(a==='localDraftAppend')return localDraftAppend(req);
+  if(a==='serviceCapabilities')return {ok:true,serviceAutomationVersion:1,privateVisitUploads:true,contractNumbering:true,quotationNumbering:true,localFirstDrafts:true};
   if(a==='ensureContractNumbers')return ensureContractNumbers();
   if (a === 'list')        return { ok: true, items: listRows(req.list) };
   if (a === 'multiList')   { var _o = {}; (req.lists || []).forEach(function (n) { _o[n] = listRows(n); }); return { ok: true, lists: _o }; }   // อ่านหลายแท็บในครั้งเดียว

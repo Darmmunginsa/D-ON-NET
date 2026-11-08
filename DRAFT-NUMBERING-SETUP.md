@@ -1,5 +1,7 @@
 # Draft basket and approval numbering
 
+For the current combined deployment including Local-first, follow [LOCAL-FIRST-SETUP.md](LOCAL-FIRST-SETUP.md) and use SalePro-AppsScript-FULL.gs only. Do not add a separate copy of QuotationNumbering.gs to that single-file project.
+
 New Drafts and pending submissions keep `Title` blank. The record UUID continues to link all line items, metadata, projects and approvals. Existing numbered records retain their numbers. Drafts are listed in the top drawer and omitted from the default quotations list (the explicit Draft status filter still works).
 
 The server allocates `<Sale initials><NN>-<MM>-<YYYY>` only when the record becomes Approved. Existing monthly numbers, including revisions, seed the counter. Script Properties retain the monthly high-water mark. Allocation and row update use the same script lock. A retry against the same row reuses the issued number. An interrupted write can leave a sequence gap; numbers are never reused.

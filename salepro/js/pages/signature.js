@@ -125,6 +125,7 @@ function updateSigPreview(src) {
 
 async function initQuoteSignature() {
   const saved = await loadSigFromSharePoint();
+  if(typeof LocalFirst!=='undefined'&&LocalFirst.activeId())return;
   if (saved) { currentQuoteSignature = saved; updateSigPreview(saved); }
   else { currentQuoteSignature = ''; updateSigPreview(''); }
 }
