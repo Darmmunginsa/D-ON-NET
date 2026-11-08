@@ -21,7 +21,7 @@ const TravelQuote=(()=>{
    config=s;summary();$('travel-settings-message').textContent='บันทึกอัตราค่าเดินทางแล้ว ใช้เมื่อคำนวณใหม่ ใบเก่าไม่เปลี่ยนราคา';
   }catch(e){$('travel-settings-message').textContent=e.message;}finally{busy=false;$('travel-setting-save').disabled=false;}
  }
- function reset(){routeGeneration++;lastRoute=null;lastAttached='';for(const id of ['travel-km','travel-destination','travel-point'])if($(id))$(id).value='';if($('travel-area'))$('travel-area').value='';if($('travel-confirmed'))$('travel-confirmed').checked=false;if($('travel-message'))message('');}
+ function reset(){routeGeneration++;lastRoute=null;lastAttached='';for(const id of ['travel-km','travel-destination','travel-point'])if($(id))$(id).value='';if($('travel-recalc-required'))$('travel-recalc-required').value='';if($('travel-area'))$('travel-area').value='';if($('travel-confirmed'))$('travel-confirmed').checked=false;if($('travel-message'))message('');}
  function refresh(){fillOptions();}
  function fillOptions(){
   const attached=quoteItems.find(i=>i.travel);
@@ -29,17 +29,25 @@ const TravelQuote=(()=>{
    const total=m.version===2?m.actualAmount:m.amount,count=quoteItems.filter(i=>i.travel).length;
    message('รวมค่าเดินทาง '+fmt(total)+' บาท ใน '+count+' รายการแล้ว (ก่อนส่วนลดรายรายการ ส่วนลดรวม และ VAT)'+(m.version===2&&m.actualAmount!==m.totalAmount?' · ยอดตามระยะทาง '+fmt(m.totalAmount)+' บาท ต่างกันจากการปัดราคาต่อหน่วย 2 ตำแหน่ง':'')+'\nอัตราที่ใช้ '+fmt(m.rate)+' บาท/กม. × '+m.km+' กม. × '+m.trips+' เที่ยว');
   }else lastAttached='';
-  // Editing quantity/price/line discount requires removing the travel allocation first.
-  for(const it of quoteItems){const row=[...document.querySelectorAll('#items-body tr[data-id]')].find(r=>r.dataset.id===String(it.id));if(row)for(const el of row.querySelectorAll('.col-qty input,.col-price input,.col-disc input')){el.disabled=!!it.travel;if(it.travel)el.title='นำค่าเดินทางออกก่อนแก้จำนวน ราคา หรือส่วนลด';}}
+  // Quantity stays editable. Its input handler invalidates the entire travel allocation.
+  for(const it of quoteItems){const row=[...document.querySelectorAll('#items-body tr[data-id]')].find(r=>r.dataset.id===String(it.id));if(row){const qty=row.querySelector('.col-qty input');if(qty){qty.disabled=false;if(it.travel)qty.title='แก้จำนวนได้ ระบบจะคืนราคาก่อนรวมค่าเดินทาง และให้คำนวณค่าเดินทางใหม่';}for(const el of row.querySelectorAll('.col-price input,.col-disc input')){el.disabled=!!it.travel;if(it.travel)el.title='นำค่าเดินทางออกก่อนแก้ราคา หรือส่วนลด';}}}
+  if($('travel-recalc-required')?.value==='1')message('จำนวนเปลี่ยนแล้ว คืนราคาก่อนรวมค่าเดินทางทุกรายการ กรุณาคำนวณและรวมค่าเดินทางใหม่ หรือเลือกนำค่าเดินทางออก');
  }
- function remove(){T.remove(quoteItems);message('นำค่าเดินทางออกแล้ว คืนราคางานเดิม');$('items-body').innerHTML='';renderItems();}
+ function quantityChanged(id){
+  if(!quoteItems.some(it=>String(it.id)===String(id))||!quoteItems.some(it=>it.travel))return;
+  T.remove(quoteItems);lastAttached='';if($('travel-recalc-required'))$('travel-recalc-required').value='1';
+  // Update prices/totals in place: rebuilding rows would destroy the active quantity input/caret.
+  for(const it of quoteItems){const row=[...document.querySelectorAll('#items-body tr[data-id]')].find(r=>r.dataset.id===String(it.id));if(!row)continue;const price=row.querySelector('.col-price input'),total=row.querySelector('.col-total');if(price)price.value=String(it.price??'');if(total)total.textContent=totalCell(it);}
+  fillOptions();if(typeof toast==='function')toast('จำนวนเปลี่ยนแล้ว กรุณารวมค่าเดินทางใหม่ก่อนส่งอนุมัติ','info');
+ }
+ function remove(){T.remove(quoteItems);if($('travel-recalc-required'))$('travel-recalc-required').value='';message('นำค่าเดินทางออกแล้ว คืนราคางานเดิม');$('items-body').innerHTML='';renderItems();}
  async function apply(){
   if(busy)return;
   try{busy=true;$('travel-apply').disabled=true;const previousOrigin=config?.origin;await load();summary();if(previousOrigin&&config?.origin!==previousOrigin){$('travel-confirmed').checked=false;throw Error('Admin เปลี่ยนจุดเริ่มเดินทาง กรุณาตรวจเส้นทางและยืนยันระยะทางใหม่');}
    const routePoint=point(),label=T.text($('travel-destination').value)||routePoint;T.routeTarget(label,routePoint);
    const result=T.calculate(config,{destination:label,area:$('travel-area').value,confirmed:$('travel-confirmed').checked,km:$('travel-km').value});
    if(result.amount>0&&typeof pricePeriod!=='undefined'&&pricePeriod)throw Error('ค่าเดินทางใช้กับงานครั้งเดียว กรุณาเลือกงวดราคา/หน่วยปกติก่อนรวมค่าเดินทาง');
-   T.applyAll(quoteItems,result,{...context(),destination:label,routePoint,routeSource:lastRoute&&lastRoute.km===Number($('travel-km').value)&&lastRoute.target===T.routeTarget(label,routePoint)?'google-routes':'manual'});$('items-body').innerHTML='';renderItems();
+   T.applyAll(quoteItems,result,{...context(),destination:label,routePoint,routeSource:lastRoute&&lastRoute.km===Number($('travel-km').value)&&lastRoute.target===T.routeTarget(label,routePoint)?'google-routes':'manual'});if($('travel-recalc-required'))$('travel-recalc-required').value='';$('items-body').innerHTML='';renderItems();
    if(result.amount===0)message(result.area==='bangkok'?'หน้างานกรุงเทพฯ ไม่คิดค่าเดินทาง':'ค่าเดินทางเป็น 0 บาทตามอัตราที่ตั้ง');
   }catch(e){message(e.message);}finally{busy=false;$('travel-apply').disabled=false;}
  }
@@ -62,6 +70,7 @@ const TravelQuote=(()=>{
  function init(){
   const box=document.createElement('details');box.id='travel-quote-card';box.className='card travel-card';box.innerHTML=`<summary>ค่าเดินทางนอกกรุงเทพฯ · รวมในราคางาน</summary>
 <div class="travel-body travel-workflow">
+  <input type="hidden" id="travel-recalc-required" value="">
   <div class="travel-intro"><p id="travel-rate-summary"></p><p>ระบุหน้างาน ตรวจระยะทาง แล้วจึงยืนยันรวมค่าเดินทางในราคา</p></div>
   <section class="travel-section" aria-labelledby="travel-site-heading">
     <h4 id="travel-site-heading"><span>1</span> ระบุหน้างาน</h4>
@@ -105,5 +114,5 @@ const TravelQuote=(()=>{
   $('travel-maps').addEventListener('click',event=>{try{if(!config?.origin)throw Error('โหลดอัตรา Admin ก่อนเปิดเส้นทาง');const target=T.routeTarget($('travel-destination').value,point()),params=new URLSearchParams({api:'1',origin:config.origin,destination:target,travelmode:'driving'});event.currentTarget.href='https://www.google.com/maps/dir/?'+params;}catch(e){event.preventDefault();message(e.message);}});
  }
  document.addEventListener('DOMContentLoaded',init);
- return {refresh,restore,reset,fetchDistance,openSettings,validate:()=>{TravelCost.validate(quoteItems,context());const m=quoteItems.find(it=>it.travel)?.travel;if(m&&(!$('travel-confirmed').checked||(T.text($('travel-destination').value)||point())!==T.text(m.destination)||point()!==T.text(m.routePoint||'')||$('travel-area').value!==m.area||Number($('travel-km').value)!==m.km||(typeof pricePeriod!=='undefined'&&pricePeriod)))throw Error('ข้อมูลค่าเดินทางเปลี่ยน กรุณาตรวจหน้างานและคำนวณใหม่ก่อนบันทึก');}};
+ return {refresh,restore,reset,fetchDistance,openSettings,quantityChanged,validate:()=>{if($('travel-recalc-required')?.value==='1')throw Error('จำนวนเปลี่ยนหลังรวมค่าเดินทาง กรุณารวมค่าเดินทางใหม่ หรือเลือกนำค่าเดินทางออกก่อนบันทึก');TravelCost.validate(quoteItems,context());const m=quoteItems.find(it=>it.travel)?.travel;if(m&&(!$('travel-confirmed').checked||(T.text($('travel-destination').value)||point())!==T.text(m.destination)||point()!==T.text(m.routePoint||'')||$('travel-area').value!==m.area||Number($('travel-km').value)!==m.km||(typeof pricePeriod!=='undefined'&&pricePeriod)))throw Error('ข้อมูลค่าเดินทางเปลี่ยน กรุณาตรวจหน้างานและคำนวณใหม่ก่อนบันทึก');}};
 })();

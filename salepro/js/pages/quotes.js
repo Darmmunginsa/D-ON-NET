@@ -1046,6 +1046,7 @@ function blankCell(btn) {
 function updateItemQtyRaw(id, val) {
   const it = quoteItems.find(i => i.id == id);
   if (!it) return;
+  if(String(it.qty??'')!==String(val)&&typeof TravelQuote!=='undefined')TravelQuote.quantityChanged(id);
   it.qty = val;
   const row = document.querySelector(`#items-body tr[data-id="${id}"]`);
   if (row) { const lt = row.querySelector('.col-total'); if (lt) lt.textContent = totalCell(it); }

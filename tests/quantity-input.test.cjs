@@ -1,0 +1,16 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),T=require('../shared/travel-cost.js');
+function setup(withTravel){
+ const items=[{id:1,type:'item',name:'Battery',qty:1,price:1000,disc:0},{id:2,type:'item',name:'Service',qty:2,price:500,disc:0}];
+ if(withTravel)T.applyAll(items,{amount:320,rate:8,trips:2,km:20,area:'outside'},{clientName:'Client',quoteAddress:'Site',destination:'Site'});
+ const els=new Map(),rows=items.map(it=>{const qty={value:String(it.qty),disabled:true},price={value:String(it.price)},total={textContent:''},disc={};return {dataset:{id:String(it.id)},qty,price,total,querySelector:s=>s==='.col-qty input'?qty:s==='.col-price input'?price:s==='.col-total'?total:null,querySelectorAll:()=>[price,disc]};});
+ const el=id=>{if(!els.has(id))els.set(id,{value:'',checked:false,textContent:''});return els.get(id);};
+ el('q-client').value='Client';el('q-cust-address').value='Site';
+ const ctx=vm.createContext({console,TravelCost:T,quoteItems:items,Date,Number,String,document:{addEventListener(){},getElementById:el,querySelectorAll:()=>rows,querySelector:s=>rows.find(r=>s.includes('"'+r.dataset.id+'"'))},fmt:String,totalCell:it=>String(Number(it.qty||0)*it.price),calcTotals(){ctx.total=items.reduce((n,it)=>n+(Number(it.qty)||0)*it.price,0);},updateApproverBox(){},toast(){},renderItems(){ctx.renders++;ctx.TravelQuote.refresh();},renders:0});
+ vm.runInContext(fs.readFileSync('salepro/js/pages/travel.js','utf8')+'\nglobalThis.TravelQuote=TravelQuote;',ctx);
+ const source=fs.readFileSync('salepro/js/pages/quotes.js','utf8'),start=source.indexOf('function updateItemQtyRaw('),end=source.indexOf('// ราคา:',start);vm.runInContext(source.slice(start,end),ctx);
+ return {ctx,items,rows,el};
+}
+test('quantities stay enabled when travel has been allocated; prices remain protected',()=>{const h=setup(true);h.ctx.TravelQuote.refresh();assert.ok(h.rows.every(r=>r.qty.disabled===false));assert.ok(h.rows.every(r=>r.price.disabled===true));});
+test('typing multiple digits restores every base price without rebuilding the active input',()=>{const h=setup(true),input=h.rows[0].qty;h.ctx.updateItemQtyRaw(1,'1');assert.ok(h.items[0].travel);h.ctx.updateItemQtyRaw(1,'12');h.ctx.updateItemQtyRaw(1,'123');assert.equal(h.items[0].qty,'123');assert.equal(h.items[0].price,1000);assert.equal(h.items[1].price,500);assert.ok(h.items.every(i=>!i.travel));assert.equal(h.rows[0].qty,input);assert.equal(h.rows[0].price.value,'1000');assert.equal(h.ctx.renders,0);assert.equal(h.ctx.total,124000);assert.equal(h.el('travel-recalc-required').value,'1');assert.throws(()=>h.ctx.TravelQuote.validate(),/จำนวนเปลี่ยน/);});
+test('plain quantities accept decimals and empty edits, with correct totals and no travel warning',()=>{const h=setup(false);h.ctx.updateItemQtyRaw(1,'2.5');assert.equal(h.items[0].qty,'2.5');assert.equal(h.ctx.total,3500);h.ctx.updateItemQtyRaw(1,'');assert.equal(h.ctx.total,1000);assert.notEqual(h.el('travel-recalc-required').value,'1');});
+test('new quote reset clears the pending travel recalculation flag',()=>{const h=setup(true);h.ctx.updateItemQtyRaw(1,'2');h.ctx.TravelQuote.reset();assert.equal(h.el('travel-recalc-required').value,'');});
