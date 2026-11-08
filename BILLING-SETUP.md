@@ -1,0 +1,13 @@
+# SalePro billing notes
+
+Open **งานวางบิล** under Finance, or send an eligible quotation from its tracking dialog / payment tracking card. Select one or more quotations for the same verified customer, set the billing date and optional due date/note, then create the document. Credit is an optional filter. Sources must have received a customer PO, include a PO number, and have an unpaid balance. Customer identity uses a 13-digit tax ID or a unique CRM profile, not just a matching display name.
+
+The saved document uses the existing Invoice template with the title **ใบวางบิล / BILLING NOTE**. Each group includes Refer PO and the original quotation number. All public item descriptions, groups and notes are copied; internal Catalog notes are excluded. Item discounts and document discounts reconcile to the source subtotals. VAT and totals come from the saved quotations; paid amounts are captured as of issue. The note separately shows grand total, paid and balance due. Printing again uses this saved snapshot; later payments do not rewrite a previously issued note.
+
+Each document is one `Settings` row with the key `Billing_v1_<UUID>`. Number format is `BL-YYYYMMDD-<8 character identifier>` (not a sequential invoice number). Creation reads sources, lines, Settings and customers afresh and rejects missing/inconsistent lines or sources already in another active billing note. A stable UUID is reused after an uncertain save response. The frontend checks existing assignments; it does not provide a server-side transaction lock against different users issuing overlapping selections simultaneously, so one staff member should issue a customer's billing at a time. A server-side issue action would be needed to guarantee that across concurrent clients.
+
+Saved notes remain searchable by number, customer and PO. Cancellation keeps their history and releases their source quotations for a replacement note. Only the issuer/Admin can cancel through this page. Viewing requires all source quotations to be visible in the current session. Existing backend access rules are unchanged.
+
+No quotations are merged/deleted and no sales results, approval states, payments, emails or PO files are modified. No Apps Script / Worker deployment is required: it uses the existing authenticated Settings CRUD API. A document exceeding 45,000 characters is rejected before writing and must be split into smaller billing notes.
+
+Validation: billing core and page tests use isolated fixtures, covering totals, discounts, VAT, partial payments, identity, duplicate selection/assignment, missing lines, notes, persistence, uncertain save recovery, cancellation and Invoice template output. Local browser QA creates only fixture data, never production records.

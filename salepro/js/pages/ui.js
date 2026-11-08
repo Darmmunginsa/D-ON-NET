@@ -4,6 +4,8 @@
 const pageTitles = {dashboard:'Dashboard',quotes:'ใบเสนอราคา',newquote:'สร้างใบเสนอราคาใหม่',approve:'รออนุมัติ',payment:'ติดตามการชำระเงิน',catalog:'Catalog สินค้า',settings:'Approve Settings',prospects:'เป้าหมายลูกค้า',customers:'ลูกค้า (CRM)',company:'ตั้งค่าบริษัท',forecast:'Sale Forecast',vendor:'Vendor',contracts:'ทะเบียนสัญญา',projects:'โครงการ (Project)',expiry:'แจ้งเตือนหมดอายุ',saleresult:'ผลการขาย (Win / Lose)',activity:'ประวัติการใช้งาน (Log)'};
 
 function showPage(id, el) {
+  pageTitles.billing='งานวางบิล';
+  if(id==='billing'&&typeof Billing!=='undefined')Billing.render();
   if(id==='calendar'&&typeof SaleCalendar!=='undefined')SaleCalendar.load();
   if(id!=='newquote'&&typeof QuoteTools!=='undefined')QuoteTools.closeAll();
   if(id==='prospects'&&!currentUser?.email){toast('กรุณาเข้าสู่ระบบ SalePro ก่อน','error');return;}

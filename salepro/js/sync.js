@@ -113,6 +113,7 @@ async function syncAllLatest(expectedEmail) {
     renderCatalog();
     renderApprove();
     renderPayment();
+    if(typeof Billing!=='undefined')Billing.render();
     updateBadge();
     if(typeof LocalFirst!=='undefined'&&typeof LocalFirst.captureAppearance==='function')await LocalFirst.captureAppearance(expectedEmail);
     if(syncEmail()!==expectedEmail)return false;_startupFreshEmail=expectedEmail;

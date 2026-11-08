@@ -22,6 +22,7 @@ function renderPayment() {
           <span>ชำระแล้ว: <span style="color:var(--green);font-family:var(--mono)">${fmt(q.PaidAmount||0)}</span></span>
           <span>คงเหลือ: <span style="color:${rem>0?'var(--red)':'var(--green)'};font-family:var(--mono)">${fmt(rem)}</span></span>
           <div style="margin-left:auto">
+            ${rem > 0 && typeof Billing!=='undefined' ? `<button class="btn btn-sm" onclick="Billing.add('${q.id}')">ส่งเข้างานวางบิล</button>` : ''}
             ${rem > 0 ? `<button class="btn btn-sm btn-success" onclick="openPaymentModal('${q.id}')">+ บันทึกชำระ</button>` : '<span style="color:var(--green);font-size:12px">✓ ชำระครบแล้ว</span>'}
           </div>
         </div>

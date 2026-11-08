@@ -1889,11 +1889,12 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const F_HEAD = "'Leelawadee UI','Tahoma','Angsana New',sans-serif";    // ยกเว้น: ชื่อบริษัทหัวเอกสาร (ตัวหนาตามรูป)
   const F_ADDR = "'Angsana New','Sarabun',serif";                        // ที่อยู่บริษัทหัวเอกสาร: Angsana New
   const copy = CUST_DOC_COPIES[copyKey] || CUST_DOC_COPIES.customer;
-  const today = fmtDate(new Date());
+  const today = fmtDate(kind==='billing' ? q._billing.date : new Date());
   // เลขเอกสาร: คำนำหน้าปรับได้จากตั้งค่าบริษัท (ค่าเริ่มต้น IV/RV/TAX)
   const _reEsc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const PFX_IV=((co.DocPfxIV||'').trim()||'IV'), PFX_RV=((co.DocPfxRV||'').trim()||'RV'), PFX_TAX=((co.DocPfxTAX||'').trim()||'TAX');
   let docNo = custDocNo(q);
+  if(kind==='billing')docNo=q._billing.number;
   if (kind === 'receipt') docNo = docNo.replace(new RegExp(_reEsc(PFX_IV),'i'), PFX_RV);
   // override คำนำหน้า "เลขที่" เท่านั้น (Hardware หรือ ตัวเลือกที่เพิ่มเอง) — ไม่เปลี่ยนชนิด/หัวเอกสาร
   let _ovPfx='';
@@ -1906,6 +1907,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const noPrice = kind === 'tempdelivery';
   const notTax = !isTax;   // ใบที่ไม่ใช่ใบกำกับภาษี ให้ขึ้นป้าย "ไม่ใช่ใบกำกับภาษี"
   const titles = {
+    billing:      ['ใบวางบิล', 'BILLING NOTE'],
     tax:          ['ใบกำกับภาษี', 'TAX INVOICE'],
     receipt:      ['ใบเสร็จรับเงิน', 'RECEIPT'],
     delivery:     ['ใบส่งของ / ใบแจ้งหนี้', 'DELIVERY ORDER / INVOICE'],
@@ -1925,12 +1927,12 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const _manualOn = _manualRows.length > 0;
   // ยอดเงิน: โหมด Manual คิดยอดจากคอลัมน์ "จำนวนเงิน" ที่กรอกเอง (ข้อความ/ว่าง = 0) — ไม่งั้นคิดจากใบเสนอราคา
   const _amtNum = v => { const s=String(v==null?'':v).trim(); if(s===''||!/^-?[\d,]*\.?\d*$/.test(s)) return 0; const n=parseFloat(s.replace(/,/g,'')); return isFinite(n)?n:0; };
-  const subTotal = _manualOn
+  const subTotal = kind==='billing' ? q._billing.totals.net : _manualOn
     ? _manualRows.reduce((s,r)=> s + (_isGN(r)?0:_amtNum(r.amount)), 0)
     : items.reduce((s,it)=>{ const d=parseFloat(it.DiscountPct||0)/100; return s + parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d); }, 0);
-  const vatAmt = subTotal * 0.07;
-  const grand = subTotal + vatAmt;
-  const bahtWords = (typeof bahtText === 'function') ? bahtText(grand) : '';
+  const vatAmt = kind==='billing' ? q._billing.totals.vat : subTotal * 0.07;
+  const grand = kind==='billing' ? q._billing.totals.total : subTotal + vatAmt;
+  const bahtWords = (typeof bahtText === 'function') ? bahtText(kind==='billing'?q._billing.totals.balance:grand) : '';
 
   // ── คอลัมน์ตาราง (ซ่อน/แสดง + ความกว้าง) — ตั้งค่าจากพรีวิว, เก็บใน manual.cols ──
   const _cfg = (manual && manual.cols && typeof manual.cols==='object') ? manual.cols : {vis:{},w:{}};
@@ -2036,7 +2038,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
     + infoRow('วันที่','DATE',today,true)
     + infoRow('กำหนดชำระเงิน','TERMS',termsVal)
     + infoRow('พนักงานขาย','SALESMAN',q.SaleName||'')
-    + infoRow('ใบสั่งซื้อเลขที่','P/O NO.',poRef)
+    + infoRow('ใบสั่งซื้อเลขที่',kind==='billing'?'Refer PO':'P/O NO.',poRef)
     + '</div>';
 
   // ── footer (ต่างกันตามชนิด) — ปรับให้ตรงฟอร์มจริง ──
@@ -2083,14 +2085,14 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
       +'<div style="border-top:1px dotted #999;text-align:center;padding-top:4px;color:#555">'+label+'</div>'
       +DATELINE+'</div>';
     footer = '<div style="display:flex;gap:10px;align-items:stretch">'
-      +recvBox('<span style="font-family:'+F_TH+';font-size:11px;white-space:nowrap">ได้รับสินค้าระบุไว้ข้างต้นถูกต้องเรียบร้อยแล้ว</span><br><span style="font-family:'+F_EN+';font-size:8px;color:#555;white-space:nowrap">RECEIVED THE ABOVE IN GOOD ORDER AND CONDITION.</span>','<span style="font-family:'+F_TH+';font-size:11px">ผู้รับของ (ลงนามประทับตรา)</span>')
-      +recvBox('','<span style="font-family:'+F_TH+';font-size:11px">ผู้ส่งของ / <span style="font-family:'+F_EN+'">SENDER</span></span>')
+      +recvBox(kind==='billing'?'รับเอกสารใบวางบิลตามรายการข้างต้น':'<span style="font-family:'+F_TH+';font-size:11px;white-space:nowrap">ได้รับสินค้าระบุไว้ข้างต้นถูกต้องเรียบร้อยแล้ว</span><br><span style="font-family:'+F_EN+';font-size:8px;color:#555;white-space:nowrap">RECEIVED THE ABOVE IN GOOD ORDER AND CONDITION.</span>',kind==='billing'?'ผู้รับวางบิล / RECEIVED BY':'<span style="font-family:'+F_TH+';font-size:11px">ผู้รับของ (ลงนามประทับตรา)</span>')
+      +recvBox('',kind==='billing'?'ผู้วางบิล / ISSUED BY':'<span style="font-family:'+F_TH+';font-size:11px">ผู้ส่งของ / <span style="font-family:'+F_EN+'">SENDER</span></span>')
       +authBox+'</div>';
   }
 
   // หมายเหตุ/การชำระเงิน/AMOUNT — จัดเป็น 3 คอลัมน์ (หัวข้อ | : | เนื้อหา) ให้ ":" และตัวหนังสือตรงกันทุกบรรทัด
   const _ntRow = (label,val) => '<tr><td style="vertical-align:top;white-space:nowrap;font-weight:600;padding:0">'+label+'</td><td style="vertical-align:top;padding:0 5px">:</td><td style="vertical-align:top;padding:0">'+val+'</td></tr>';
-  const NOTE_TERMS = '<table style="border-collapse:collapse;width:100%;font-size:10px;line-height:1.5;color:#333">'
+  const NOTE_TERMS = kind==='billing' ? '<div style="font-size:10px;line-height:1.6;white-space:pre-line">'+esc(q._billing.status==='cancelled'?'ยกเลิกใบวางบิล\n':'')+esc(q._billing.note||'')+'<br>ยอดชำระแล้ว ณ วันที่ออกเอกสาร: '+fmt2(q._billing.totals.paid)+'<br><b>ยอดคงเหลือที่วางบิล: '+fmt2(q._billing.totals.balance)+'</b><br>เอกสารนี้ไม่ใช่ใบเสร็จรับเงิน</div>' : '<table style="border-collapse:collapse;width:100%;font-size:10px;line-height:1.5;color:#333">'
     + _ntRow('หมายเหตุ', '<b>สินค้าจำหน่ายแล้วไม่รับเปลี่ยนคืน</b>')
     + _ntRow('การชำระเงิน', 'โปรดชำระเงินด้วยเช็คขีดคร่อมในนาม <b>'+CO_NAME_TH+'</b> บัญชีที่ค้างกำหนดชำระบริษัทฯ จะคิดดอกเบี้ยในอัตรา 2% ต่อเดือน สินค้าตามใบส่งของนี้แม้จะได้ส่งมอบแก่ผู้ซื้อแล้วก็ยังคงเป็นทรัพย์สินของผู้ขายอยู่จนกว่าผู้ซื้อจะได้ชำระราคาเสร็จเรียบร้อยแล้ว และหากการชำระราคาสินค้าเป็นเช็ค การซื้อ-ขายนี้จะสมบูรณ์ต่อเมื่อเช็คสามารถเรียกเก็บเงินจากธนาคารได้เรียบร้อยแล้วเท่านั้น')
     + '</table>';
@@ -2146,13 +2148,14 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const totalsRows = noPrice
     ? '<tr><td colspan="'+visCols.length+'" style="border:1px solid '+NAVY+';padding:8px 10px;font-size:10px;line-height:1.55;color:#333;vertical-align:top">'+NOTE_TERMS+'</td></tr>'
     : '<tr>'
-      +'<td colspan="'+(visCols.length-2)+'" rowspan="3" style="border:1px solid '+NAVY+';padding:8px 10px;vertical-align:top">'+NOTE_TERMS+'<div style="margin-top:8px;font-size:11px;border-top:1px solid '+NAVY+'55;padding-top:5px;text-align:center;font-weight:600">'+esc(bahtWords)+'</div></td>'
+      +'<td colspan="'+(visCols.length-2)+'" rowspan="'+(kind==='billing'?5:3)+'" style="border:1px solid '+NAVY+';padding:8px 10px;vertical-align:top">'+NOTE_TERMS+'<div style="margin-top:8px;font-size:11px;border-top:1px solid '+NAVY+'55;padding-top:5px;text-align:center;font-weight:600">'+esc(bahtWords)+'</div></td>'
       +'<td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:6px 10px;font-size:11px"><b>รวมเงิน</b> TOTAL</td>'
       +'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(subTotal)+'</td></tr>'
       +'<tr><td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:6px 10px;font-size:11px"><b>ภาษีมูลค่าเพิ่ม</b> PLUS VAT</td>'
       +'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(vatAmt)+'</td></tr>'
       +'<tr><td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:7px 10px;font-size:11px"><b>ยอดเงินสุทธิ</b> GRAND TOTAL</td>'
-      +'<td style="border:1px solid '+NAVY+';padding:7px 10px;text-align:right;font-family:'+F_NUM+';font-weight:700;font-size:14px">'+fmt2(grand)+'</td></tr>';
+      +'<td style="border:1px solid '+NAVY+';padding:7px 10px;text-align:right;font-family:'+F_NUM+';font-weight:700;font-size:14px">'+fmt2(grand)+'</td></tr>'
+      +(kind==='billing'?'<tr>'+totLabel('ชำระแล้ว','PAID')+totVal(fmt2(q._billing.totals.paid))+'</tr><tr>'+totLabel('ยอดวางบิล','BALANCE DUE')+totVal('<b>'+fmt2(q._billing.totals.balance)+'</b>')+'</tr>':'');
   // ประกอบหลายหน้า — header ซ้ำทุกหน้า, filler ดันเนื้อหาเต็มหน้า, totals+footer เฉพาะหน้าสุดท้าย
   const nP = rowPages.length;
   const pagesHtml = rowPages.map(function(prows, pi){
@@ -2196,6 +2199,7 @@ function openSaleTrackerModal(id) {
   // Clear pending docs UI
 
   document.getElementById('st-title').textContent = (q.Title||'') + ' — ' + (q.ClientName||'');
+  const billingBtn=document.getElementById('st-billing-add');if(billingBtn)billingBtn.style.display=canManageSaleActions(q)&&['PO Received','Closed'].includes(q.Status)?'':'none';
   const badge = document.getElementById('st-status-badge');
   if (badge) {
     const _isPaid = (q.PaidAmount||0) >= (q.TotalAmount||1) && (q.TotalAmount||0) > 0;
