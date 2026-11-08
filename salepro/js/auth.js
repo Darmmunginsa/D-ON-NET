@@ -216,6 +216,8 @@ function getCalendarToken() {
     const tc = _ensureCalTokenClient();
     if (!tc) { rej(new Error('Google OAuth ยังไม่พร้อม — ลองใหม่อีกครั้ง')); return; }
     _calResolve = res; _calReject = rej;
-    try { tc.requestAccessToken({ prompt: '' }); } catch (e) { rej(e); }
+    // ใบ้ให้ Google เลือกบัญชีเดียวกับที่ล็อกอิน SalePro ไว้ (ลดการถามเลือกบัญชี)
+    const hint = (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : '';
+    try { tc.requestAccessToken(hint ? { prompt: '', hint: hint } : { prompt: '' }); } catch (e) { rej(e); }
   });
 }
