@@ -189,35 +189,3 @@ function getGmailToken() {
     try { tc.requestAccessToken({ prompt: '' }); } catch (e) { rej(e); }
   });
 }
-
-// ── Google Calendar API OAuth (อ่านปฏิทินของผู้ที่ล็อกอิน เพื่อดึงนัดส่วนตัวมาแสดง) ──
-let _calTokenClient = null, _calTok = '', _calTokExp = 0, _calResolve = null, _calReject = null;
-function _ensureCalTokenClient() {
-  if (_calTokenClient) return _calTokenClient;
-  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return null;
-  _calTokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: CONFIG.googleClientId,
-    scope: 'https://www.googleapis.com/auth/calendar.events',
-    callback: function(resp) {
-      if (resp && resp.access_token) {
-        _calTok = resp.access_token;
-        _calTokExp = Date.now() + ((resp.expires_in || 3600) * 1000) - 60000;
-        if (_calResolve) { _calResolve(_calTok); _calResolve = null; _calReject = null; }
-      } else if (_calReject) {
-        _calReject(new Error('ไม่ได้รับสิทธิ์อ่าน Google Calendar')); _calReject = null; _calResolve = null;
-      }
-    }
-  });
-  return _calTokenClient;
-}
-function getCalendarToken() {
-  if (_calTok && Date.now() < _calTokExp) return Promise.resolve(_calTok);
-  return new Promise(function(res, rej) {
-    const tc = _ensureCalTokenClient();
-    if (!tc) { rej(new Error('Google OAuth ยังไม่พร้อม — ลองใหม่อีกครั้ง')); return; }
-    _calResolve = res; _calReject = rej;
-    // ใบ้ให้ Google เลือกบัญชีเดียวกับที่ล็อกอิน SalePro ไว้ (ลดการถามเลือกบัญชี)
-    const hint = (typeof currentUser !== 'undefined' && currentUser && currentUser.email) ? currentUser.email : '';
-    try { tc.requestAccessToken(hint ? { prompt: '', hint: hint } : { prompt: '' }); } catch (e) { rej(e); }
-  });
-}
