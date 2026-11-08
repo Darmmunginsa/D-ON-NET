@@ -512,7 +512,6 @@ function renderItems() {
         ? `<button class="action-btn" title="รอพิจารณานำเข้า Catalog (ที่ PurchasePro)" style="color:var(--amber)">⏳C</button>`
         : `<button class="action-btn" onclick="sendItemToCatalogReview(${it.id})" title="ส่งรายการนี้เข้าพิจารณานำเข้า Catalog (ที่ PurchasePro)" style="color:var(--accent2);font-weight:700">+C</button>`);
       const itemAction = `<td style="width:54px"><div class="row-actions">${hdrBtn}
-            ${!it.asHeader?`<button type="button" class="action-btn" onclick="openServiceCatalogSave(${it.id})" title="เก็บเป็น Service Catalog" aria-label="เก็บเป็น Service Catalog">▣</button>`:''}
             ${_catBtn}
             <button class="action-btn" onclick="removeItem(${it.id})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
             <input type="number" class="row-h-input" min="0" value="${it.rowH||''}" placeholder="สูง" title="ความสูงแถว (px)" onchange="setRowHeight(${it.id},this.value)">
