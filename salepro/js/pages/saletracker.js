@@ -1673,7 +1673,7 @@ function openCDPreview(kind, copy, external){
   const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px';
   const printBtn=document.createElement('button'); printBtn.textContent='🖨 พิมพ์ / บันทึก PDF'; printBtn.style.cssText='padding:8px 18px;background:#17356b;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer';
   const closeBtn=document.createElement('button'); closeBtn.textContent='✕ ปิด'; closeBtn.style.cssText='padding:8px 16px;background:#fff;color:#334155;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;cursor:pointer';
-  btns.appendChild(printBtn); btns.appendChild(closeBtn); bar.appendChild(btns); ov.appendChild(bar);
+  if(!_cdExternal)btns.appendChild(printBtn); btns.appendChild(closeBtn); bar.appendChild(btns); ov.appendChild(bar);
   if(_cdExternal){
     const session=_cdExternal,save=document.createElement('button'),both=document.createElement('button'),status=document.createElement('span');
     status.id='_cdSaveStatus';status.style.cssText='color:#fff;font-size:11px';status.textContent='บันทึกเมื่อกดบันทึกการจัดหน้า';bar.appendChild(status);bar.style.flexWrap='wrap';
