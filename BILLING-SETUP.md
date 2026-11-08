@@ -1,5 +1,11 @@
 # SalePro billing notes
 
+## Shared PO document editor and copies
+
+Billing notes now open the same split editor/preview as customer PO documents. It supports manual rows, groups, notes, row order, pasting a table, column visibility/width and page breaks. Billing editing has an independent session: it never changes `stDealData`, source quotations or the customer PO's layout. Click **บันทึกการจัดหน้า** to persist `layout`, `layoutNote` and `displayTotals` in the billing record. Unsaved edits require confirmation before closing; a concurrent record change blocks overwriting. Changing billing line amounts recalculates its display totals (7% VAT when the net changes) while retaining source totals for comparison.
+
+Choose **ต้นฉบับ** or **สำเนา** for preview/single-copy printing, or **พิมพ์ต้นฉบับ + สำเนา** for both sets in one print/PDF document. Each copy retains the same billing number, rows, layout and totals. Multiple-page notes produce two complete sets rather than two individual sheets. AI import and invoice/tax prefix controls remain available only in the original PO workflow; billing uses its own fixed document type/number.
+
 Open **งานวางบิล** under Finance, or send an eligible quotation from its tracking dialog / payment tracking card. Select one or more quotations for the same verified customer, set the billing date and optional due date/note, then create the document. Credit is an optional filter. Sources must have received a customer PO, include a PO number, and have an unpaid balance. Customer identity uses a 13-digit tax ID or a unique CRM profile, not just a matching display name.
 
 The saved document uses the existing Invoice template with the title **ใบวางบิล / BILLING NOTE**. Each group includes Refer PO and the original quotation number. All public item descriptions, groups and notes are copied; internal Catalog notes are excluded. Item discounts and document discounts reconcile to the source subtotals. VAT and totals come from the saved quotations; paid amounts are captured as of issue. The note separately shows grand total, paid and balance due. Printing again uses this saved snapshot; later payments do not rewrite a previously issued note.

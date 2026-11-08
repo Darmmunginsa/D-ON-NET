@@ -1257,16 +1257,20 @@ function saveDocReferNote(kind, val) {
 }
 
 // ── โหมด Manual: กรอกรายการในเอกสารเอง ทีละคอลัมน์ (สลับกับดึงอัตโนมัติจากใบเสนอราคา) ──
-function _docManual() { stDealData.docManual = stDealData.docManual || {}; if (!Array.isArray(stDealData.docManual.rows)) stDealData.docManual.rows = []; return stDealData.docManual; }
+let _cdExternal=null;
+function _cdState(){return _cdExternal?_cdExternal.state:stDealData;}
+function _saveCDState(){if(_cdExternal){const el=document.getElementById('_cdSaveStatus');if(el)el.textContent=_cdExternal.isDirty()?'มีการปรับแก้ · กดบันทึกการจัดหน้าเพื่อเก็บไว้':'บันทึกการจัดหน้าแล้ว';return Promise.resolve();}return saveSTDealData();}
+function _docManual() { const state=_cdState();state.docManual = state.docManual || {}; if (!Array.isArray(state.docManual.rows)) state.docManual.rows = []; return state.docManual; }
 function toggleDocManual(on) {
   const dm = _docManual();
   dm.on = !!on;
   if (on && !dm.rows.length) dm.rows = (typeof _cdSeedRowsFromItems==='function') ? _cdSeedRowsFromItems() : [{ t:'item', no:'', desc:'', qty:'', price:'', amount:'' }];
   const box = document.getElementById('cpo-manual-box'); if (box) box.style.display = on ? '' : 'none';
   renderDocManualRows();
-  saveSTDealData();
+  _saveCDState();
 }
 function renderDocManualRows() {
+  if(_cdExternal)return;
   const tb = document.getElementById('cpo-manual-rows'); if (!tb) return;
   const dm = _docManual();
   const xbtn = (i,f) => '<button onclick="clearDocManualCell('+i+',\''+f+'\')" title="ล้างให้ว่าง" style="flex:0 0 auto;width:16px;height:16px;line-height:14px;padding:0;border-radius:50%;border:1px solid var(--border,#ccc);background:none;cursor:pointer;color:var(--muted);font-size:10px">×</button>';
@@ -1296,9 +1300,9 @@ function renderDocManualRows() {
   [...tb.querySelectorAll('textarea')].forEach(_autoGrow);
 }
 function _autoGrow(el) { if (!el) return; el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
-function addDocManualRow() { _docManual().rows.push({ no:'', desc:'', qty:'', price:'', amount:'' }); renderDocManualRows(); saveSTDealData(); }
-function removeDocManualRow(i) { const dm=_docManual(); dm.rows.splice(i,1); renderDocManualRows(); if(typeof _cdRefresh==='function')_cdRefresh(); saveSTDealData(); }
-function clearDocManualCell(i, field) { const dm=_docManual(); if(!dm.rows[i])return; dm.rows[i][field]=''; renderDocManualRows(); if(typeof _cdRefreshFrame==='function')_cdRefreshFrame(); saveSTDealData(); }
+function addDocManualRow() { _docManual().rows.push({ no:'', desc:'', qty:'', price:'', amount:'' }); renderDocManualRows(); _saveCDState(); }
+function removeDocManualRow(i) { const dm=_docManual(); dm.rows.splice(i,1); renderDocManualRows(); if(typeof _cdRefresh==='function')_cdRefresh(); _saveCDState(); }
+function clearDocManualCell(i, field) { const dm=_docManual(); if(!dm.rows[i])return; dm.rows[i][field]=''; renderDocManualRows(); if(typeof _cdRefreshFrame==='function')_cdRefreshFrame(); _saveCDState(); }
 let _docManualSaveT = null;
 function updateDocManualCell(i, field, val) {
   const dm = _docManual(); if (!dm.rows[i]) return; dm.rows[i][field] = val;
@@ -1312,7 +1316,7 @@ function blurDocManualAmount(el, i) {
     if (isFinite(n)) { el.value = n.toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   }
   updateDocManualCell(i, 'amount', el.value);
-  clearTimeout(_docManualSaveT); saveSTDealData();
+  clearTimeout(_docManualSaveT); _saveCDState();
 }
 
 // ════════ PO ลูกค้า: ระบบจัดหน้าเอกสาร (พรีวิวแยกซ้าย-ขวา · คอลัมน์ · Manual · AI/Excel) ════════
@@ -1328,27 +1332,28 @@ const CUST_DOC_COLS = [
 ];
 function _cdColCfg() { const dm=_docManual(); if(!dm.cols||typeof dm.cols!=='object')dm.cols={}; if(!dm.cols.vis)dm.cols.vis={}; if(!dm.cols.w)dm.cols.w={}; return dm.cols; }
 function _cdColW(k) { const c=_cdColCfg(); const def=(CUST_DOC_COLS.find(x=>x.k===k)||{}).w; return (c.w[k]!=null&&c.w[k]!=='')?+c.w[k]:def; }
-function toggleCDCol(k,on) { _cdColCfg().vis[k]=!!on; saveSTDealData(); _cdRefresh(); }
+function toggleCDCol(k,on) { _cdColCfg().vis[k]=!!on; _saveCDState(); _cdRefresh(); }
 let _cdColWT=null;
-function setCDColWidth(k,val) { _cdColCfg().w[k]=val; const lbl=document.getElementById('cd-cw-'+k); if(lbl)lbl.textContent=val+'px'; clearTimeout(_cdColWT); _cdColWT=setTimeout(function(){ _cdRefreshFrame(); saveSTDealData(); },250); }
+function setCDColWidth(k,val) { _cdColCfg().w[k]=val; const lbl=document.getElementById('cd-cw-'+k); if(lbl)lbl.textContent=val+'px'; clearTimeout(_cdColWT); _cdColWT=setTimeout(function(){ _cdRefreshFrame(); _saveCDState(); },250); }
 
 // รีเฟรชทั้ง editor ฝั่งซ้าย + inline box + พรีวิวฝั่งขวา
 function _docManualChanged() { try{ renderDocManualRows(); }catch(e){} _cdRefresh(); }
 let _cdManT=null;
-function setCDManual(i,field,val) { const r=_docManual().rows; if(r[i])r[i][field]=val; if(typeof _cdUpdateWarn==='function')_cdUpdateWarn(); clearTimeout(_cdManT); _cdManT=setTimeout(function(){ _cdRefreshFrame(); try{renderDocManualRows();}catch(e){} saveSTDealData(); },350); }
-function setCDManualBlank(i,field) { const r=_docManual().rows; if(r[i])r[i][field]=' '; _docManualChanged(); saveSTDealData(); }
-function setCDManualAlign(i,a) { const r=_docManual().rows; if(r[i])r[i].align=a; _docManualChanged(); saveSTDealData(); }
-function moveCDManualRow(i,dir) { const a=_docManual().rows; const j=i+dir; if(j<0||j>=a.length)return; const t=a[i];a[i]=a[j];a[j]=t; _docManualChanged(); saveSTDealData(); }
+function setCDManual(i,field,val) { const r=_docManual().rows; if(r[i])r[i][field]=val; if(typeof _cdUpdateWarn==='function')_cdUpdateWarn(); clearTimeout(_cdManT); _cdManT=setTimeout(function(){ _cdRefreshFrame(); try{renderDocManualRows();}catch(e){} _saveCDState(); },350); }
+function setCDManualBlank(i,field) { const r=_docManual().rows; if(r[i])r[i][field]=' '; _docManualChanged(); _saveCDState(); }
+function setCDManualAlign(i,a) { const r=_docManual().rows; if(r[i])r[i].align=a; _docManualChanged(); _saveCDState(); }
+function moveCDManualRow(i,dir) { const a=_docManual().rows; const j=i+dir; if(j<0||j>=a.length)return; const t=a[i];a[i]=a[j];a[j]=t; _docManualChanged(); _saveCDState(); }
 function addCDManualRow(type) {
   const row = type==='group' ? {t:'group',name:'หัวข้อกลุ่ม',align:'left'}
             : type==='note'  ? {t:'note',name:'',desc:''}
             : {t:'item',no:'',pn:'',name:'',desc:'',qty:'',unit:'',price:'',amount:''};
-  _docManual().rows.push(row); _docManualChanged(); saveSTDealData();
+  _docManual().rows.push(row); _docManualChanged(); _saveCDState();
 }
 
 // ยอดรวมโหมด Manual (เฉพาะแถว item)
 function _cdManualSum() { const _num=v=>{const s=String(v==null?'':v).trim(); if(s===''||!/^-?[\d,]*\.?\d*$/.test(s))return 0; const n=parseFloat(s.replace(/,/g,'')); return isFinite(n)?n:0;}; return (_docManual().rows||[]).reduce((s,r)=> s + ((r.t==='group'||r.t==='note')?0:_num(r.amount)), 0); }
 function _cdWarnHtml() {
+  if(_cdExternal)return _cdExternal.warning();
   const man=_cdManualSum();
   const fmt2=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
   const base='<span style="color:#15803d">Σ รวมรายการ (ก่อน VAT) = <b>'+fmt2(man)+'</b> บาท · VAT 7% = '+fmt2(man*0.07)+' · รวมสุทธิ '+fmt2(man*1.07)+'</span>';
@@ -1421,7 +1426,7 @@ function openCDPasteImport(){
     ov.remove();
     const _tg=document.getElementById('cpo-manual-toggle'); if(_tg)_tg.checked=true;
     const _bx=document.getElementById('cpo-manual-box'); if(_bx)_bx.style.display='';
-    _docManualChanged(); saveSTDealData();
+    _docManualChanged(); _saveCDState();
     toast('นำเข้า '+parsed.length+' รายการแล้ว','success');
   };
 }
@@ -1494,7 +1499,7 @@ function openCDAIImport(){
       close();
       const _tg=document.getElementById('cpo-manual-toggle'); if(_tg)_tg.checked=true;
       const _bx=document.getElementById('cpo-manual-box'); if(_bx)_bx.style.display='';
-      _docManualChanged(); saveSTDealData();
+      _docManualChanged(); _saveCDState();
       toast('ดูดข้อมูลสำเร็จ '+rows.length+' รายการ','success');
     }catch(e){ st.innerHTML='<span style="color:#b91c1c">ไม่สำเร็จ: '+escHtml(e.message)+'</span>'; okBtn.disabled=false; okBtn.style.opacity='1'; }
   };
@@ -1508,18 +1513,18 @@ function renderCDEditor() {
   const esc=escHtml;
   let h='';
   // ชนิดเอกสาร + สำเนา (สลับได้ในพรีวิว)
-  const kinds=[['delivery','ใบส่งของ/ใบแจ้งหนี้'],['tax','ใบกำกับภาษี'],['receipt','ใบเสร็จรับเงิน'],['tempdelivery','ใบส่งของชั่วคราว']];
+  const kinds=_cdExternal?[['billing','ใบวางบิล']]:[['delivery','ใบส่งของ/ใบแจ้งหนี้'],['tax','ใบกำกับภาษี'],['receipt','ใบเสร็จรับเงิน'],['tempdelivery','ใบส่งของชั่วคราว']];
   h+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:4px">ชนิดเอกสาร</div>';
   h+='<select onchange="switchCDKind(this.value)" style="width:100%;font-size:12px;margin-bottom:8px">'+kinds.map(k=>'<option value="'+k[0]+'" '+(kind===k[0]?'selected':'')+'>'+k[1]+'</option>').join('')+'</select>';
-  const copies=[['customer','ต้นฉบับลูกค้า'],['acct','สำเนา (บัญชี)'],['company','สำเนาบริษัท']];
+  const copies=_cdExternal?[['customer','ต้นฉบับ'],['billingcopy','สำเนา']]:[['customer','ต้นฉบับลูกค้า'],['acct','สำเนา (บัญชี)'],['company','สำเนาบริษัท']];
   h+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:4px">สำเนา</div>';
   h+='<select onchange="switchCDCopy(this.value)" style="width:100%;font-size:12px;margin-bottom:12px">'+copies.map(c=>'<option value="'+c[0]+'" '+((_cdPreview&&_cdPreview.copy)===c[0]?'selected':'')+'>'+c[1]+'</option>').join('')+'</select>';
   // สินค้าเป็น Hardware → เลขเอกสารใช้ TAX แทน IV/RV
-  h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155;margin-bottom:8px;cursor:pointer;padding:6px 8px;border:1px dashed #cbd5e1;border-radius:6px"><input type="checkbox" '+(dm.hardware?'checked':'')+' onchange="setCDHardware(this.checked)"> 📦 สินค้าเป็น Hardware — เลขเอกสารใช้ <b>TAX</b> แทน IV/RV</label>';
+  if(!_cdExternal)h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155;margin-bottom:8px;cursor:pointer;padding:6px 8px;border:1px dashed #cbd5e1;border-radius:6px"><input type="checkbox" '+(dm.hardware?'checked':'')+' onchange="setCDHardware(this.checked)"> 📦 สินค้าเป็น Hardware — เลขเอกสารใช้ <b>TAX</b> แทน IV/RV</label>';
   // ตัวเลือกคำนำหน้าเลขที่ที่เพิ่มเอง (แบบเดียวกับ Hardware — เปลี่ยนแค่เลขที่ ไม่เปลี่ยนชนิด/หัวเอกสาร)
-  try { ((typeof companySettings!=='undefined'&&companySettings.DocTypes)||[]).forEach(function(t){ if(t&&t.key&&(t.name||'').trim()){ const on=(dm.pfxKey===t.key); h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155;margin-bottom:8px;cursor:pointer;padding:6px 8px;border:1px dashed #cbd5e1;border-radius:6px"><input type="checkbox" '+(on?'checked':'')+' onchange="setCDDocPrefix(\''+t.key+'\',this.checked)"> 🏷 '+esc(t.name)+' — เลขเอกสารใช้ <b>'+esc(t.prefix||'')+'</b> แทน IV/RV</label>'; } }); } catch(e){}
+  try { (!_cdExternal&&typeof companySettings!=='undefined'&&companySettings.DocTypes||[]).forEach(function(t){ if(t&&t.key&&(t.name||'').trim()){ const on=(dm.pfxKey===t.key); h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#334155;margin-bottom:8px;cursor:pointer;padding:6px 8px;border:1px dashed #cbd5e1;border-radius:6px"><input type="checkbox" '+(on?'checked':'')+' onchange="setCDDocPrefix(\''+t.key+'\',this.checked)"> 🏷 '+esc(t.name)+' — เลขเอกสารใช้ <b>'+esc(t.prefix||'')+'</b> แทน IV/RV</label>'; } }); } catch(e){}
   // ข้อความเหนือ E.&O.E.
-  const rn=(stDealData.docReferNote||{})[kind]||'';
+  const rn=(_cdState().docReferNote||{})[kind]||'';
   h+='<div style="font-size:12px;font-weight:600;color:#334155;margin-bottom:4px">ข้อความเหนือ "ผิด ตก ยกเว้น" (ต่อชนิดเอกสาร)</div>';
   h+='<textarea oninput="setCDReferNote(this.value)" placeholder="เช่น อ้างอิงใบเสนอราคา..." style="width:100%;min-height:52px;font-size:12px;line-height:1.5;margin-bottom:12px">'+esc(rn)+'</textarea>';
   // คอลัมน์: ซ่อน/แสดง + ความกว้าง
@@ -1544,12 +1549,12 @@ function renderCDEditor() {
   h+='<div style="font-size:10px;color:#94a3b8;margin-bottom:12px">* คอลัมน์ "รายการ" ยืดเต็มพื้นที่ที่เหลือเสมอ</div>';
   // Manual toggle
   h+='<div style="border-top:1px solid #e2e8f0;margin:6px 0 10px"></div>';
-  h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#334155;margin-bottom:6px;cursor:pointer"><input type="checkbox" '+(_manual?'checked':'')+' onchange="toggleCDManual(this.checked)"> ✎ ปรับรายการเอง (Manual)</label>';
+  h+='<label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#334155;margin-bottom:6px;cursor:pointer"><input type="checkbox" '+(_manual?'checked':'')+(_cdExternal?' disabled':'')+' onchange="toggleCDManual(this.checked)"> ✎ ปรับรายการเอง (Manual)</label>';
   if(_manual){
     const rows=dm.rows||[];
     h+='<div style="font-size:10.5px;color:#64748b;margin-bottom:6px">แก้ได้ทุกช่อง ไม่จำกัดบรรทัด · ยอดรวม/VAT/สุทธิ คิดจากคอลัมน์ "จำนวนเงิน" ที่กรอกเอง</div>';
     h+='<button onclick="fillCDFromQuote()" style="width:100%;font-size:12px;padding:7px;border:1px solid #16a34a;background:#f0fdf4;color:#15803d;border-radius:6px;cursor:pointer;margin-bottom:6px;font-weight:600">⟲ ดึงรายการจากใบเสนอราคามาแก้</button>';
-    h+='<button onclick="openCDAIImport()" style="width:100%;font-size:12px;padding:7px;border:none;background:#17356b;color:#fff;border-radius:6px;cursor:pointer;margin-bottom:6px;font-weight:600">🤖 ดูดจากไฟล์ใบเสนอราคา (AI · PDF/รูป)</button>';
+    if(!_cdExternal)h+='<button onclick="openCDAIImport()" style="width:100%;font-size:12px;padding:7px;border:none;background:#17356b;color:#fff;border-radius:6px;cursor:pointer;margin-bottom:6px;font-weight:600">🤖 ดูดจากไฟล์ใบเสนอราคา (AI · PDF/รูป)</button>';
     h+='<button onclick="openCDPasteImport()" style="width:100%;font-size:12px;padding:6px;border:1px solid #2563a8;background:#eff6ff;color:#1d4ed8;border-radius:6px;cursor:pointer;margin-bottom:8px">📋 วางจากตาราง (Excel)</button>';
     if(!noPrice) h+='<div id="cd-man-warn" style="font-size:11px;margin-bottom:8px">'+_cdWarnHtml()+'</div>';
     const n=rows.length;
@@ -1608,11 +1613,12 @@ function renderCDEditor() {
   }
   return h;
 }
-function addCDBreak(idx){ const dm=_docManual(); if(!Array.isArray(dm.breaks))dm.breaks=[]; if(dm.breaks.indexOf(idx)<0)dm.breaks.push(idx); _cdRefresh(); saveSTDealData(); }
-function delCDBreak(idx){ const dm=_docManual(); dm.breaks=(dm.breaks||[]).filter(n=>n!==idx); _cdRefresh(); saveSTDealData(); }
-function setCDReferNote(val){ const kind=_cdPreview?_cdPreview.kind:'delivery'; stDealData.docReferNote=stDealData.docReferNote||{}; stDealData.docReferNote[kind]=val||''; const _el=document.getElementById(kind==='tax'?'cpo-refnote-tax':(kind==='receipt'?'cpo-refnote-receipt':null)); if(_el)_el.value=val||''; clearTimeout(_cdManT); _cdManT=setTimeout(function(){ _cdRefreshFrame(); saveSTDealData(); },350); }
+function addCDBreak(idx){ const dm=_docManual(); if(!Array.isArray(dm.breaks))dm.breaks=[]; if(dm.breaks.indexOf(idx)<0)dm.breaks.push(idx); _cdRefresh(); _saveCDState(); }
+function delCDBreak(idx){ const dm=_docManual(); dm.breaks=(dm.breaks||[]).filter(n=>n!==idx); _cdRefresh(); _saveCDState(); }
+function setCDReferNote(val){ const kind=_cdPreview?_cdPreview.kind:'delivery'; const state=_cdState(); state.docReferNote=state.docReferNote||{}; state.docReferNote[kind]=val||''; const _el=document.getElementById(kind==='tax'?'cpo-refnote-tax':(kind==='receipt'?'cpo-refnote-receipt':null)); if(_el)_el.value=val||''; clearTimeout(_cdManT); _cdManT=setTimeout(function(){ _cdRefreshFrame(); _saveCDState(); },350); }
 // สร้างแถว Manual จากรายการในใบเสนอราคา (ดึงมาแก้ต่อ)
 function _cdSeedRowsFromItems(){
+  if(_cdExternal)return _cdExternal.seedRows();
   const items=_cdItemsCache||[];
   if(!items.length) return [{t:'item',no:'',pn:'',name:'',desc:'',qty:'',unit:'',price:'',amount:''}];
   return items.map(function(it){
@@ -1629,19 +1635,20 @@ function fillCDFromQuote(){
   dm.on=true; dm.rows=_cdSeedRowsFromItems();
   const _tg=document.getElementById('cpo-manual-toggle'); if(_tg)_tg.checked=true;
   const _bx=document.getElementById('cpo-manual-box'); if(_bx)_bx.style.display='';
-  _docManualChanged(); saveSTDealData();
+  _docManualChanged(); _saveCDState();
   toast('ดึง '+(dm.rows.length)+' รายการจากใบเสนอราคาแล้ว','success');
 }
-function toggleCDManual(on){ const dm=_docManual(); dm.on=!!on; if(on && !(dm.rows||[]).length) dm.rows=_cdSeedRowsFromItems(); const _tg=document.getElementById('cpo-manual-toggle'); if(_tg)_tg.checked=!!on; const _bx=document.getElementById('cpo-manual-box'); if(_bx)_bx.style.display=on?'':'none'; _docManualChanged(); saveSTDealData(); }
-function setCDHardware(on){ const dm=_docManual(); dm.hardware=!!on; if(on)dm.pfxKey=''; _cdRefresh(); saveSTDealData(); }
+function toggleCDManual(on){ const dm=_docManual(); dm.on=!!on; if(on && !(dm.rows||[]).length) dm.rows=_cdSeedRowsFromItems(); const _tg=document.getElementById('cpo-manual-toggle'); if(_tg)_tg.checked=!!on; const _bx=document.getElementById('cpo-manual-box'); if(_bx)_bx.style.display=on?'':'none'; _docManualChanged(); _saveCDState(); }
+function setCDHardware(on){ const dm=_docManual(); dm.hardware=!!on; if(on)dm.pfxKey=''; _cdRefresh(); _saveCDState(); }
 // ตัวเลือกคำนำหน้าเลขที่ที่เพิ่มเอง — เลือกได้ทีละอัน (exclusive กับ Hardware)
-function setCDDocPrefix(key,on){ const dm=_docManual(); dm.pfxKey=on?key:''; if(on)dm.hardware=false; _cdRefresh(); saveSTDealData(); }
+function setCDDocPrefix(key,on){ const dm=_docManual(); dm.pfxKey=on?key:''; if(on)dm.hardware=false; _cdRefresh(); _saveCDState(); }
 function switchCDKind(k){ if(_cdPreview)_cdPreview.kind=k; _cdRefresh(); }
 function switchCDCopy(c){ if(_cdPreview)_cdPreview.copy=c; _cdRefresh(); }
 
 // ── พรีวิวแยกซ้าย-ขวา (editor | เอกสารจริง) ──
 let _cdPreview=null, _cdItemsCache=[], _cdQCache=null;
 function _cdBuildHtml(){
+  if(_cdExternal)return _cdExternal.build(_cdPreview?.copy||'customer');
   const q=_cdQCache||quotesData.find(x=>x.id===stQuoteId)||{};
   const po=(stDealData.custPOs||[])[0]||{};
   const co=companySettings||{};
@@ -1652,29 +1659,40 @@ function _cdBuildHtml(){
 }
 function _cdRefresh(){ if(!_cdPreview)return; const ed=document.getElementById('_cdEditor'); if(ed)ed.innerHTML=renderCDEditor(); _cdRefreshFrame(); }
 function _cdRefreshFrame(){ if(!_cdPreview)return; const f=document.getElementById('_cdFrame'); if(f)f.srcdoc=_cdBuildHtml(); }
-function openCDPreview(kind, copy){
+function openCDPreview(kind, copy, external){
+  if(document.getElementById('_docOverlay')){toast('กรุณาปิดพรีวิวเดิมก่อนเปิดเอกสารอื่น','info');return;}
+  if(!_cdExternal&&(_cdManT||_cdColWT||_docManualSaveT))saveSTDealData();
+  clearTimeout(_cdManT);clearTimeout(_cdColWT);clearTimeout(_docManualSaveT);_cdManT=_cdColWT=_docManualSaveT=null;
+  _cdExternal=external||null;
   _cdPreview={kind:kind||'delivery', copy:copy||'customer'};
   const old=document.getElementById('_docOverlay'); if(old)old.remove();
   const ov=document.createElement('div'); ov.id='_docOverlay';
   ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,0.62);display:flex;flex-direction:column;padding:10px 12px;gap:8px';
   const bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px';
-  bar.innerHTML='<div style="color:#fff;font-size:13px;font-weight:600">พรีวิว / จัดหน้าเอกสาร PO ลูกค้า</div>';
+  bar.innerHTML='<div style="color:#fff;font-size:13px;font-weight:600">พรีวิว / จัดหน้าเอกสาร '+(_cdExternal?'ใบวางบิล':'PO ลูกค้า')+'</div>';
   const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px';
   const printBtn=document.createElement('button'); printBtn.textContent='🖨 พิมพ์ / บันทึก PDF'; printBtn.style.cssText='padding:8px 18px;background:#17356b;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer';
   const closeBtn=document.createElement('button'); closeBtn.textContent='✕ ปิด'; closeBtn.style.cssText='padding:8px 16px;background:#fff;color:#334155;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;cursor:pointer';
   btns.appendChild(printBtn); btns.appendChild(closeBtn); bar.appendChild(btns); ov.appendChild(bar);
+  if(_cdExternal){
+    const session=_cdExternal,save=document.createElement('button'),both=document.createElement('button'),status=document.createElement('span');
+    status.id='_cdSaveStatus';status.style.cssText='color:#fff;font-size:11px';status.textContent='บันทึกเมื่อกดบันทึกการจัดหน้า';bar.appendChild(status);bar.style.flexWrap='wrap';
+    save.textContent='บันทึกการจัดหน้า';save.className='btn btn-sm btn-success';save.onclick=async()=>{save.disabled=true;try{await session.save();status.textContent='บันทึกการจัดหน้าแล้ว';}catch(e){status.textContent=e.message;toast(e.message,'error');}finally{save.disabled=false;}};
+    both.textContent='พิมพ์ต้นฉบับ + สำเนา';both.className='btn btn-sm btn-primary';both.onclick=()=>{try{_cdPrintHTML(session.buildBoth());}catch(e){toast(e.message,'error');}};btns.prepend(save,both);
+  }
   const wrap=document.createElement('div'); wrap.style.cssText='flex:1;min-height:0;display:flex;gap:10px';
   const ed=document.createElement('div'); ed.id='_cdEditor'; ed.style.cssText='width:min(460px,42vw);flex-shrink:0;background:#fff;border-radius:8px;padding:12px;overflow:auto';
   ed.innerHTML=renderCDEditor();
   const f=document.createElement('iframe'); f.id='_cdFrame'; f.style.cssText='flex:1;min-width:0;border:none;border-radius:8px;background:#fff;box-shadow:0 12px 44px rgba(0,0,0,0.45)'; f.srcdoc=_cdBuildHtml();
   wrap.appendChild(ed); wrap.appendChild(f); ov.appendChild(wrap);
   document.body.appendChild(ov);
-  function close(){ ov.remove(); _cdPreview=null; document.removeEventListener('keydown',onKey); if(typeof renderCustPOTab==='function')renderCustPOTab(); }
+  function close(){if(_cdExternal?.isDirty()&&!confirm('ยังไม่ได้บันทึกการจัดหน้า ต้องการปิดโดยไม่บันทึกหรือไม่?'))return;const external=_cdExternal;if(!external&&(_cdManT||_cdColWT||_docManualSaveT))saveSTDealData();clearTimeout(_cdManT);clearTimeout(_cdColWT);clearTimeout(_docManualSaveT);_cdManT=_cdColWT=_docManualSaveT=null;document.getElementById('_cdPaste')?.remove();ov.remove(); _cdPreview=null;_cdExternal=null; document.removeEventListener('keydown',onKey);if(external)return; if(typeof renderCustPOTab==='function')renderCustPOTab(); }
   function onKey(e){ if(e.key==='Escape'){ e.stopPropagation(); close(); } }
-  printBtn.onclick=function(){ const html=_cdBuildHtml(); const w=window.open('','_blank'); if(!w){ toast('เบราว์เซอร์บล็อกป๊อปอัป — โปรดอนุญาตแล้วลองใหม่','error'); return; } w.document.open(); w.document.write(html); w.document.close(); setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} },500); };
+  printBtn.onclick=function(){try{_cdPrintHTML(_cdBuildHtml());}catch(e){toast(e.message,'error');}};
   closeBtn.onclick=close;
   document.addEventListener('keydown',onKey);
 }
+function _cdPrintHTML(html){const w=window.open('','_blank');if(!w){toast('เบราว์เซอร์บล็อกป๊อปอัป — โปรดอนุญาตแล้วลองใหม่','error');return;}w.document.open();w.document.write(html);w.document.close();setTimeout(()=>{try{w.focus();w.print();}catch(_){}},500);}
 
 // ── ขอข้ามการรับ PO (ต้องผ่านการอนุมัติจาก Approver ก่อนออกเอกสารได้) ──
 function _stTimeline(text, type) {
@@ -1776,6 +1794,8 @@ async function getQuoteItemsForST() {
 // 3 สำเนา: customer(ต้นฉบับ-ลูกค้า) / acct(สำเนา-บัญชี) / company(สำเนา-บริษัท)
 // ธีมสี: ส้ม | เลขที่: TIS-YYMM-NNN | หัว/โลโก้: Company Settings
 const CUST_DOC_COPIES = {
+  billingoriginal:{ recip:'ต้นฉบับ', original:true },
+  billingcopy:{ recip:'สำเนา', original:false },
   customer: { recip: 'ต้นฉบับลูกค้า',  original: true  },
   acct:     { recip: 'สำเนา (บัญชี)',  original: false },
   company:  { recip: 'สำเนาบริษัท',    original: false }

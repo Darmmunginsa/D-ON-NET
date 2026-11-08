@@ -51,5 +51,11 @@
   const first=quotes[0];
   return {version:1,id,number:'BL-'+date.replace(/-/g,'')+'-'+id.replace(/-/g,'').slice(0,8).toUpperCase(),date,dueDate,note,owner,status:'issued',customerKey:key,sourceIds:sources.map(s=>s.id),sources,rows,customer:{ClientName:first.ClientName,CustomerAddress:first.CustomerAddress||'',CustomerTaxID:first.CustomerTaxID||'',SaleName:first.SaleName||'',PaymentMethod:'Credit'},totals:{gross:money(gross),discount:money(discount),net:money(net),vat:money(vat),total:money(total),paid:money(paid),balance:money(total-paid)}};
  }
- root.BillingCore={cents,customerKey,poNumbers,reason,build};
+ function layoutTotals(doc,rows){
+  const netCents=rows.reduce((sum,r)=>{if(r.t==='group'||r.t==='note')return sum;const raw=String(r.amount??'').trim().replace(/,/g,'');return sum+(/^-?\d*(?:\.\d+)?$/.test(raw)?cents(raw):0);},0);
+  const net=money(netCents),vat=netCents===cents(doc.totals.net)?doc.totals.vat:money(Math.round(netCents*0.07)),total=money(netCents+cents(vat)),paid=doc.totals.paid,balance=money(cents(total)-cents(paid));
+  return {...doc.totals,net,vat,total,paid,balance};
+ }
+ function copiesHTML(original,copy){const content=html=>{const body=html.match(/<body[^>]*>([\s\S]*)<\/body>/i);if(!body)throw Error('รูปแบบเอกสารไม่ถูกต้อง');return body[1].replace(/<div class="no-print"[^>]*>[\s\S]*?<\/div>/gi,'');};return original.replace(/<body[^>]*>[\s\S]*<\/body>/i,'<body>'+content(original)+content(copy)+'</body>');}
+ root.BillingCore={cents,customerKey,poNumbers,reason,build,layoutTotals,copiesHTML};
 })(globalThis);
