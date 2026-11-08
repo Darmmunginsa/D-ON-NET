@@ -148,6 +148,7 @@ async function afterLogin() {
 
 async function logout() {
   if(typeof LocalFirst!=='undefined'){try{await LocalFirst.pause();}catch(e){toast('ยังบันทึก Draft ในเครื่องไม่สำเร็จ: '+e.message,'error');return;}}
+  if(typeof GoogleBusy!=='undefined')GoogleBusy.clear();
   AuthSession.clear();
   currentUser = null;
   try { AppStorage.removeItem('guser'); } catch(e) {}
