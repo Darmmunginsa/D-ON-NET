@@ -1,6 +1,9 @@
 (function(root){'use strict';
  const round=n=>Math.round((n+Number.EPSILON)*100)/100;
  const text=v=>String(v||'').replace(/\s+/g,' ').trim();
+ function coordinates(value){const raw=text(value);if(!raw)return '';const match=raw.match(/^([+-]?\d+(?:\.\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?)$/);if(!match||Math.abs(Number(match[1]))>90||Math.abs(Number(match[2]))>180)throw Error('กรอกพิกัดละติจูด, ลองจิจูด เช่น 13.7500, 100.5000 ไม่ใช่ลิงก์แผนที่');return Number(match[1])+', '+Number(match[2]);}
+ function repeatedAddress(value){const raw=text(value),labels=raw.match(/ตำบล|แขวง|อำเภอ|เขต|จังหวัด/g)||[];return labels.some((label,index)=>labels.indexOf(label)!==index);}
+ function routeTarget(address,pin){const point=coordinates(pin);if(point)return point;const value=text(address);if(repeatedAddress(value))throw Error('ที่อยู่มีส่วนตำบล/อำเภอ/จังหวัดซ้ำ กรุณาแก้ช่องหน้างาน หรือใส่พิกัดหมุดจริงก่อนคำนวณ');if(value.length<5)throw Error('ระบุชื่อ/ที่อยู่หน้างานให้ชัดเจน หรือใส่พิกัดหมุดจริง');return value;}
  function bangkok(address){return /กรุงเทพมหานคร|กรุงเทพฯ|\bbangkok\b/i.test(text(address));}
  function settings(v){
   if(!v||typeof v!=='object')throw Error('Admin ยังไม่ได้ตั้งค่าเดินทาง');
@@ -36,5 +39,5 @@
   remove(items);const at=new Date().toISOString();for(const p of plans){p.it.price=p.price;p.it.travel={...result,...context,version:2,basePrice:p.base,baseQty:p.qty,baseDisc:Number(p.it.disc||0),amount:round((p.price-p.base)*p.qty),totalAmount:result.amount,actualAmount:actual,allocationCount:rows.length,chargedPrice:p.price,source:'manual-google-maps',at};}
  }
  function validate(items,context){for(const it of items)if(it.travel){const m=it.travel;if(!(m.version===2?eligibleAll(it)&&Number(it.qty)===m.baseQty&&Number(it.disc||0)===m.baseDisc&&items.filter(eligibleAll).length===m.allocationCount&&items.filter(x=>x.travel?.version===2&&x.travel.at===m.at).length===m.allocationCount:eligible(it))||Number(it.price)!==Number(m.chargedPrice)||text(m.quoteAddress)!==text(context.quoteAddress)||text(m.clientName)!==text(context.clientName)||bangkok(m.destination)||m.area!=='outside')throw Error('ข้อมูลหน้างานหรือรายการที่รวมค่าเดินทางเปลี่ยน กรุณานำค่าเดินทางออกแล้วตรวจและคำนวณใหม่');}}
- const api={round,text,bangkok,settings,calculate,eligible,eligibleAll,remove,apply,applyAll,validate};if(typeof module==='object'&&module.exports)module.exports=api;else root.TravelCost=api;
+ const api={round,text,coordinates,repeatedAddress,routeTarget,bangkok,settings,calculate,eligible,eligibleAll,remove,apply,applyAll,validate};if(typeof module==='object'&&module.exports)module.exports=api;else root.TravelCost=api;
 })(globalThis);

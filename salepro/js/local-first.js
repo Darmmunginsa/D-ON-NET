@@ -2,7 +2,7 @@
 const LocalFirst=(()=>{
  let engine=null,account='',generation=0,groups=[],active=null,dirty=false,saving=Promise.resolve(),syncing=false,error='',lastSync='',restoring=false,initializing=null,syncTask=null,cacheTail=Promise.resolve(),localWrites=0;
  const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v)),uuid=()=>crypto.randomUUID();
- const fields=()=>Object.fromEntries([...$('page-newquote').querySelectorAll('input[id],select[id],textarea[id]')].filter(e=>e.type!=='file'&&!/^(customer-history|draft-drawer)/.test(e.id)).map(e=>[e.id,{value:e.value,checked:e.checked}]));
+ const fields=()=>Object.fromEntries([$('page-newquote'),$('travel-dialog')].filter(Boolean).flatMap(root=>[...root.querySelectorAll('input[id],select[id],textarea[id]')]).filter(e=>e.type!=='file'&&!/^(customer-history|draft-drawer)/.test(e.id)).map(e=>[e.id,{value:e.value,checked:e.checked}]));
  function snapshot(){const values=fields();if(values['q-draft-name'])values['q-draft-name'].value=String(values['q-draft-name'].value||'').trim();return {fields:values,items:clone(quoteItems),signature:currentQuoteSignature||'',fonts:clone(zoneFont),spacing:clone(rowSpacing),columns:{...clone(colVisible),__lines:colLines,__pricePeriod:typeof pricePeriod!=='undefined'?pricePeriod:''},columnLines:colLines,mergeSources:typeof _mergeSourceIds!=='undefined'?clone(_mergeSourceIds||[]):[],duplicateSource:typeof _dupSourceId!=='undefined'?_dupSourceId:null,project:typeof _nqProjectId!=='undefined'?_nqProjectId:null};}
  function mine(){return !!engine&&String(currentUser?.email||'').toLowerCase()===account;}
  async function status(){if(!mine())return;const pending=await engine.pending();const el=$('local-sync-status');if(el){el.textContent=error?'ข้อมูลในเครื่อง · '+error:syncing?'กำลังซิงก์ Draft…':pending?'บันทึกในเครื่องแล้ว · รอซิงก์ '+pending+' เวอร์ชัน':(lastSync?'Draft ซิงก์แล้ว · '+lastSync:'สำเนาในเครื่องพร้อม');el.title='กดบันทึก Draft เพื่อเก็บใน IndexedDB แยกตามบัญชี · Catalog/ลูกค้าใช้สำเนาล่าสุดในเครื่อง';}await refreshGroups();}
@@ -55,7 +55,7 @@ const LocalFirst=(()=>{
    for(const [id,v]of Object.entries(s.fields)){const el=$(id);if(el&&el.type!=='file'){el.value=v.value;if(['checkbox','radio'].includes(el.type))el.checked=!!v.checked;}}
    quoteItems=clone(s.items);currentQuoteSignature=s.signature||'';applyZoneFonts(s.fonts);setRowSpacingState(s.spacing);setColVisible({...s.columns,__lines:s.columnLines!==false});
    if(typeof _mergeSourceIds!=='undefined')_mergeSourceIds=clone(s.mergeSources||[]);if(typeof _dupSourceId!=='undefined')_dupSourceId=s.duplicateSource||null;if(typeof _nqProjectId!=='undefined')_nqProjectId=s.project||null;
-   active={...r,resolvedParents:g.heads.map(h=>h.revision)};$('items-body')?.replaceChildren();if(typeof TravelQuote!=='undefined')TravelQuote.reset();renderItems();if(typeof TravelQuote!=='undefined')TravelQuote.restore();updateSigPreview(currentQuoteSignature);updateApproverBox();autoGrowAll($('page-newquote'));DraftDrawer.close();dirty=false;restoring=false;
+   active={...r,resolvedParents:g.heads.map(h=>h.revision)};$('items-body')?.replaceChildren();renderItems();if(typeof TravelQuote!=='undefined')TravelQuote.restore();for(const [id,v]of Object.entries(s.fields)){const el=$(id);if(el?.closest('#travel-dialog')&&el.type!=='file'){el.value=v.value;if(['checkbox','radio'].includes(el.type))el.checked=!!v.checked;}}updateSigPreview(currentQuoteSignature);updateApproverBox();autoGrowAll($('page-newquote'));DraftDrawer.close();dirty=false;restoring=false;
  }
  async function rename(id,revision,name){
    if(!mine())throw Error('กรุณาเข้าสู่ระบบก่อน');name=String(name||'').trim();if(!name||name.length>120)throw Error('ระบุชื่อ Draft ไม่เกิน 120 ตัวอักษร');await saving.catch(()=>{});await refreshGroups();
@@ -77,7 +77,7 @@ const LocalFirst=(()=>{
    const all=await getListItems(CONFIG.lists.quotations),found=all.find(q=>q.LocalDraftId===active.draftId);if(found)throw Error('Draft นี้มีรายการส่งแล้ว กรุณากด Sync และตรวจใบรออนุมัติ ห้ามส่งซ้ำ');
  }
  async function submitted(quoteId){if(!active||!mine())return;await engine.save(active.draftId,[active.revision],{},'submitted',quoteId);active=null;await status();flush();}
- function markDirty(event){if(restoring||!mine()||editingQuoteId||!$('page-newquote').classList.contains('active')||!event.target?.closest('#page-newquote')||event.target.closest('#customer-history-drawer'))return;dirty=true;}
+ function markDirty(event){if(restoring||!mine()||editingQuoteId||!$('page-newquote').classList.contains('active')||!(event.target?.closest('#page-newquote')||event.target?.closest('#travel-dialog'))||event.target.closest('#customer-history-drawer'))return;dirty=true;}
  document.addEventListener('input',markDirty);document.addEventListener('change',markDirty);
  window.addEventListener('online',()=>flush());window.addEventListener('offline',()=>{error='ออฟไลน์ · เก็บ Draft ในเครื่อง';status();});
  window.addEventListener('beforeunload',event=>{if(dirty||localWrites){event.preventDefault();event.returnValue='';}});
