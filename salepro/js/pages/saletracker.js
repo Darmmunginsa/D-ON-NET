@@ -235,7 +235,7 @@ function switchSTTab(tab, el) {
   if (tab === 'tech') renderTechJobList();
   if (tab === 'custpo') renderCustPOTab();
   if (tab === 'expense') renderExpenseTab();
-  if (tab === 'expiry') renderExpiryTab();
+  if (tab === 'expiry') {renderExpiryTab();loadExpirySourceDetails();}
 }
 
 // ============================================================
@@ -243,6 +243,26 @@ function switchSTTab(tab, el) {
 // เก็บใน stDealData.expiries = [{id,type,name,serial,startDate,expiryDate,qty,note,emails[],remindDays,remindSentAt,renewed,renewedAt}]
 // ============================================================
 const EXPIRY_TYPES = ['อุปกรณ์','License','Warranty','สัญญาบริการ','อื่นๆ'];
+let expirySourceState={quote:'',owner:'',items:[],loading:false,error:'',request:0};
+function expirySourceDetails(e){
+ const current=expirySourceState.quote===String(stQuoteId)&&expirySourceState.owner===String(currentUser?.email||'');
+ const rows=current?expirySourceState.items:[],matches=e.sourceItemId?rows.filter(r=>String(r.id)===String(e.sourceItemId)):rows.filter(r=>String(r.Title||'').trim()===String(e.name||'').trim());
+ const fallback=(!e.sourceQuoteId||String(e.sourceQuoteId)===String(stQuoteId))?String(e.sourceDetail||''):'';
+ const parts=matches.length?matches.map(r=>({title:r.Title||'',detail:String(r.Description||'')})):fallback?[{title:'รายละเอียดเมื่อดึงรายการ',detail:fallback}]:[];
+ const error=current?expirySourceState.error:'';
+ return '<section style="margin:0 0 12px;padding:10px 12px;background:var(--surface);border:1px solid var(--border2);border-radius:8px"><div style="font-size:12px;color:var(--muted);margin-bottom:6px">รายละเอียดจากใบเสนอราคา · เลือกข้อความเพื่อคัดลอก Serial ได้</div>'
+  +(matches.length>1?'<p style="font-size:11px;color:var(--amber)">พบหลายรายการชื่อเดียวกัน กรุณาตรวจรายละเอียดก่อนคัดลอก</p>':'')
+  +(parts.length?parts.map(p=>'<div class="expiry-detail-copy" style="margin-top:6px">'+(parts.length>1?'<div style="font-size:11px;margin-bottom:4px">'+escHtml(p.title)+'</div>':'')+(p.detail?'<textarea readonly aria-label="รายละเอียดจากใบเสนอราคา" rows="'+Math.min(7,Math.max(2,p.detail.split('\n').length))+'" style="width:100%;padding:8px 10px;box-sizing:border-box;resize:vertical;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-family:var(--font);font-size:12px;line-height:1.6">'+escHtml(p.detail)+'</textarea><button type="button" class="btn btn-sm" onclick="copyExpiryDetail(this)" style="margin-top:5px">คัดลอกรายละเอียด</button>':'<div style="font-size:12px;color:var(--muted)">รายการนี้ไม่มีรายละเอียดในใบเสนอราคา</div>')+'</div>').join(''):'<div style="font-size:12px;color:var(--muted)">'+(current&&expirySourceState.loading?'กำลังโหลดรายละเอียด…':'ไม่พบรายการต้นทางที่ตรงกัน · ลองกดดึงจากใบเสนอราคา')+'</div>')
+  +(error?'<p style="font-size:11px;color:var(--amber)">'+escHtml(error)+'</p>':'')+'</section>';
+}
+async function loadExpirySourceDetails(){
+ const quote=String(stQuoteId),owner=String(currentUser?.email||''),request=expirySourceState.request+1;
+ expirySourceState={quote,owner,request,items:[],loading:true,error:''};
+ try{const rows=await getListItems(CONFIG.lists.quoteItems);if(!Array.isArray(rows))throw Error('ข้อมูลรายการไม่ครบ');if(request!==expirySourceState.request||String(stQuoteId)!==quote||String(currentUser?.email||'')!==owner)return;expirySourceState.items=rows.filter(r=>String(r.QuoteID)===quote&&!isMarkerItem(r));}
+ catch(e){if(request===expirySourceState.request)expirySourceState.error='โหลดรายละเอียดไม่สำเร็จ: '+e.message;}
+ finally{if(request===expirySourceState.request&&String(stQuoteId)===quote&&String(currentUser?.email||'')===owner){expirySourceState.loading=false;document.querySelectorAll('[data-expiry-source]').forEach(host=>{const e=_stExpiries().find(e=>String(e.id)===host.dataset.expirySource);if(e)host.innerHTML=expirySourceDetails(e);});}}
+}
+async function copyExpiryDetail(button){const area=button.closest('.expiry-detail-copy')?.querySelector('textarea');if(!area)return;try{await navigator.clipboard.writeText(area.value);toast('คัดลอกรายละเอียดแล้ว','success');}catch(_){area.focus();area.select();toast('เลือกข้อความให้แล้ว กด Ctrl+C เพื่อคัดลอก','info');}}
 function _stExpiries() { if (!Array.isArray(stDealData.expiries)) stDealData.expiries = []; return stDealData.expiries; }
 // สถานะอายุ: คืน {days, label, color}  (days = เหลือกี่วัน ติดลบ=เลยกำหนด)
 function expiryStatus(expiryDate, renewed) {
@@ -277,6 +297,7 @@ function renderExpiryTab() {
       + '<button onclick="removeExpiry(\'' + e.id + '\')" title="ลบรายการนี้" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:17px;padding:4px">✕</button>'
       + '</div>'
       // แถวข้อมูลหลัก (grid) — Serial / จำนวน / วันเริ่ม / วันหมดอายุ / เตือนล่วงหน้า
+      + '<div data-expiry-source="'+escHtml(String(e.id))+'">'+expirySourceDetails(e)+'</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">'
       + fld('Serial / S/N', '<input value="' + escHtml(e.serial||'') + '" oninput="updateExpiry(\'' + e.id + '\',\'serial\',this.value)" placeholder="S/N" style="' + INP + '">')
       + fld('จำนวน (เครื่อง)', '<input type="number" min="0" value="' + (e.qty!=null?e.qty:'') + '" oninput="updateExpiry(\'' + e.id + '\',\'qty\',this.value)" placeholder="0" style="' + INP + '">')
@@ -334,15 +355,17 @@ async function saveExpiryManual() { try { await saveSTDealData(); toast('บั�
 function markExpiryRenewed(id) { updateExpiry(id,'renewed',true); }
 async function pullExpiryFromQuote() {
   try {
+    const sourceQuote=String(stQuoteId),sourceOwner=String(currentUser?.email||'');
     const items = (typeof getQuoteItemsForST==='function') ? await getQuoteItemsForST() : [];
+    if(String(stQuoteId)!==sourceQuote||String(currentUser?.email||'')!==sourceOwner)return;
     const have = new Set(_stExpiries().map(e => (e.name||'').trim().toLowerCase()));
     let n = 0;
     items.forEach(function(it) {
       const nm = (it.Title||it.Description||'').trim(); if (!nm) return;
       if (have.has(nm.toLowerCase())) return;
-      _stExpiries().push({ id:'ex'+_nextItemId(), type:'อุปกรณ์', name:nm, serial:'', startDate:'', expiryDate:'', qty:(+it.Quantity||''), note:'', emails:(currentUser&&currentUser.email?[currentUser.email]:[]), remindDays:30, remindSentAt:null, renewed:false }); n++;
+      _stExpiries().push({ id:'ex'+_nextItemId(), type:'อุปกรณ์', name:nm, sourceItemId:String(it.id||''),sourceQuoteId:sourceQuote,sourceDetail:String(it.Description||''),serial:'', startDate:'', expiryDate:'', qty:(+it.Quantity||''), note:'', emails:(currentUser&&currentUser.email?[currentUser.email]:[]), remindDays:30, remindSentAt:null, renewed:false }); n++;
     });
-    renderExpiryTab(); saveSTDealData();
+    renderExpiryTab(); loadExpirySourceDetails(); saveSTDealData();
     toast(n ? ('ดึง '+n+' รายการมาแล้ว — กรอกวันหมดอายุต่อได้เลย') : 'ไม่มีรายการใหม่ให้ดึง', n?'success':'info');
   } catch(e) { toast('ดึงไม่สำเร็จ: '+e.message, 'error'); }
 }
