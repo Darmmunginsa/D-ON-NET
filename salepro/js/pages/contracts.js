@@ -5,6 +5,49 @@
 let contractsData = [];        // [{spId, id, invNo, party, name, vendorTax, poRef, start, end, billing, value, coordinator, alertDays, alertEmails, quoteId, manualDisbursed, note, remindSentFor}]
 let editingContractId = null;  // spId ที่กำลังแก้
 
+let contractSavedSnapshot = null;
+function contractFormSnapshot() {
+  return JSON.stringify([...document.querySelectorAll('#contract-modal input, #contract-modal select, #contract-modal textarea')].map(el => [el.id, el.type === 'checkbox' ? el.checked : el.value]));
+}
+function refreshContractSaveState() {
+  const button = document.getElementById('ct-save-btn');
+  if (!button) return;
+  const saved = contractSavedSnapshot !== null && contractSavedSnapshot === contractFormSnapshot();
+  button.style.background = saved ? '#15803d' : '#c2410c';
+  button.style.borderColor = saved ? '#22c55e' : '#fb923c';
+  button.style.color = '#fff';
+  button.textContent = saved ? '✓ บันทึกแล้ว' : 'บันทึกสัญญา · ยังไม่บันทึก';
+}
+function initializeContractSaveState(saved) {
+  const modal = document.getElementById('contract-modal');
+  if (!modal.dataset.saveStateBound) {
+    modal.dataset.saveStateBound = '1';
+    ['input', 'change', 'click'].forEach(event => modal.addEventListener(event, () => setTimeout(refreshContractSaveState, 0)));
+  }
+  contractSavedSnapshot = saved ? contractFormSnapshot() : null;
+  refreshContractSaveState();
+}
+function contractEndForMonths(start, months) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !Number.isInteger(months) || months < 1 || months > 120) return '';
+  const date = new Date(start + 'T00:00:00Z');
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0,10) !== start) return '';
+  // End on the day before the anniversary, clamping month-end dates.
+  const day = date.getUTCDate();
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  const last = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  date.setUTCDate(Math.min(day, last));
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0,10);
+}
+function setContractEndMonths(months) {
+  const end = contractEndForMonths(document.getElementById('ct-start').value, Number(months));
+  if (!end) return toast('กรุณาระบุวันเริ่มสัญญา และระยะเวลา 1–120 เดือน','error');
+  document.getElementById('ct-end').value = end;
+  document.getElementById('ct-end').dispatchEvent(new Event('change', {bubbles:true}));
+  refreshContractSaveState();
+}
+
 async function loadContracts() {
   try {
     await requireContractNumbering();
@@ -270,6 +313,7 @@ function openAddContract() {
   openServiceAgreementFields(null);
   renderContractCustomerOptions();
   openModal('contract-modal');
+  initializeContractSaveState(false);
 }
 function editContract(spId) {
   const c = contractsData.find(x => String(x.spId) === String(spId)); if (!c) return;
@@ -288,6 +332,7 @@ function editContract(spId) {
   renderContractCustomerOptions();
   if(contractCustomerId){const customer=contractCustomerProfiles.find(x=>String(x.id)===String(contractCustomerId));applyContractCustomer(customer,false);}else contractQuoteCustomerChanged();
   openModal('contract-modal');
+  initializeContractSaveState(true);
 }
 async function saveContract() {
   const g = id => document.getElementById(id)?.value || '';
@@ -313,6 +358,8 @@ async function saveContract() {
     toast('กำลังบันทึก...','info');
     if (editingContractId) { await updateListItem(CONFIG.lists.contracts, editingContractId, { Title: obj.party||obj.name, Value: value }); }
     else { await createListItem(CONFIG.lists.contracts, { Title: obj.party||obj.name, Value: value }); }
+    contractSavedSnapshot = contractFormSnapshot();
+    refreshContractSaveState();
     closeModal('contract-modal');
     await loadContracts(); renderContracts();
     toast('บันทึกสัญญาแล้ว','success');
