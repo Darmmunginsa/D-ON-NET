@@ -8,7 +8,7 @@
 function _allExpiries() {
   const out = [];
   (quotesData || []).forEach(function(q) {
-    let ds; try { ds = parseDealStatus(q.DealStatus); } catch(e) { return; }
+    let ds; try { ds = parseDealStatus((typeof getStoredDealStatus==='function' && getStoredDealStatus(q.id)) || q.DealStatus); } catch(e) { return; }
     const exps = (ds && Array.isArray(ds.expiries)) ? ds.expiries : [];
     exps.forEach(function(e) {
       if (!e) return;
@@ -93,7 +93,7 @@ function renderExpiryDashboard() {
 
   host.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px">'
     + '<thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid var(--border)">'
-    + '<th style="padding:7px 8px">ประเภท</th><th style="padding:7px 8px">สินค้า/รุ่น</th><th style="padding:7px 8px">Serial</th><th style="padding:7px 8px">ลูกค้า</th><th style="padding:7px 8px">วันหมดอายุ</th><th style="padding:7px 8px">สถานะ</th><th style="padding:7px 8px"></th></tr></thead><tbody>'
+    + '<th style="padding:7px 8px">ประเภท</th><th style="padding:7px 8px">สินค้า/รุ่น</th><th style="padding:7px 8px">Serial</th><th style="padding:7px 8px">ลูกค้า</th><th style="padding:7px 8px">วันหมดอายุ</th><th style="padding:7px 8px">สถานะ</th><th style="padding:7px 8px">Warranty บน Web</th><th style="padding:7px 8px"></th></tr></thead><tbody>'
     + list.map(function(e) {
         const st = expiryStatus(e.expiryDate, e.renewed);
         return '<tr style="border-bottom:1px solid var(--border)">'
@@ -103,6 +103,7 @@ function renderExpiryDashboard() {
           + '<td style="padding:7px 8px;color:var(--muted)">' + escHtml(e.client||'-') + '</td>'
           + '<td style="padding:7px 8px;font-family:var(--mono)">' + (e.expiryDate ? fmtDate(e.expiryDate) : '-') + '</td>'
           + '<td style="padding:7px 8px"><span style="color:' + st.color + ';font-weight:600">● ' + st.label + '</span></td>'
+          + '<td style="padding:7px 8px;white-space:nowrap">' + (e.publicLookup===true ? (ServicePlan.publicRecord(e) ? '<span class="badge" style="color:var(--green);background:rgba(34,197,94,.12)">✓ เผยแพร่บน Web แล้ว</span>' : '<span style="color:var(--amber)">ข้อมูลประกันไม่ครบ · ตรวจสอบก่อนเผยแพร่</span>') : '<span style="color:var(--muted)">ยังไม่เผยแพร่</span>') + '</td>'
           + '<td style="padding:7px 8px;text-align:right;white-space:nowrap"><button class="btn btn-sm" onclick="openExpiryDeal(\'' + e.quoteId + '\')" style="font-size:11px">เปิดดีล</button></td>'
           + '</tr>';
       }).join('')
