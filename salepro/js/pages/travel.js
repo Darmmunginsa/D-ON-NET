@@ -60,10 +60,32 @@ const TravelQuote=(()=>{
  }
  function restore(){fillOptions();}
  function init(){
-  const box=document.createElement('details');box.id='travel-quote-card';box.className='card travel-card';box.innerHTML=`<summary>ค่าเดินทางนอกกรุงเทพฯ · รวมในราคางาน</summary><div class="travel-body"><p id="travel-rate-summary"></p><p>เปิดเส้นทาง Google Maps แล้วตรวจและกรอกระยะทางขับรถเที่ยวเดียว ระบบคำนวณค่าเดินทางตามอัตรา Admin ยังไม่ได้เชื่อม API ดึงระยะทางอัตโนมัติ</p><label for="travel-destination">ที่อยู่หน้างานจริง</label><textarea id="travel-destination" rows="2"></textarea><button type="button" class="btn btn-sm" id="travel-use-address">ใช้ที่อยู่ลูกค้าในใบเสนอราคา</button> <a id="travel-maps" class="btn btn-sm" href="https://www.google.com/maps" target="_blank" rel="noopener">เปิดเส้นทาง Google Maps ↗</a><div class="travel-grid"><div><label for="travel-area">พื้นที่หน้างาน</label><select id="travel-area"><option value="">กรุณาตรวจพื้นที่</option><option value="bangkok">กรุงเทพมหานคร · ไม่คิดค่าเดินทาง</option><option value="outside">นอกกรุงเทพมหานคร</option></select></div><div><label for="travel-km">ระยะทางขับรถเที่ยวเดียว (กม.)</label><input id="travel-km" type="number" min="0" max="3000" step="0.1"></div></div><label><input id="travel-confirmed" type="checkbox"> ตรวจแล้วว่าหน้างานอยู่นอกกรุงเทพฯ และระยะทางเที่ยวเดียวถูกต้อง</label><p>เฉลี่ยค่าเดินทางเท่ากันในทุกรายการสินค้า/บริการที่มีจำนวนและราคาตัวเลข โดยหารตามจำนวนของแต่ละรายการเพื่อบวกในราคาต่อหน่วย ปัดราคา 2 ตำแหน่ง ไม่รวมแถวหัวข้อหรือหมายเหตุ ค่าเดินทางรวมก่อนส่วนลดและ VAT โดยไม่เพิ่มแถวในเอกสาร</p><button type="button" class="btn btn-primary btn-sm" id="travel-apply">คำนวณและรวมในราคางาน</button> <button type="button" class="btn btn-sm" id="travel-remove">นำค่าเดินทางออก</button><p id="travel-message" role="status" aria-live="polite"></p></div>`;
-  box.querySelector('.travel-body > p:nth-child(2)').textContent='ดึงระยะทางขับรถจาก Google Maps หรือตรวจเส้นทางแล้วกรอกเอง จากนั้นยืนยันพื้นที่นอกกรุงเทพฯ และรวมค่าเดินทางในราคางาน';
-  const pinBox=document.createElement('div');pinBox.innerHTML='<label for="travel-point">พิกัดหมุดหน้างาน (ใช้แทนที่อยู่เมื่อค้นหาไม่พบ)</label><input id="travel-point" type="text" placeholder="ละติจูด, ลองจิจูด เช่น 13.7500, 100.5000"><p>ค้นสถานที่ใน Google Maps แล้วคัดลอกพิกัดหมุดตรงทางเข้าจริง ไม่ใช้จุดกลางตำบล · ที่อยู่บนใบเสนอราคาจะไม่เปลี่ยน</p><a href="https://www.google.com/maps" target="_blank" rel="noopener" class="btn btn-sm">ค้นหาหมุดใน Google Maps ↗</a>';box.querySelector('#travel-destination').after(pinBox);
-  const fetchButton=document.createElement('button');fetchButton.id='travel-fetch';fetchButton.type='button';fetchButton.className='btn btn-primary btn-sm';fetchButton.textContent='ดึงระยะทางจาก Google Maps';fetchButton.addEventListener('click',fetchDistance);box.querySelector('#travel-maps').after(fetchButton);
+  const box=document.createElement('details');box.id='travel-quote-card';box.className='card travel-card';box.innerHTML=`<summary>ค่าเดินทางนอกกรุงเทพฯ · รวมในราคางาน</summary>
+<div class="travel-body travel-workflow">
+  <div class="travel-intro"><p id="travel-rate-summary"></p><p>ระบุหน้างาน ตรวจระยะทาง แล้วจึงยืนยันรวมค่าเดินทางในราคา</p></div>
+  <section class="travel-section" aria-labelledby="travel-site-heading">
+    <h4 id="travel-site-heading"><span>1</span> ระบุหน้างาน</h4>
+    <div class="travel-grid travel-site-grid">
+      <div class="travel-field"><div class="travel-field-label"><label for="travel-destination">ที่อยู่หน้างานจริง</label><button type="button" class="btn btn-sm" id="travel-use-address">ใช้ที่อยู่จากใบเสนอราคา</button></div><textarea id="travel-destination" rows="2" placeholder="ชื่อสถานที่ / ที่อยู่หน้างาน"></textarea><p class="travel-hint">แก้เฉพาะหน้างานได้ ที่อยู่บนใบเสนอราคาจะไม่เปลี่ยน</p></div>
+      <div class="travel-field"><label for="travel-point">พิกัดหน้างาน <span class="travel-optional">(ถ้ามี)</span></label><input id="travel-point" type="text" placeholder="ละติจูด, ลองจิจูด เช่น 13.7500, 100.5000"><p class="travel-hint">หากค้นหาที่อยู่ไม่เจอ ให้ใช้พิกัดหมุดตรงทางเข้าจริง</p><a href="https://www.google.com/maps" target="_blank" rel="noopener" class="btn btn-sm travel-pin-link">ค้นหาหมุดใน Google Maps ↗</a></div>
+    </div>
+  </section>
+  <section class="travel-section" aria-labelledby="travel-distance-heading">
+    <h4 id="travel-distance-heading"><span>2</span> ตรวจระยะทางและพื้นที่</h4>
+    <div class="travel-grid travel-distance-grid">
+      <div class="travel-field"><label for="travel-km">ระยะทางขับรถเที่ยวเดียว (กม.)</label><div class="travel-distance-entry"><input id="travel-km" type="number" min="0" max="3000" step="0.1" placeholder="ระบุระยะเที่ยวเดียว"><button type="button" class="btn btn-sm travel-fetch-button" id="travel-fetch">ดึงระยะทาง</button></div><div class="travel-route-review"><a id="travel-maps" href="https://www.google.com/maps" target="_blank" rel="noopener">เปิดตรวจเส้นทาง ↗</a><span>ดึงจาก Google Maps หรือกรอกระยะเองหลังตรวจเส้นทาง</span></div></div>
+      <div class="travel-field"><label for="travel-area">พื้นที่หน้างาน</label><select id="travel-area"><option value="">กรุณาตรวจพื้นที่</option><option value="bangkok">กรุงเทพมหานคร · ไม่คิดค่าเดินทาง</option><option value="outside">นอกกรุงเทพมหานคร</option></select><p class="travel-hint">เลือกตามหน้างานจริง ไม่ใช่ที่อยู่ออกเอกสาร</p></div>
+    </div>
+    <p id="travel-message" role="status" aria-live="polite"></p>
+  </section>
+  <section class="travel-section travel-confirm-section" aria-labelledby="travel-confirm-heading">
+    <h4 id="travel-confirm-heading"><span>3</span> ยืนยันก่อนรวมราคา</h4>
+    <label class="travel-confirm-row"><input id="travel-confirmed" type="checkbox"><span>ตรวจหมุดและเส้นทางแล้ว หน้างานอยู่นอกกรุงเทพฯ และระยะทางเที่ยวเดียวถูกต้อง</span></label>
+    <details class="travel-allocation-help"><summary>ดูวิธีรวมค่าเดินทางในราคา</summary><p>เฉลี่ยค่าเดินทางเท่ากันในทุกรายการสินค้า/บริการที่มีจำนวนและราคาตัวเลข โดยหารตามจำนวนเพื่อบวกในราคาต่อหน่วย ปัดราคา 2 ตำแหน่ง ไม่รวมแถวหัวข้อหรือหมายเหตุ ค่าเดินทางรวมก่อนส่วนลดและ VAT โดยไม่เพิ่มแถวในเอกสาร</p></details>
+  </section>
+</div>
+<footer class="travel-actions"><button type="button" class="btn btn-sm travel-remove-button" id="travel-remove">นำค่าเดินทางออก</button><button type="button" class="btn btn-primary" id="travel-apply">ยืนยันและรวมค่าเดินทางในราคา →</button></footer>`;
+  box.querySelector('#travel-fetch').addEventListener('click',fetchDistance);
   const dialog=document.createElement('dialog');dialog.id='travel-dialog';dialog.className='quote-floating';dialog.setAttribute('aria-labelledby','travel-dialog-title');
   const header=document.createElement('div');header.className='travel-dialog-header';
   const title=document.createElement('h3');title.id='travel-dialog-title';title.textContent='ค่าเดินทางนอกกรุงเทพฯ · รวมในราคางาน';
