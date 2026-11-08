@@ -113,17 +113,13 @@ async function afterLogin() {
     document.getElementById('user-avatar').textContent = (currentUser.displayName || 'U')[0].toUpperCase();
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-screen').style.display = 'flex';
-    initNewQuote();
+    userRoles={isAdmin:false,isApprover:false,isSales:true};
+    document.querySelectorAll('.nav-admin-only').forEach(el=>el.style.display='none');
+    if(typeof resetStartupData==='function')resetStartupData();
     if(typeof LocalFirst!=='undefined')await LocalFirst.initialize();
-    // โหลดสิทธิ์ก่อน sync — ให้การกรองใบเสนอราคา (Admin/Approver เห็นทุกใบ) ถูกต้องตั้งแต่เข้าโปรแกรม
-    await loadUserRoles();
-    await syncAll();
-    // Load saved theme (per-user)
-    await loadTheme();
-    // Load Sale profile (name/tel/signature) from SharePoint — durable across devices
-    await loadSaleProfile();
-    // โหลดทะเบียนลูกค้าไว้ล่วงหน้า — เพื่อจับคู่ชื่อ/ที่อยู่ ไทย-EN บนใบเสนอราคา/เอกสารสำคัญ
-    if (typeof loadCustomers === 'function') { try { await loadCustomers(); } catch(e) { console.warn('preload customers failed:', e.message); } }
+    initNewQuote();
+    // One fresh batch supplies roles, theme, profile, customer records and company assets.
+    if(await syncAll()===false)return;
     // Show role badge after sync (tiers loaded)
     const roleBadge = document.getElementById('user-role-badge');
     if (roleBadge) {

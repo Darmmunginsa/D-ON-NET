@@ -1,7 +1,8 @@
 // ============================================================
 // COMPANY SETTINGS
 // ============================================================
-let companySettings = { CompanyName:'', CompanyNameEn:'', TaxID:'', Phone:'', Fax:'', Email:'', Address:'', AddressEn:'', PrimaryColor:'#1a3a5c', FooterText:'', LogoURL:'', SignatureURL:'', LogoBase64:'', SignatureBase64:'', HeaderFontSize:10, DocNoFormat:'', HeaderNameImage:'', HeaderNameW:0, HeaderNameH:0, DefaultCC:'', DocPfxIV:'', DocPfxRV:'', DocPfxTAX:'', DocTypes:[] };
+const COMPANY_DEFAULTS = { CompanyName:'', CompanyNameEn:'', TaxID:'', Phone:'', Fax:'', Email:'', Address:'', AddressEn:'', PrimaryColor:'#1a3a5c', FooterText:'', LogoURL:'', SignatureURL:'', LogoBase64:'', SignatureBase64:'', HeaderFontSize:10, DocNoFormat:'', HeaderNameImage:'', HeaderNameW:0, HeaderNameH:0, DefaultCC:'', DocPfxIV:'', DocPfxRV:'', DocPfxTAX:'', DocTypes:[] };
+let companySettings = JSON.parse(JSON.stringify(COMPANY_DEFAULTS));
 // ข้อมูลหัวเอกสารเพิ่มเติม (ชื่อ/ที่อยู่ EN + Fax) — เก็บใน Settings JSON เลี่ยงเพิ่มคอลัมน์ Company list
 function loadCompanyExtra() {
   try { const it = (_settingsCache || []).find(i => i.Title === 'CompanyExtra'); if (it && it.Value) { const o = JSON.parse(it.Value)||{}; companySettings.CompanyNameEn=o.CompanyNameEn||''; companySettings.AddressEn=o.AddressEn||''; companySettings.Fax=o.Fax||''; companySettings.DocNoFormat=o.DocNoFormat||''; companySettings.HeaderNameImage=o.HeaderNameImage||''; companySettings.HeaderNameW=+o.HeaderNameW||0; companySettings.HeaderNameH=+o.HeaderNameH||0; companySettings.DefaultCC=o.DefaultCC||''; companySettings.DocPfxIV=o.DocPfxIV||''; companySettings.DocPfxRV=o.DocPfxRV||''; companySettings.DocPfxTAX=o.DocPfxTAX||''; companySettings.DocTypes=Array.isArray(o.DocTypes)?o.DocTypes:[]; } } catch(e) {}
@@ -208,6 +209,7 @@ async function saveSignatureOnly() {
 }
 
 async function saveCompanySettings() {
+  const actor=currentUser?.email;
   toast('กำลังบันทึก...','info');
   try {
     if (pendingLogoFile) {
@@ -254,6 +256,7 @@ async function saveCompanySettings() {
         if (_settingsCache) _settingsCache.push({ id: c.id, Title: 'CompanyHeaderFontSize', Value: String(headerFs) });
       }
     } catch(e2) { console.warn('Save header font size failed:', e2.message); }
+    if(typeof LocalFirst!=='undefined'&&typeof LocalFirst.captureAppearance==='function')await LocalFirst.captureAppearance(actor);
     toast('บันทึกตั้งค่าบริษัทสำเร็จ','success');
   } catch(e) { toast('ไม่สำเร็จ: '+e.message,'error'); }
 }

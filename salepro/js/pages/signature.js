@@ -17,17 +17,21 @@ let _saleProfileItemId = null;
 async function loadSaleProfile() {
   try {
     const email = (currentUser?.email || '').toLowerCase();
-    const items = _settingsCache || await getListItems(CONFIG.lists.settings);
+    const before={..._saleProfile},items = _settingsCache || await getListItems(CONFIG.lists.settings);
+    if(email!==String(currentUser?.email||'').toLowerCase())return;
     const it = items.find(i => i.Title === 'SaleProfile_' + email);
-    if (it) {
-      _saleProfileItemId = it.id;
-      _saleProfile = { name: '', tel: '', signature: '', ...(JSON.parse(it.Value || '{}')) };
-      if (_saleProfile.signature) { sigCache[sigKey(email)] = _saleProfile.signature; }
+    _saleProfileItemId=it?.id||null;_saleProfile={name:'',tel:'',signature:'',...(it?JSON.parse(it.Value||'{}'):{})};
+    sigCache[sigKey(email)]=_saleProfile.signature||'';try{AppStorage.setItem(sigKey(email),_saleProfile.signature||'');}catch(_){}
+    if(!(typeof LocalFirst!=='undefined'&&LocalFirst.activeId())){
+      for(const [id,key]of [['q-sale-name','name'],['q-sale-tel','tel']]){const el=document.getElementById(id);if(el&&(!el.value||el.value===before[key]||(key==='name'&&!before.name&&el.value===currentUser?.displayName)))el.value=_saleProfile[key]||'';}
+      if(currentQuoteSignature===before.signature){currentQuoteSignature=_saleProfile.signature||'';updateSigPreview(currentQuoteSignature);}
     }
   } catch(e) { console.warn('load sale profile failed:', e.message); }
 }
 
 async function saveSaleProfile(partial) {
+  try{if(typeof ensureStartupData==='function')await ensureStartupData();}catch(e){console.warn('save sale profile:',e.message);return;}
+  const actor=currentUser?.email;
   _saleProfile = { ..._saleProfile, ...partial };
   // ย่อลายเซ็นให้ < 45,000 ตัวอักษร (กันลิมิตเซลล์ 50k)
   if (_saleProfile.signature && typeof shrinkImageBase64 === 'function') {
@@ -43,6 +47,7 @@ async function saveSaleProfile(partial) {
       _saleProfileItemId = c.id;
       if (_settingsCache) _settingsCache.push({ id: c.id, Title: 'SaleProfile_' + email, Value: value });
     }
+    if(typeof LocalFirst!=='undefined'&&typeof LocalFirst.captureAppearance==='function')await LocalFirst.captureAppearance(actor);
   } catch(e) { console.warn('save sale profile failed:', e.message); }
 }
 

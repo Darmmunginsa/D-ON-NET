@@ -90,11 +90,11 @@ async function getListItems(list) {
 }
 // อ่านหลายแท็บในครั้งเดียว → { listName: items[] }  (ลด round-trip ตอน sync)
 // ถ้า Apps Script ยังไม่รองรับ (ยังไม่ redeploy) → fallback โหลดทีละตัว
-async function getListItemsMulti(lists) {
+async function getListItemsMulti(lists,options={}) {
   try { const actor=currentUser?.email,d = await _call({ action: 'multiList', lists }); if (d && d.lists) {if(typeof LocalFirst!=='undefined')await Promise.all(Object.entries(d.lists).map(([name,rows])=>LocalFirst.remember(name,rows,actor)));return d.lists;} }
-  catch (e) { console.warn('multiList ไม่รองรับ → fallback:', e.message); }
+  catch (e) { if(options.strict)throw e;console.warn('multiList ไม่รองรับ → fallback:', e.message); }
   const out = {};
-  for (const l of lists) { out[l] = await getListItems(l).catch(() => []); }
+  for (const l of lists) { out[l] = await getListItems(l).catch(e => {if(options.strict)throw e;return [];}); }
   return out;
 }
 async function createListItem(list, fields) {

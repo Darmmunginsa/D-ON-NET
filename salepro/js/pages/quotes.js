@@ -1548,6 +1548,7 @@ let _quoteSaveBusy=false;
 async function saveQuote(status,options={}){
   if(_quoteSaveBusy)return;_quoteSaveBusy=true;
   try{
+    if((status!=='Draft'||options.online)&&typeof ensureStartupData==='function')await ensureStartupData();
     if(status==='Draft'&&!options.online&&!editingQuoteId&&typeof LocalFirst!=='undefined'&&LocalFirst.ready())return await LocalFirst.save(true);
     if((status==='Pending'||status==='Approved'||options.online)&&typeof LocalFirst!=='undefined'&&LocalFirst.activeId())await LocalFirst.beforeSubmit();
     const id=await _saveQuoteImpl(status);

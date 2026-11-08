@@ -35,15 +35,28 @@ function filterQuotesForUser(allQuotes, freshSettings) {
   });
 }
 
-async function syncAll() {
+let _syncTask=null,_syncActor='',_startupFreshEmail='';
+const syncEmail=()=>String(currentUser?.email||'').trim().toLowerCase();
+function resetStartupData(){_startupFreshEmail='';}
+async function ensureStartupData(){const email=syncEmail();if(!email)throw Error('กรุณาเข้าสู่ระบบก่อน');if(_startupFreshEmail===email&&!_syncTask)return;if(!await syncAll()||_startupFreshEmail!==email)throw Error('ยังตรวจข้อมูลล่าสุดไม่สำเร็จ เก็บ Draft ได้ แต่กรุณาซิงก์ก่อนส่งอนุมัติ');}
+async function syncAll(){
+  const email=syncEmail();if(!email)return false;
+  if(_syncTask){const actor=_syncActor,result=await _syncTask;return actor===email?result:syncAll();}
+  _syncActor=email;_syncTask=syncAllLatest(email).finally(()=>{_syncTask=null;});return _syncTask;
+}
+async function syncAllLatest(expectedEmail) {
+  _startupFreshEmail='';
   toast('กำลังซิงค์ข้อมูล...', 'info');
   try {
     await BasketPersistence.idle();
     // โหลดทุกแท็บใน "ครั้งเดียว" (multiList) — ลด round-trip บน Apps Script ให้เร็วขึ้นมาก
-    let catData, allQuotes, settingsData, procData, companyData;
+    let catData, allQuotes, settingsData, procData, companyData, customerData;
     if (typeof getListItemsMulti === 'function') {
       const L = CONFIG.lists;
-      const m = await getListItemsMulti([L.catalog, L.quotations, L.settings, L.procurement, L.company]);
+      const names=[L.catalog,L.quotations,L.settings,L.procurement,L.company];if(L.customers)names.push(L.customers);
+      const m = await getListItemsMulti(names,{strict:true});
+      if(names.some(name=>!Array.isArray(m[name])))throw Error('ข้อมูลเริ่มต้นจากเซิร์ฟเวอร์ไม่ครบ');
+      if(L.customers)customerData=m[L.customers];
       catData = m[L.catalog] || []; allQuotes = m[L.quotations] || []; settingsData = m[L.settings] || [];
       procData = m[L.procurement] || []; companyData = m[L.company] || [];
     } else {
@@ -53,7 +66,9 @@ async function syncAll() {
       settingsData= await getListItems(CONFIG.lists.settings);
       procData    = await getListItems(CONFIG.lists.procurement).catch(()=>[]);
       companyData = await getListItems(CONFIG.lists.company);
+      if(CONFIG.lists.customers)customerData=await getListItems(CONFIG.lists.customers);
     }
+    if(syncEmail()!==expectedEmail)return false;
     catalogData = catData;
     // รวม Settings (ฝั่งขาย) + ProcurementData (ฝั่งจัดซื้อ) เป็น cache เดียว โดยลิสต์จัดซื้อ "ชนะ" ถ้า Title ซ้ำ
     _settingsCache = [...new Map((settingsData||[]).map(i=>[i.Title,{...i,_srcList:CONFIG.lists.settings}])).values()];
@@ -63,7 +78,7 @@ async function syncAll() {
     const _headerFs = _hfsItem ? (+_hfsItem.Value || 10) : 10;
     // ใช้ companyData ที่โหลดมาแล้วโดยตรง
     if (companyData && companyData.length > 0) {
-      const s = companyData[0];
+      const s = companyData[0];if(typeof companySettingsId!=='undefined')companySettingsId=s.id||null;
       companySettings = { CompanyName: s.CompanyName||'', TaxID: s.TaxID||'', Phone: s.Phone||'',
         Email: s.Email||'', Address: s.Address||'', PrimaryColor: s.PrimaryColor||'',
         FooterText: s.FooterText||'', LogoURL: s.LogoURL||'', SignatureURL: s.SignatureURL||'',
@@ -72,12 +87,15 @@ async function syncAll() {
         HeaderFontSize: _headerFs };
       if (s.PrimaryColor) { document.documentElement.style.setProperty('--accent', s.PrimaryColor); }
     } else {
-      companySettings.HeaderFontSize = _headerFs;
+      companySettings=typeof COMPANY_DEFAULTS!=='undefined'?JSON.parse(JSON.stringify(COMPANY_DEFAULTS)):{};companySettings.HeaderFontSize=_headerFs;if(typeof companySettingsId!=='undefined')companySettingsId=null;
     }
     if (typeof loadCompanyExtra === 'function') loadCompanyExtra();   // ชื่อ/ที่อยู่ EN + Fax หัวเอกสาร
     await loadApprovalTiers(); // ใช้ _settingsCache ที่เซ็ตไว้แล้ว
     if (typeof loadApprovalPolicy === 'function') loadApprovalPolicy();   // เงื่อนไข Margin + Sale อนุมัติเอง
     await loadUserRoles(); // Re-evaluate using the freshly loaded settings/tiers before filtering quotes.
+    if(syncEmail()!==expectedEmail)return false;
+    await Promise.allSettled([typeof loadTheme==='function'?loadTheme(settingsData):Promise.resolve(),typeof loadSaleProfile==='function'?loadSaleProfile():Promise.resolve(),typeof loadCustomers==='function'&&Array.isArray(customerData)?loadCustomers(customerData):Promise.resolve()]);
+    if(syncEmail()!==expectedEmail)return false;
     // cache payments ไว้ใน memory
     paymentsCache = null; // invalidate cache เพื่อโหลดใหม่เมื่อจำเป็น
     // Filter quotes based on user role
@@ -88,7 +106,7 @@ async function syncAll() {
     quotesData.forEach(qq => { const t = (typeof getQuoteTag === 'function') ? getQuoteTag(qq.id) : ''; if (t) qq.Tag = t; });
     catalogExtraLoaded=false;
     try { await loadCatalogExtra(); if(typeof LocalFirst!=='undefined')await LocalFirst.remember('CatalogExtra',[catalogExtra]); } catch(e) {}   // ข้อมูลเสริมสินค้า (ต้นทุน/Vendor)
-    await BasketPersistence.retry([_bkKey('QuoteBaskets'),_bkKey('QuoteBasketMap')],saveSettingItem);
+    const basketKeys=[_bkKey('QuoteBaskets'),_bkKey('QuoteBasketMap')];
     loadBaskets(); // Reload after settings arrive, even if first render created empty arrays.
     renderDash();
     renderQuotes();
@@ -96,15 +114,20 @@ async function syncAll() {
     renderApprove();
     renderPayment();
     updateBadge();
+    if(typeof LocalFirst!=='undefined'&&typeof LocalFirst.captureAppearance==='function')await LocalFirst.captureAppearance(expectedEmail);
+    if(syncEmail()!==expectedEmail)return false;_startupFreshEmail=expectedEmail;
     toast('Sync สำเร็จ', 'success');
+    BasketPersistence.retry(basketKeys,async(key,value)=>{if(syncEmail()!==expectedEmail)throw Error('บัญชีเปลี่ยน');return saveSettingItem(key,value);}).catch(e=>console.warn('basket retry:',e.message));
     // ตรวจการติดตามที่ถึงกำหนด (ต่อสัญญา ฯลฯ) → ส่งเมลแจ้งผู้เกี่ยวข้อง
     checkFollowUpsDue().catch(e => console.warn('followup check:', e.message));
     if (typeof checkExpiriesDue === 'function') checkExpiriesDue().catch(e => console.warn('expiry check:', e.message));
     if (typeof checkRecurringDue === 'function') checkRecurringDue().catch(e => console.warn('recurring check:', e.message));
     if (typeof renderImportantBell === 'function') renderImportantBell();
     if (typeof checkContractsDue === 'function') checkContractsDue().catch(e => console.warn('contract check:', e.message));
+    return true;
   } catch(e) {
-    toast('Sync ไม่สำเร็จ: ' + e.message, 'error');
+    if(syncEmail()===expectedEmail)toast('Sync ไม่สำเร็จ: ' + e.message, 'error');
+    return false;
   }
 }
 

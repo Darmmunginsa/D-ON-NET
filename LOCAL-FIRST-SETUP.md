@@ -18,6 +18,10 @@ The optional internal Draft name can be set in the editor before Save Draft, or 
 
 ## Deploy
 
+### Startup read cache (November 2026)
+
+SalePro also warms company header assets, the signed-in Sale profile and theme from a per-account presentation cache. Cached fields are allowlisted; roles, approval data and tokens are excluded. Fresh startup loads Catalog, Quotations, Settings, Procurement, Company and Customers in one multiList batch. Theme and profile reuse that Settings result, and concurrent Sync requests share the same operation. Incomplete responses fail instead of triggering individual retry requests. Online quotation submission waits for a successful fresh startup read; manual local Draft saves remain available. Basket recovery runs after rendering. This frontend update needs no additional Apps Script deployment. First visits still require network data; subsequent visits can display cached assets while refreshing.
+
 The combined backend at `salepro/apps-script/SalePro-AppsScript-FULL.gs` preserves the supplied Desktop/new.txt changes (including mail CC), the latest repo's numbering helper, all service/contract modules and LocalDraftSync. Paste that combined file into the existing single-file Code.gs project, Save, and deploy a New version of the existing deployment. Do not additionally paste its modules into the same project. Keep the existing URL, database, Script Properties and trigger settings. Do not run database initialization.
 
 The two new tabs are created automatically on first use. No Cloudflare Worker update is needed. Until the new backend is deployed, local Drafts remain queued and their submission is blocked with an update message. Existing numbered quote flows stay online.

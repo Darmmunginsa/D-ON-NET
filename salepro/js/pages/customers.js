@@ -6,8 +6,8 @@ let editingCustomerId = null;
 let customerCodes = {};   // { [customerId]: 'E003' } — เก็บใน Settings (เลี่ยงคอลัมน์ใหม่)
 let customerFaxes = {};   // { [customerId]: 'Fax' } — เก็บใน Settings เช่นกัน
 
-async function loadCustomers() {
-  try { customersData = await getListItems(CONFIG.lists.customers); } catch(e) { console.warn('ใช้ข้อมูลลูกค้าล่าสุดในเครื่อง:',e.message); }
+async function loadCustomers(sourceRows) {
+  try { customersData = Array.isArray(sourceRows)?sourceRows:await getListItems(CONFIG.lists.customers); } catch(e) { console.warn('ใช้ข้อมูลลูกค้าล่าสุดในเครื่อง:',e.message); }
   loadCustomerCodes();
   loadCustomerFaxes();
 }

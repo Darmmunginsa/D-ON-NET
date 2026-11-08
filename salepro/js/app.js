@@ -325,21 +325,23 @@ async function saveTheme() {
   try {
     const email = (currentUser?.email||'').toLowerCase();
     if (!email) return;
+    const chosen={..._currentTheme};if(typeof ensureStartupData==='function')await ensureStartupData();_currentTheme=chosen;applyTheme(chosen);
     const key = 'Theme_' + email;
-    const items = await getListItems(CONFIG.lists.settings);
+    const items = _settingsCache||await getListItems(CONFIG.lists.settings);
     const existing = items.find(i => i.Title === key);
     if (existing) await updateListItem(CONFIG.lists.settings, existing.id, { Value: JSON.stringify(_currentTheme) });
     else await createListItem(CONFIG.lists.settings, { Title: key, Value: JSON.stringify(_currentTheme) });
+    if(typeof LocalFirst!=='undefined'&&typeof LocalFirst.captureAppearance==='function')await LocalFirst.captureAppearance(email);
   } catch(e) { console.warn('Save theme failed:', e.message); }
 }
 
-async function loadTheme() {
+async function loadTheme(sourceItems) {
   try {
     const email = (currentUser?.email||'').toLowerCase();
     if (!email) return;
-    const items = await getListItems(CONFIG.lists.settings);
+    const items = Array.isArray(sourceItems)?sourceItems:(_settingsCache||await getListItems(CONFIG.lists.settings));
     const it = items.find(i => i.Title === 'Theme_' + email);
-    if (it && it.Value) { _currentTheme = JSON.parse(it.Value); applyTheme(_currentTheme); }
+    _currentTheme = it?.Value ? JSON.parse(it.Value) : {...THEME_DEFAULT};applyTheme(_currentTheme);
   } catch(e) { /* keep default */ }
 }
 
