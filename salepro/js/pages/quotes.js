@@ -215,6 +215,7 @@ async function saveQuoteDefaults(note, terms) {
   catch(e) { console.warn('save quote defaults', e.message); }
 }
 function initNewQuote() {
+  if(document.getElementById('q-draft-name'))document.getElementById('q-draft-name').value='';
   if(typeof LocalFirst!=='undefined')LocalFirst.reset();
   if(typeof TravelQuote!=='undefined')TravelQuote.reset();
   _dupSourceId = null;   // ใบใหม่เปล่า ไม่ผูกความสัมพันธ์
@@ -1163,6 +1164,7 @@ async function editQuote(id) {
 
     // ข้อมูลใบเสนอราคา
     _set('q-no',      q.Title);
+    _set('q-draft-name',q.DraftName||'');
     _set('q-date',    (q.QuoteDate||'').split('T')[0] || new Date().toISOString().split('T')[0]);
 
     // ข้อมูลลูกค้า
@@ -1560,6 +1562,7 @@ async function _saveQuoteImpl(status) {
   const t = calcTotals();
   const fields = {
     Title: document.getElementById('q-no').value,
+    DraftName:(document.getElementById('q-draft-name')?.value||'').trim(),
     ...(typeof LocalFirst!=='undefined'&&LocalFirst.activeId()?{LocalDraftId:LocalFirst.activeId()}:{}),
     ClientName: document.getElementById('q-client').value || '(ไม่ระบุ)',
     ContactPerson: document.getElementById('q-contact').value,

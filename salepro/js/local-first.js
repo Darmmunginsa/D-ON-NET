@@ -3,7 +3,7 @@ const LocalFirst=(()=>{
  let engine=null,account='',generation=0,groups=[],active=null,dirty=false,saving=Promise.resolve(),syncing=false,error='',lastSync='',restoring=false,initializing=null,syncTask=null,cacheTail=Promise.resolve(),localWrites=0;
  const $=id=>document.getElementById(id),clone=v=>JSON.parse(JSON.stringify(v)),uuid=()=>crypto.randomUUID();
  const fields=()=>Object.fromEntries([...$('page-newquote').querySelectorAll('input[id],select[id],textarea[id]')].filter(e=>e.type!=='file'&&!/^(customer-history|draft-drawer)/.test(e.id)).map(e=>[e.id,{value:e.value,checked:e.checked}]));
- function snapshot(){return {fields:fields(),items:clone(quoteItems),signature:currentQuoteSignature||'',fonts:clone(zoneFont),spacing:clone(rowSpacing),columns:{...clone(colVisible),__lines:colLines,__pricePeriod:typeof pricePeriod!=='undefined'?pricePeriod:''},columnLines:colLines,mergeSources:typeof _mergeSourceIds!=='undefined'?clone(_mergeSourceIds||[]):[],duplicateSource:typeof _dupSourceId!=='undefined'?_dupSourceId:null,project:typeof _nqProjectId!=='undefined'?_nqProjectId:null};}
+ function snapshot(){const values=fields();if(values['q-draft-name'])values['q-draft-name'].value=String(values['q-draft-name'].value||'').trim();return {fields:values,items:clone(quoteItems),signature:currentQuoteSignature||'',fonts:clone(zoneFont),spacing:clone(rowSpacing),columns:{...clone(colVisible),__lines:colLines,__pricePeriod:typeof pricePeriod!=='undefined'?pricePeriod:''},columnLines:colLines,mergeSources:typeof _mergeSourceIds!=='undefined'?clone(_mergeSourceIds||[]):[],duplicateSource:typeof _dupSourceId!=='undefined'?_dupSourceId:null,project:typeof _nqProjectId!=='undefined'?_nqProjectId:null};}
  function mine(){return !!engine&&String(currentUser?.email||'').toLowerCase()===account;}
  async function status(){if(!mine())return;const pending=await engine.pending();const el=$('local-sync-status');if(el){el.textContent=error?'ข้อมูลในเครื่อง · '+error:syncing?'กำลังซิงก์ Draft…':pending?'บันทึกในเครื่องแล้ว · รอซิงก์ '+pending+' เวอร์ชัน':(lastSync?'Draft ซิงก์แล้ว · '+lastSync:'สำเนาในเครื่องพร้อม');el.title='กดบันทึก Draft เพื่อเก็บใน IndexedDB แยกตามบัญชี · Catalog/ลูกค้าใช้สำเนาล่าสุดในเครื่อง';}await refreshGroups();}
  async function refreshGroups(){if(!mine())return;const e=engine,result=await e.list();if(e!==engine||!mine())return;groups=result;if(typeof DraftDrawer!=='undefined')DraftDrawer.render();}
@@ -36,7 +36,7 @@ const LocalFirst=(()=>{
    if(!mine())return Promise.reject(Error('ข้อมูลในเครื่องยังไม่พร้อม'));
    if(editingQuoteId)return Promise.reject(Error('ใบเดิมบันทึกผ่านเซิร์ฟเวอร์ กรุณาออนไลน์ก่อน'));
    const email=account,e=engine,data=snapshot();
-   if(!data.fields['q-client']?.value&&!data.fields['q-note']?.value&&!data.items.some(i=>i.name)){if(show)toast('เพิ่มชื่อลูกค้า หรือรายการก่อนบันทึก Draft','info');return Promise.resolve(null);}
+   if(!data.fields['q-draft-name']?.value&&!data.fields['q-client']?.value&&!data.fields['q-note']?.value&&!data.items.some(i=>i.name)){if(show)toast('เพิ่มชื่อ Draft ชื่อลูกค้า หรือรายการก่อนบันทึก','info');return Promise.resolve(null);}
    const context=active||(active={draftId:uuid(),revision:null,snapshot:null});localWrites++;
    const task=saving.catch(()=>{}).then(async()=>{
      if(!mine()||email!==account||engine!==e)throw Error('บัญชีเปลี่ยนก่อนบันทึก กรุณาตรวจ Draft');
@@ -57,6 +57,20 @@ const LocalFirst=(()=>{
    if(typeof _mergeSourceIds!=='undefined')_mergeSourceIds=clone(s.mergeSources||[]);if(typeof _dupSourceId!=='undefined')_dupSourceId=s.duplicateSource||null;if(typeof _nqProjectId!=='undefined')_nqProjectId=s.project||null;
    active={...r,resolvedParents:g.heads.map(h=>h.revision)};$('items-body')?.replaceChildren();if(typeof TravelQuote!=='undefined')TravelQuote.reset();renderItems();if(typeof TravelQuote!=='undefined')TravelQuote.restore();updateSigPreview(currentQuoteSignature);updateApproverBox();autoGrowAll($('page-newquote'));DraftDrawer.close();dirty=false;restoring=false;
  }
+ async function rename(id,revision,name){
+   if(!mine())throw Error('กรุณาเข้าสู่ระบบก่อน');name=String(name||'').trim();if(!name||name.length>120)throw Error('ระบุชื่อ Draft ไม่เกิน 120 ตัวอักษร');await saving.catch(()=>{});await refreshGroups();
+   const group=groups.find(g=>g.id===id),r=group?.heads.find(r=>r.revision===revision);if(!r||r.kind!=='draft')throw Error('Draft เปลี่ยนแล้ว กรุณาเปิดลิ้นชักใหม่');
+   const data=clone(r.snapshot);data.fields['q-draft-name']={value:name,checked:false};const next=await engine.save(id,[r.revision],data);
+   if(active?.draftId===id&&active.revision===r.revision){const parents=active.resolvedParents?.map(p=>p===r.revision?next.revision:p);Object.assign(active,next);if(parents)active.resolvedParents=parents;if($('q-draft-name'))$('q-draft-name').value=name;}
+   await status();flush();
+ }
+ async function remove(id){
+   if(!mine())throw Error('กรุณาเข้าสู่ระบบก่อน');await saving.catch(()=>{});await refreshGroups();const group=groups.find(g=>g.id===id);if(!group)throw Error('ไม่พบ Draft นี้');
+   // A terminal marker uses the existing lifecycle protocol, so older backends also sync deletion.
+   await engine.save(id,group.heads.map(r=>r.revision),{deleted:true},'submitted','');
+   if(active?.draftId===id){reset();if($('page-newquote').classList.contains('active'))showPage('quotes',null);}
+   await status();flush();
+ }
  async function beforeSubmit(){const context=active;if(!active||!mine())return;if(!navigator.onLine)throw Error('ส่งอนุมัติต้องออนไลน์ Draft ยังอยู่ในเครื่อง');await save(false);await flush();if(active!==context)throw Error('Draft ที่เปิดเปลี่ยนแล้ว กรุณาตรวจฉบับก่อนส่ง');if(await engine.pending())throw Error('ยังซิงก์ Draft ไม่ครบ กรุณารอหรือตรวจการเข้าสู่ระบบ');
    const group=groups.find(g=>g.id===active.draftId);if(!group||group.heads.length!==1||group.heads[0].revision!==active.revision)throw Error('Draft เปลี่ยนจากอีกเครื่อง กรุณาเปิดลิ้นชักและเลือกเวอร์ชันก่อนส่งอนุมัติ');
    const cap=await _callRaw({action:'serviceCapabilities'});if(!cap.localFirstDrafts)throw Error('ต้องอัปเดต Apps Script รุ่น Local-first ก่อนส่ง Draft นี้อนุมัติ');
@@ -68,5 +82,5 @@ const LocalFirst=(()=>{
  window.addEventListener('online',()=>flush());window.addEventListener('offline',()=>{error='ออฟไลน์ · เก็บ Draft ในเครื่อง';status();});
  window.addEventListener('beforeunload',event=>{if(dirty||localWrites){event.preventDefault();event.returnValue='';}});
  setInterval(()=>{if(mine())flush();},45000);
- return {initialize,remember,cacheWrite,editorChanged,save,open,flush,reset,pause,beforeSubmit,submitted,refreshGroups,ready:mine,activeId:()=>active?.draftId||'',cards:()=>mine()?groups.flatMap(g=>g.heads.filter(r=>r.kind==='draft').map(r=>({id:'local:'+r.revision,LocalDraftId:g.id,LocalRevision:r.revision,LocalConflict:g.heads.length>1,Status:'Draft',Title:'',ClientName:r.snapshot.fields['q-client']?.value||'ยังไม่ระบุลูกค้า',SaleEmail:account,QuoteDate:r.snapshot.fields['q-date']?.value||'',TotalAmount:0,Note:'บันทึก '+r.at+(g.heads.length>1?' · มีหลายเวอร์ชัน':''),UpdatedAt:r.at}))):[]};
+ return {initialize,remember,cacheWrite,editorChanged,save,open,rename,remove,flush,reset,pause,beforeSubmit,submitted,refreshGroups,ready:mine,activeId:()=>active?.draftId||'',cards:()=>mine()?groups.flatMap(g=>g.heads.filter(r=>r.kind==='draft').map(r=>({id:'local:'+r.revision,LocalDraftId:g.id,LocalRevision:r.revision,LocalConflict:g.heads.length>1,DraftName:r.snapshot.fields['q-draft-name']?.value||'',Status:'Draft',Title:'',ClientName:r.snapshot.fields['q-client']?.value||'ยังไม่ระบุลูกค้า',SaleEmail:account,QuoteDate:r.snapshot.fields['q-date']?.value||'',TotalAmount:0,Note:'บันทึก '+r.at+(g.heads.length>1?' · มีหลายเวอร์ชัน':''),UpdatedAt:r.at}))):[]};
 })();

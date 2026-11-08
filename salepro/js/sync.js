@@ -21,6 +21,7 @@ function approvalEmail(value){return String(value||'').trim().toLowerCase();}
 function canApproveQuotation(q){const email=approvalEmail(currentUser?.email);return !!email&&q?.Status==='Pending'&&!!approvalEmail(q.ApproverEmail)&&approvalEmail(q.ApproverEmail)===email;}
 function pendingApprovalsForUser(){return quotesData.filter(q=>q.Status==='Pending'&&(userRoles.isAdmin||canApproveQuotation(q)));}
 function filterQuotesForUser(allQuotes, freshSettings) {
+  allQuotes=allQuotes.filter(q=>!(q.Status==='Draft'&&(q.DraftArchived===true||q.DraftArchived==='true')));
   if (!currentUser) return [];
   // Admin and Approver see all quotes
   if (userRoles.isAdmin || userRoles.isApprover) return allQuotes;

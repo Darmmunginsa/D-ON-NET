@@ -4,6 +4,10 @@ New quote Drafts commit to IndexedDB before showing success. Draft creation and 
 
 Storage is partitioned by backend URL and signed-in email. Tokens are never stored in IndexedDB. Login still requires the existing Google authentication. The app has no offline login or service-worker installation in this phase. Browser storage is a working copy, not an independent permanent backup.
 
+## Draft names and removal
+
+The optional internal Draft name can be set in the editor before Save Draft, or changed from the drawer without saving unrelated editor changes. Names do not replace quotation numbers and are searchable. Removal requires confirmation. Local Draft removal uses a terminal lifecycle marker supported by the existing backend; other devices discard obsolete offline branches after receiving it. Existing server Drafts are archived with DraftArchived, preserving their line items and references. Only owners/Admin can manage those older Drafts, and a fresh status check rejects items already submitted. Neither operation changes approved documents or requires a backend deployment.
+
 ## Sync
 
 - `SaleDrafts` stores the current snapshot or conflicting branches, separate from Quotations. Pending local edits coalesce. Sync is retried on reconnection, every 45 seconds and by clicking the Draft status button.
