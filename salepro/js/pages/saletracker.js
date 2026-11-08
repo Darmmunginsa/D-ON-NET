@@ -272,7 +272,9 @@ function refreshExpirySaveButton(){
   button.style.borderColor=dirty?'#fb923c':'#22c55e';
   button.style.color='#fff';
   button.textContent=dirty?'💾 บันทึก · มีการแก้ไข':'✓ บันทึกแล้ว';
+  document.querySelectorAll('[data-warranty-publish]').forEach(b=>{b.disabled=dirty||warrantyPublishPending;b.title=dirty?'กรุณากดบันทึกขวาบนก่อนส่งให้ Web':'';});
 }
+let warrantyPublishPending=false;
 // สถานะอายุ: คืน {days, label, color}  (days = เหลือกี่วัน ติดลบ=เลยกำหนด)
 function expiryStatus(expiryDate, renewed) {
   if (renewed) return { days: null, label: '✓ ต่ออายุแล้ว', color: 'var(--green)' };
@@ -332,7 +334,7 @@ function renderExpiryTab() {
       + '</div>'
       // แถวล่าง: ค้นประกัน + ปุ่มต่ออายุ
       + '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">'
-      + '<label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" '+(e.publicLookup?'checked':'')+' onchange="setExpiryPublic(\''+e.id+'\',this.checked)" style="width:16px;height:16px"> ให้ลูกค้าค้นประกันบนเว็บไซต์ (หนึ่ง Serial ต่อเครื่อง)</label>'
+      + '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+(e.publicLookup?'<span style="font-size:12px;color:var(--green)">✓ เผยแพร่บน Web แล้ว</span>':'<span style="font-size:12px;color:var(--muted)">ยังไม่เผยแพร่บน Web</span>')+(isReadOnly?'':'<button type="button" data-warranty-publish class="btn btn-sm" onclick="setExpiryPublic(\''+e.id+'\','+(!e.publicLookup)+')">'+(e.publicLookup?'หยุดเผยแพร่':'ส่งให้ Web ตรวจสอบ Warranty')+'</button>')+'</div>'
       + (e.renewed
           ? '<button class="btn btn-sm" onclick="updateExpiry(\'' + e.id + '\',\'renewed\',false)" style="font-size:13px">ยกเลิกต่ออายุ</button>'
           : '<button class="btn btn-sm btn-success" onclick="markExpiryRenewed(\'' + e.id + '\')" style="font-size:13px;padding:8px 16px">✓ ต่ออายุแล้ว</button>')
@@ -3282,4 +3284,29 @@ async function confirmCloseDeal() {
 }
 
 
-function setExpiryPublic(id,enabled){const e=_stExpiries().find(x=>x.id===id);if(!e)return;const candidate={...e,publicLookup:enabled};if(enabled&&!ServicePlan.publicRecord(candidate)){toast('ระบุประเภทอุปกรณ์/Warranty รุ่น Serial วันเริ่ม วันหมดประกัน และจำนวน 1 เครื่องก่อนเปิดค้นหาบนเว็บ','error');renderExpiryTab();return;}e.publicLookup=enabled;if(enabled)e.qty=1;renderExpiryTab();saveSTDealData();}
+async function setExpiryPublic(id,enabled){
+  if(warrantyPublishPending||stDealData.closed)return;
+  if(JSON.stringify(_stExpiries())!==expiryManualSaved)return toast('กรุณากดบันทึกขวาบนก่อนส่งให้ Web','info');
+  const e=_stExpiries().find(x=>x.id===id);if(!e)return;
+  const candidate={...e,publicLookup:enabled};
+  if(enabled&&(!String(e.name||'').trim()||!ServicePlan.publicRecord(candidate)))return toast('ระบุประเภทอุปกรณ์/Warranty รุ่น Serial วันเริ่ม วันหมดประกัน และจำนวน 1 เครื่องก่อนส่งให้ Web','error');
+  const quote=String(stQuoteId),owner=String(currentUser?.email||'');
+  // Publish only this saved record; do not submit unsaved tracker edits.
+  const q=quotesData.find(x=>String(x.id)===quote);
+  const saved=JSON.parse(getStoredDealStatus(quote)||q?.DealStatus||'{}');
+  const target=(saved.expiries||[]).find(x=>x.id===id);
+  if(!target||JSON.stringify(target)!==JSON.stringify(e))return toast('ข้อมูลเปลี่ยนแล้ว กรุณาบันทึกและลองส่งอีกครั้ง','info');
+  target.publicLookup=enabled;
+  warrantyPublishPending=true;refreshExpirySaveButton();
+  try{
+    const raw=serializeDealStatus(saved);await putStoredDealStatus(quote,raw);
+    if(q)q.DealStatus=raw;
+    if(String(stQuoteId)===quote&&String(currentUser?.email||'')===owner){
+      const current=_stExpiries().find(x=>x.id===id);if(current)current.publicLookup=enabled;
+      const baseline=JSON.parse(expiryManualSaved);const prior=baseline.find(x=>x.id===id);if(prior)prior.publicLookup=enabled;expiryManualSaved=JSON.stringify(baseline);
+      renderExpiryTab();
+    }
+    toast(enabled?'ส่งให้ Web ตรวจสอบ Warranty แล้ว':'หยุดเผยแพร่บน Web แล้ว','success');
+  }catch(error){toast('เปลี่ยนสถานะ Web ไม่สำเร็จ: '+error.message,'error');}
+  finally{warrantyPublishPending=false;refreshExpirySaveButton();}
+}
