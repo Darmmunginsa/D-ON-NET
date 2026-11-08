@@ -173,7 +173,7 @@ function buildQuoteRow(q, isChild, depth) {
         ${q.Status !== 'Approved' && q.Status !== 'Pending' && q.Status !== 'Cancelled' && q.Status !== 'Closed' && q.Status !== 'PO Received' && canEditQuote(q) ? `<button class="action-btn" style="color:var(--accent2)" onclick="editQuote('${q.id}')" title="แก้ไข">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
         </button>` : ''}
-        ${QueuePlanner.can(q) ? `<button class="action-btn" style="color:var(--accent2)" onclick="QueuePlanner.open('${q.id}')" title="นัดหมายและจัดคิว"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>` : ''}
+        ${QueuePlanner.buttonHtml(q)}
         <button class="action-btn" onclick="showPDFForQuote('${q.id}')" title="PDF">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
         </button>

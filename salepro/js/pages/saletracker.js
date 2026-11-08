@@ -2219,7 +2219,7 @@ function openSaleTrackerModal(id) {
   // Clear pending docs UI
 
   document.getElementById('st-title').textContent = (q.Title||'') + ' — ' + (q.ClientName||'');
-  const billingBtn=document.getElementById('st-billing-add');if(billingBtn)billingBtn.style.display=canManageSaleActions(q)&&['PO Received','Closed'].includes(q.Status)?'':'none';
+  if(typeof Billing!=='undefined')Billing.refreshTracker(q);
   const badge = document.getElementById('st-status-badge');
   if (badge) {
     const _isPaid = (q.PaidAmount||0) >= (q.TotalAmount||1) && (q.TotalAmount||0) > 0;

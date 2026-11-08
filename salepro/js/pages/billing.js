@@ -7,7 +7,10 @@ const Billing=(()=>{
  function visible(d){return Array.isArray(d.sourceIds)&&d.sourceIds.every(id=>quotesData.some(q=>String(q.id)===String(id)));}
  function deal(q,settings=_settingsCache||[]){const r=settings.find(i=>i.Title==='DealStatus_'+q.id);return JSON.parse(r?.Value||q.DealStatus||'{}');}
  function allowed(q){return typeof canManageSaleActions==='function'&&canManageSaleActions(q);}
- function assigned(id,docs){return docs.find(d=>d.status!=='cancelled'&&d.sourceIds?.includes(String(id)));}
+ function assigned(id,docs){return docs.find(d=>d.status!=='cancelled'&&d.sourceIds?.some(source=>String(source)===String(id)));}
+ function status(id){try{return assigned(id,records())||null;}catch(e){return {error:e.message};}}
+ function buttonHtml(q){if(!allowed(q))return '';const d=status(q.id);return d?`<button class="btn btn-sm" disabled title="${esc(d.error||d.number)}" style="color:var(--green)">${d.error?'ตรวจข้อมูลวางบิล':'✓ วางบิลแล้ว'}</button>`:`<button class="btn btn-sm" onclick="Billing.add('${esc(q.id)}')">ส่งเข้างานวางบิล</button>`;}
+ function refreshTracker(q){const button=$('st-billing-add');if(!button||!q)return;const d=status(q.id);button.style.display=allowed(q)&&['PO Received','Closed'].includes(q.Status)?'':'none';button.disabled=!!d;button.textContent=d?(d.error?'ตรวจข้อมูลวางบิล':'✓ วางบิลแล้ว'):'ส่งเข้างานวางบิล';button.title=d?(d.error||'ใบวางบิล '+d.number):'ส่งใบนี้ไปเลือกออกใบวางบิล';button.style.color=d?'var(--green)':'';}
  function eligible(q){try{return allowed(q)&&!BillingCore.reason(q,deal(q));}catch(_){return false;}}
  function date(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
  function mount(){
@@ -28,6 +31,7 @@ const Billing=(()=>{
   const total=sel.reduce((n,q)=>n+BillingCore.cents(q.TotalAmount),0)/100,paid=sel.reduce((n,q)=>n+BillingCore.cents(q.PaidAmount),0)/100;
   $('billing-selection').innerHTML=`<div class="billing-help">เลือก ${sel.length} ใบ${sel.length?' · '+esc(sel[0].ClientName):''}</div><div class="billing-total">${fmt(total-paid)}</div><div class="billing-help">ยอดคงเหลือที่วางบิล</div><div class="billing-stat"><span>รวมยอดต้นฉบับ</span><b>${fmt(total)}</b></div><div class="billing-stat"><span>ชำระแล้ว</span><b>${fmt(paid)}</b></div><div class="billing-help">${sel.map(q=>esc(q.Title)).join('<br>')}</div>`;
   $('billing-create').disabled=busy||!sel.length;$('billing-clear').disabled=busy;renderHistory();
+  if(typeof stQuoteId!=='undefined'){const q=quotesData.find(q=>String(q.id)===String(stQuoteId));if(q)refreshTracker(q);}
   $('billing-candidates').querySelectorAll('[data-billing-select]').forEach(el=>{el.disabled=el.disabled||busy;});
   for(const id of ['billing-date','billing-due','billing-note','billing-refresh'])$(id).disabled=busy;
  }
@@ -86,5 +90,5 @@ const Billing=(()=>{
   openCDPreview('billing','customer',session);
  }catch(e){toast(e.message,'error');}}
  async function cancel(id){if(busy)return;const d=records().find(d=>d.id===id);if(!d||!visible(d)||!(userRoles.isAdmin||d.owner===actor()))return;if(!confirm('ยกเลิกใบวางบิล '+d.number+'? ใบเสนอราคาและการชำระเงินยังคงเดิม'))return;busy=true;const email=actor();try{const list=await getListItems(CONFIG.lists.settings),r=list.find(r=>r.Title===key(id));if(!r||actor()!==email)throw Error('ไม่พบเอกสารหรือบัญชีเปลี่ยน');const fresh=JSON.parse(r.Value);if(!(userRoles.isAdmin||fresh.owner===email))throw Error('ไม่มีสิทธิ์');fresh.status='cancelled';fresh.cancelledAt=new Date().toISOString();await updateListItem(CONFIG.lists.settings,r.id,{Value:JSON.stringify(fresh)});if(actor()!==email)return;const cached=(_settingsCache||[]).find(r=>r.Title===key(id));if(cached)cached.Value=JSON.stringify(fresh);render();toast('ยกเลิกใบวางบิลแล้ว','success');}catch(e){toast(e.message,'error');}finally{busy=false;}}
- return {render,load,add,preview};
+ return {render,load,add,preview,status,buttonHtml,refreshTracker};
 })();

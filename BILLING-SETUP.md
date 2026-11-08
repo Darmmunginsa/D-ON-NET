@@ -1,5 +1,7 @@
 # SalePro billing notes
 
+The tracker and payment list show a disabled **✓ วางบิลแล้ว** control (with the billing number in its tooltip) after successful issue. Merely selecting a quotation does not mark it complete. Cancelling the active note releases this state on refresh. Queue actions in the quotation list similarly show a disabled check when an appointment or non-cancelled technician job already exists. Calendar editing remains available; new-appointment open/save also recheck current server records. Successful queue writes update the local Settings view immediately. A cancelled appointment unlocks the source unless a technician job still records that it was dispatched/completed.
+
 ## Shared PO document editor and copies
 
 Billing notes now open the same split editor/preview as customer PO documents. It supports manual rows, groups, notes, row order, pasting a table, column visibility/width and page breaks. Billing editing has an independent session: it never changes `stDealData`, source quotations or the customer PO's layout. Click **บันทึกการจัดหน้า** to persist `layout`, `layoutNote` and `displayTotals` in the billing record. Unsaved edits require confirmation before closing; a concurrent record change blocks overwriting. Changing billing line amounts recalculates its display totals (7% VAT when the net changes) while retaining source totals for comparison.
