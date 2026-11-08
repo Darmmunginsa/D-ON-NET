@@ -197,7 +197,7 @@ function _ensureCalTokenClient() {
   if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return null;
   _calTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CONFIG.googleClientId,
-    scope: 'https://www.googleapis.com/auth/calendar.readonly',
+    scope: 'https://www.googleapis.com/auth/calendar.events',
     callback: function(resp) {
       if (resp && resp.access_token) {
         _calTok = resp.access_token;

@@ -32,6 +32,49 @@ const PersonalEvent = (() => {
 
   const _msg = s => { const el = document.getElementById('pe-msg'); if (el) el.textContent = s || ''; };
 
+  // ───── ซิงก์ไป Google Calendar จริง (ทางเดียว SalePro → Google) ─────
+  const GCAL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+  function _addMinutes(date, time, dur) {
+    const p = time.split(':'); let total = (+p[0]) * 60 + (+p[1]) + dur, dayAdd = Math.floor(total / 1440);
+    total = ((total % 1440) + 1440) % 1440;
+    const eh = String(Math.floor(total / 60)).padStart(2, '0'), em = String(total % 60).padStart(2, '0');
+    let d = date; if (dayAdd) { const dd = new Date(date + 'T00:00:00Z'); dd.setUTCDate(dd.getUTCDate() + dayAdd); d = dd.toISOString().slice(0, 10); }
+    return d + 'T' + eh + ':' + em + ':00';
+  }
+  function _gcalBody(o) {
+    const b = { summary: o.title || 'นัดของฉัน', description: o.note || '', extendedProperties: { private: { salepro: '1' } } };
+    if (o.time && /^\d{2}:\d{2}$/.test(o.time)) {
+      const dur = Number.isInteger(o.durationMinutes) && o.durationMinutes > 0 ? o.durationMinutes : 60;
+      b.start = { dateTime: o.date + 'T' + o.time + ':00', timeZone: 'Asia/Bangkok' };
+      b.end = { dateTime: _addMinutes(o.date, o.time, dur), timeZone: 'Asia/Bangkok' };
+    } else {
+      b.start = { date: o.date };
+      const dd = new Date(o.date + 'T00:00:00Z'); dd.setUTCDate(dd.getUTCDate() + 1);
+      b.end = { date: dd.toISOString().slice(0, 10) };
+    }
+    return b;
+  }
+  // สร้าง/แก้ไขนัดใน Google — คืน gcalId (สร้างใหม่ถ้ายังไม่มี หรือของเดิมถูกลบไปแล้ว)
+  async function _gcalSync(gcalId, o) {
+    if (typeof getCalendarToken !== 'function') return gcalId || '';
+    const tok = await getCalendarToken();
+    const body = JSON.stringify(_gcalBody(o));
+    const hdr = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
+    const url = gcalId ? GCAL + '/' + encodeURIComponent(gcalId) : GCAL;
+    let resp = await fetch(url, { method: gcalId ? 'PATCH' : 'POST', headers: hdr, body });
+    if (!resp.ok && gcalId && (resp.status === 404 || resp.status === 410)) {   // ถูกลบใน Google แล้ว → สร้างใหม่
+      resp = await fetch(GCAL, { method: 'POST', headers: hdr, body });
+    }
+    if (!resp.ok) { let m = 'HTTP ' + resp.status; try { const j = await resp.json(); m = (j.error && j.error.message) || m; } catch (_) {} if (resp.status === 403) m += ' (เปิด Google Calendar API แล้วหรือยัง)'; throw Error(m); }
+    return (await resp.json()).id || gcalId || '';
+  }
+  async function _gcalDelete(gcalId) {
+    if (!gcalId || typeof getCalendarToken !== 'function') return;
+    const tok = await getCalendarToken();
+    const resp = await fetch(GCAL + '/' + encodeURIComponent(gcalId), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tok } });
+    if (!resp.ok && resp.status !== 404 && resp.status !== 410) throw Error('HTTP ' + resp.status);
+  }
+
   // แปลงแถว Settings → event objects ของผู้ใช้คนนี้
   function fromSettings(settings, email) {
     const me = String(email || '').toLowerCase();
@@ -45,7 +88,8 @@ const PersonalEvent = (() => {
         date, time: /^\d{2}:\d{2}$/.test(v.time || '') ? v.time : '',
         title: String(v.title || 'นัดของฉัน'), client: 'นัดส่วนตัว', ref: '',
         owner: String(v.ownerName || v.owner || ''), done: false,
-        detail: String(v.note || ''), durationMinutes: Number.isInteger(v.durationMinutes) ? v.durationMinutes : null
+        detail: String(v.note || ''), durationMinutes: Number.isInteger(v.durationMinutes) ? v.durationMinutes : null,
+        gcalId: String(v.gcalId || '')
       }];
     });
   }
@@ -77,16 +121,21 @@ const PersonalEvent = (() => {
     if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) { _msg('เวลาไม่ถูกต้อง'); return; }
     let durationMinutes = null;
     if (durRaw !== '') { const n = Number(durRaw); if (!Number.isInteger(n) || n < 1 || n > 1440) { _msg('ระยะเวลาต้องเป็น 1–1440 นาที'); return; } durationMinutes = n; }
-    const value = JSON.stringify({
+    const obj = {
       owner: currentUser.email || '', ownerName: currentUser.displayName || currentUser.email || '',
-      title, date, time, durationMinutes, note, updatedAt: new Date().toISOString()
-    });
+      title, date, time, durationMinutes, note
+    };
     const btn = document.getElementById('pe-save'); btn.disabled = true; _msg('กำลังบันทึก...');
     try {
+      // ซิงก์ Google Calendar จริงก่อน (best-effort) เพื่อให้ได้ gcalId มาเก็บคู่กัน
+      let gcalId = editing ? (editing.gcalId || '') : '', gcalMsg = '';
+      try { _msg('กำลังซิงก์ Google Calendar...'); gcalId = await _gcalSync(gcalId, obj) || gcalId; }
+      catch (e) { gcalMsg = ' · ยังไม่ซิงก์ Google: ' + e.message; }
+      const value = JSON.stringify(Object.assign({}, obj, { gcalId, updatedAt: new Date().toISOString() }));
       if (editing) await updateListItem(CONFIG.lists.settings, editing.personalId, { Value: value });
       else await createListItem(CONFIG.lists.settings, { Title: prefix + (crypto.randomUUID ? crypto.randomUUID() : Date.now()), Value: value });
       dlg.close();
-      toast(editing ? 'แก้ไขนัดแล้ว' : 'เพิ่มนัดแล้ว', 'success');
+      toast((editing ? 'แก้ไขนัดแล้ว' : 'เพิ่มนัดแล้ว') + (gcalMsg ? gcalMsg : ' · ลง Google Calendar แล้ว'), gcalMsg ? 'info' : 'success');
       if (typeof SaleCalendar !== 'undefined') SaleCalendar.load();
     } catch (e) { _msg('บันทึกไม่สำเร็จ: ' + e.message); }
     finally { btn.disabled = false; }
@@ -97,6 +146,7 @@ const PersonalEvent = (() => {
     if (!confirm('ลบนัด "' + (editing.title || '') + '" ?')) return;
     const btn = document.getElementById('pe-del'); btn.disabled = true;
     try {
+      if (editing.gcalId) { try { await _gcalDelete(editing.gcalId); } catch (_) {} }   // ลบใน Google ด้วย (best-effort)
       await deleteListItem(CONFIG.lists.settings, editing.personalId);
       dlg.close();
       toast('ลบนัดแล้ว', 'success');
@@ -105,10 +155,11 @@ const PersonalEvent = (() => {
     finally { btn.disabled = false; }
   }
 
-  // ย้ายวัน (ลากวาง) — รับ Value เดิมมาเพื่อคงฟิลด์อื่น
+  // ย้ายวัน (ลากวาง) — รับ Value เดิมมาเพื่อคงฟิลด์อื่น + อัปเดต Google ด้วย
   async function move(personalId, oldValue, newDate) {
     let v; try { v = JSON.parse(oldValue || '{}'); } catch (_) { return; }
     v.date = newDate; v.updatedAt = new Date().toISOString();
+    if (v.gcalId) { try { v.gcalId = await _gcalSync(v.gcalId, v) || v.gcalId; } catch (_) {} }
     await updateListItem(CONFIG.lists.settings, personalId, { Value: JSON.stringify(v) });
   }
 

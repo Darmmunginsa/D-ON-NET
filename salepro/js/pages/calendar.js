@@ -100,7 +100,7 @@ const SaleCalendar=(()=>{
     if(resp.status===403)m+=' — ตรวจว่าเปิดใช้ Google Calendar API ในโปรเจกต์แล้ว';
     throw Error(m);}
    const json=await resp.json();
-   gcalEvents=(json.items||[]).flatMap(it=>{if(it.status==='cancelled')return[];const s=it.start||{};const raw=s.dateTime||s.date;if(!raw)return[];const d=C.date(raw);if(!d)return[];return[{id:'gcal:'+(it.id||Math.random()),source:'gcal',type:'gcal',date:d,time:s.dateTime?C.clock(s.dateTime):'',title:String(it.summary||'(ไม่มีหัวข้อ)'),client:'Google Calendar',ref:'',owner:'ฉัน',done:false,detail:String(it.location||'')}];});
+   gcalEvents=(json.items||[]).flatMap(it=>{if(it.status==='cancelled')return[];if(it.extendedProperties&&it.extendedProperties.private&&it.extendedProperties.private.salepro==='1')return[];const s=it.start||{};const raw=s.dateTime||s.date;if(!raw)return[];const d=C.date(raw);if(!d)return[];return[{id:'gcal:'+(it.id||Math.random()),source:'gcal',type:'gcal',date:d,time:s.dateTime?C.clock(s.dateTime):'',title:String(it.summary||'(ไม่มีหัวข้อ)'),client:'Google Calendar',ref:'',owner:'ฉัน',done:false,detail:String(it.location||'')}];});
    data.events=data.events.filter(e=>e.source!=='gcal').concat(gcalEvents);
    render();$('cal-status').textContent='ดึงจาก Google Calendar '+gcalEvents.length+' นัด · '+new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'});
    toast('ดึง '+gcalEvents.length+' นัดจาก Google Calendar แล้ว','success');
