@@ -42,7 +42,12 @@ async function sendItemToCatalogReview(itemId) {
   if ((catalogData || []).some(c => (c.Title || '').trim().toLowerCase() === nm)) { toast('มีสินค้านี้ใน Catalog อยู่แล้ว', 'info'); return; }
   const pend = _getCatalogPending();
   if (pend.some(p => (p.name || '').trim().toLowerCase() === nm)) { toast('รายการนี้รอพิจารณาอยู่แล้ว', 'info'); return; }
-  const priceNum = (isNumeric(it.price) ? +it.price : 0);
+  // Catalog stores the reusable base price, never a trip-specific travel allocation.
+  const catalogPrice = it.travel ? it.travel.basePrice : it.price;
+  if(it.travel && (catalogPrice==null || String(catalogPrice).trim()==='' || !isNumeric(catalogPrice) || +catalogPrice<0)){
+    toast('ไม่พบราคาฐานก่อนรวมค่าเดินทาง กรุณานำค่าเดินทางออกและตรวจราคาก่อนส่งเข้า Catalog','error');return;
+  }
+  const priceNum = (isNumeric(catalogPrice) ? +catalogPrice : 0);
   pend.push({
     id: 'CP' + Date.now() + Math.floor(Math.random() * 1000),
     name: it.name || '', pn: it.pn || '', unit: it.unit || '', price: priceNum, cost: +it.cost || 0,
