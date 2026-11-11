@@ -284,6 +284,7 @@ function procurementCostFor(it, quoteId) {
   return rec ? (+rec.cost || 0) : 0;
 }
 function itemCost(it) {
+  if(it.costManual===true)return Math.max(0,Number(it.cost)||0);
   // ต้นทุนจากงานจัดซื้อมาก่อน (ถ้ามี) — ราคาจริงที่ขอได้
   const pc = (typeof editingQuoteId !== 'undefined' && editingQuoteId) ? procurementCostFor(it, editingQuoteId) : 0;
   if (pc > 0) { it.cost = pc; return pc; }
@@ -548,7 +549,7 @@ function renderItems() {
         </td>
         <td class="col-qty" style="width:70px;position:relative"><input value="${escHtml(String(it.qty ?? ''))}" placeholder="จำนวน" oninput="updateItemQtyRaw(${it.id},this.value)" style="text-align:center;padding-right:18px" title="ใส่ตัวเลข หรือข้อความ (เว้นว่างได้) — ข้อความไม่นำไปคำนวณ">${_blankDot}</td>
         <td class="col-unit" style="width:70px;position:relative"><input value="${escHtml(it.unit)}" onchange="updateItemText(${it.id},'unit',this.value)" style="padding-right:18px">${_blankDot}</td>
-        <td class="col-price" style="width:110px;position:relative"><input value="${escHtml(String(it.price))}" oninput="updateItemPrice(${it.id},this.value)" placeholder="0 หรือ Included" style="text-align:right;padding-right:18px" title="ใส่ตัวเลข หรือข้อความ เช่น Included (ราคาเหมา)">${_blankDot}${(()=>{const _c=itemCost(it);const _p=catalogPriceFor(it);return `<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end;margin-top:2px;line-height:1.3">${_p>0?`<span style="font-size:9px;color:var(--accent2)" title="ราคาขายมาตรฐานจาก Catalog">ขาย ${fmt(_p)}</span>`:''}<span style="font-size:9px;color:var(--muted)">ทุน</span><input type="number" min="0" step="any" value="${_c>0?_c:''}" placeholder="ระบุ" onchange="updateItemCost(${it.id},this.value)" title="ราคาต้นทุน/หน่วย — ใส่เองได้ ใช้คำนวณกำไรในหน้าผลการขาย" style="width:60px;font-size:10px;padding:1px 4px;text-align:right;border:1px solid ${_c>0?'var(--border2)':'var(--amber)'};border-radius:4px;background:${_c>0?'transparent':'rgba(245,158,11,0.10)'}"></div>`;})()}</td>
+        <td class="col-price" style="width:110px;position:relative"><input value="${escHtml(String(it.price))}" oninput="updateItemPrice(${it.id},this.value)" placeholder="0 หรือ Included" style="text-align:right;padding-right:18px" title="ใส่ตัวเลข หรือข้อความ เช่น Included (ราคาเหมา)">${_blankDot}${(()=>{const _c=itemCost(it);const _p=catalogPriceFor(it);return `<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end;margin-top:2px;line-height:1.3">${_p>0?`<span style="font-size:9px;color:var(--accent2)" title="ราคาขายมาตรฐานจาก Catalog">ขาย ${fmt(_p)}</span>`:''}<span style="font-size:9px;color:var(--muted)">ทุน</span><input class="item-cost-input" aria-label="ราคาต้นทุนต่อหน่วย" type="number" min="0" step="any" value="${it.costManual?_c:(_c>0?_c:'')}" placeholder="ระบุ" oninput="updateItemCost(${it.id},this.value)" title="ราคาต้นทุน/หน่วย — ใส่เองได้ ใช้คำนวณกำไรในหน้าผลการขาย" style="width:60px;font-size:10px;padding:1px 4px;text-align:right;border:1px solid ${_c>0?'var(--border2)':'var(--amber)'};border-radius:4px;background:${_c>0?'transparent':'rgba(245,158,11,0.10)'}"></div>`;})()}</td>
         <td class="col-disc" style="width:70px"><input type="number" value="${it.disc}" min="0" max="100" oninput="updateItemNum(${it.id},'disc',+this.value)" style="text-align:right${isBelowCost(it)?';border-color:var(--red);background:rgba(248,113,113,0.08)':''}" ${isBelowCost(it)?'title="ราคาขายหลังลด ต่ำกว่าทุน — ลดเพิ่มไม่ได้ ต้องขออนุมัติ"':''}></td>
         <td class="col-total" style="text-align:right;font-family:var(--mono);font-size:12px;white-space:nowrap;color:var(--accent2);padding-right:8px">${isBelowCost(it)?'<span title="ต่ำกว่าทุน" style="color:var(--red)">⚠ </span>':''}${totalCell(it)}</td>
         ${itemAction}
@@ -1057,6 +1058,7 @@ function updateItemQtyRaw(id, val) {
 function updateItemPrice(id, val) {
   const it = quoteItems.find(i => i.id == id);
   if (!it) return;
+  if(String(it.price??'')!==String(val)&&typeof TravelQuote!=='undefined')TravelQuote.priceChanged(id);
   it.price = val;
   const row = document.querySelector(`#items-body tr[data-id="${id}"]`);
   if (row) { const lt = row.querySelector('.col-total'); if (lt) lt.textContent = totalCell(it); }
@@ -1068,9 +1070,10 @@ function updateItemPrice(id, val) {
 function updateItemCost(id, val) {
   const it = quoteItems.find(i => i.id == id);
   if (!it) return;
-  it.cost = +val || 0;
-  document.getElementById('items-body').innerHTML = '';
-  renderItems();
+  const cost=Number(val);
+  if(val!==''&&(!Number.isFinite(cost)||cost<0))return;
+  it.cost=val===''?0:cost;
+  it.costManual=true;
   calcTotals();
   updateApproverBox();
 }
@@ -1146,7 +1149,7 @@ async function editQuote(id) {
         qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
         // ราคา: ใช้ค่าดิบจาก extra ถ้ามี (รองรับข้อความ Included) ไม่งั้น fallback เป็นตัวเลขจาก column
         price: (ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0),
-        disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader, travel: ex.travel||null
+        disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, costManual:ex.costManual===true, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader, travel: ex.travel||null
       };
     });
   } catch(e) {
@@ -1474,7 +1477,7 @@ async function duplicateQuote(id) {
         no: ex.no || '', pn: ex.pn || '', name: it.Title || '', desc: it.Description || '', internalNotes:String(ex.internalNotes||''), catalogId:String(ex.catalogId||''),
         qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
         price: ex.travel ? ex.travel.basePrice : ((ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0)),
-        disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader
+        disc: it.DiscountPct || 0, rowH: rh, cost: +ex.cost||0, costManual:ex.costManual===true, vendorId: ex.vendorId||'', asHeader: !!ex.asHeader
       };
     });
   } catch(e) { quoteItems = []; }
@@ -1664,7 +1667,7 @@ async function _saveQuoteImpl(status) {
         if (!it.name) continue;
         _rows.push({ Title: it.name, QuoteID: quoteId, Quantity: isNumeric(it.qty) ? parseFloat(it.qty) : 0,
           Unit: it.unit, UnitPrice: priceNum(it), DiscountPct: it.disc, LineTotal: lineTotal(it), Description: it.desc||'' });
-        itemExtra.push({ no: it.no||'', pn: it.pn||'', price: String(it.price ?? ''), qtyRaw: String(it.qty ?? ''), cost: +it.cost||0, vendorId: it.vendorId||'', internalNotes:String(it.internalNotes||''),catalogId:String(it.catalogId||''), asHeader: !!it.asHeader, travel: it.travel||null });
+        itemExtra.push({ no: it.no||'', pn: it.pn||'', price: String(it.price ?? ''), qtyRaw: String(it.qty ?? ''), cost: +it.cost||0, costManual:it.costManual===true, vendorId: it.vendorId||'', internalNotes:String(it.internalNotes||''),catalogId:String(it.catalogId||''), asHeader: !!it.asHeader, travel: it.travel||null });
       }
     }
     if (_rows.length) {
