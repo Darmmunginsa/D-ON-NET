@@ -35,17 +35,17 @@ test('403 permission denial and network failure do not expire valid session',asy
  const r=runtime(),value=r.token();r.auth.accept(value,'test');r.c.fetch=async()=>({status:403,ok:false,json:async()=>({ok:false,error:'Forbidden'})});await assert.rejects(r.client.call('/gateway',{}),/Forbidden/);r.c.fetch=async()=>{throw Error('offline');};await assert.rejects(r.client.call('/gateway',{}),/offline/);assert.equal(r.auth.token('test'),value);assert.equal(r.notices().length,0);
 });
 
-test('60-minute inactivity limit warns at 55 minutes and blocks requests at 60',async()=>{
- const r=runtime();r.auth.accept(r.token('user',3*60*60*1000),'test');r.advance(55*60*1000);r.fire();assert.equal(r.notices().length,0);assert.ok(r.nodes.some(n=>n.id==='session-warning'&&!n.removed));r.advance(5*60*1000);r.fire();assert.equal(r.notices().length,1);assert.match(r.notices()[0].children[0].children[0].textContent,/60/);await assert.rejects(r.client.call('/gateway',{}),{code:'SESSION_EXPIRED'});assert.equal(r.requests(),0);
+test('4-hour inactivity limit warns at 235 minutes and blocks requests at 240',async()=>{
+ const r=runtime();r.auth.accept(r.token('user',10*60*60*1000),'test');r.advance(235*60*1000);r.fire();assert.equal(r.notices().length,0);assert.ok(r.nodes.some(n=>n.id==='session-warning'&&!n.removed));r.advance(5*60*1000);r.fire();assert.equal(r.notices().length,1);assert.match(r.notices()[0].children[0].children[0].textContent,/4 ชั่วโมง/);await assert.rejects(r.client.call('/gateway',{}),{code:'SESSION_EXPIRED'});assert.equal(r.requests(),0);
 });
 test('real input extends idle deadline; background API calls do not',async()=>{
- const r=runtime();r.auth.accept(r.token('user',3*60*60*1000),'test');r.advance(50*60*1000);r.events.keydown();r.advance(20*60*1000);r.fire();assert.equal(r.notices().length,0);await r.client.call('/gateway',{});r.advance(40*60*1000);r.fire();assert.equal(r.notices().length,1);
+ const r=runtime();r.auth.accept(r.token('user',10*60*60*1000),'test');r.advance(230*60*1000);r.events.keydown();r.advance(20*60*1000);r.fire();assert.equal(r.notices().length,0);await r.client.call('/gateway',{});r.advance(220*60*1000);r.fire();assert.equal(r.notices().length,1);
 });
 test('late input after sleeping beyond idle deadline cannot revive the session',()=>{
- const r=runtime();r.auth.accept(r.token('user',3*60*60*1000),'test');r.advance(61*60*1000);r.events.pointerdown();assert.equal(r.notices().length,1);assert.equal(r.auth.token('test'),'');
+ const r=runtime();r.auth.accept(r.token('user',10*60*60*1000),'test');r.advance(241*60*1000);r.events.pointerdown();assert.equal(r.notices().length,1);assert.equal(r.auth.token('test'),'');
 });
 test('Google renewal preserves original idle deadline and consumes same-user callback',()=>{
- const r=runtime();let prompts=0;r.c.google={accounts:{id:{prompt(){prompts++;},renderButton(){}}}};r.auth.accept(r.token('user',60*60*1000),'test');r.advance(55*60*1000);r.fire();assert.equal(prompts,0);r.events.input();assert.equal(prompts,1);const renewed=r.token('user',60*60*1000);assert.equal(r.auth.refreshCredential(renewed,'test'),true);assert.equal(r.auth.token('test'),renewed);r.advance(60*60*1000);r.fire();assert.equal(r.notices().length,1);
+ const r=runtime();let prompts=0;r.c.google={accounts:{id:{prompt(){prompts++;},renderButton(){}}}};r.auth.accept(r.token('user',60*60*1000),'test');r.advance(55*60*1000);r.fire();assert.equal(prompts,1);r.events.input();assert.equal(prompts,1);const renewed=r.token('user',6*60*60*1000);assert.equal(r.auth.refreshCredential(renewed,'test'),true);assert.equal(r.auth.token('test'),renewed);r.advance(4*60*60*1000);r.fire();assert.equal(r.notices().length,1);
 });
 test('reauthentication keeps the draft screen and rejects a different account',()=>{
  const r=runtime();r.auth.accept(r.token(),'test');r.advance(100000);r.fire();assert.equal(r.auth.refreshCredential(r.token('another'),'test'),true);assert.equal(r.notices().length,1);const renewed=r.token();assert.equal(r.auth.refreshCredential(renewed,'test'),true);assert.equal(r.notices().length,0);assert.equal(r.auth.token('test'),renewed);assert.equal(r.logouts(),0);
@@ -56,3 +56,6 @@ test('manual logout clears idle clock and renewal UI',()=>{
 test('manual renewal from warning remains in-place when Google prompt is blocked',()=>{
  const r=runtime();r.c.google={accounts:{id:{prompt(){throw Error('blocked');},renderButton(){}}}};r.auth.accept(r.token(),'test');const renewed=r.token('user',60*60*1000);assert.equal(r.auth.refreshCredential(renewed,'test'),true);assert.equal(r.auth.token('test'),renewed);assert.equal(r.logouts(),0);
 });
+
+test('mouse movement counts as activity and is throttled to avoid writes on every event',()=>{const r=runtime();r.auth.accept(r.token('user',10*60*60*1000),'test');r.advance(230*60*1000);r.events.pointermove({isTrusted:true});const activity=[...r.session].find(([k])=>k.endsWith(':activity'))[1];r.advance(100);r.events.pointermove({isTrusted:true});assert.equal([...r.session].find(([k])=>k.endsWith(':activity'))[1],activity);r.advance(20*60*1000);r.fire();assert.equal(r.notices().length,0);});
+test('hidden tab and synthetic mouse events cannot keep an unattended session alive',()=>{const r=runtime();r.auth.accept(r.token('user',10*60*60*1000),'test');r.advance(230*60*1000);r.events.pointermove({isTrusted:false});r.c.document.hidden=true;r.events.pointermove({isTrusted:true});r.advance(11*60*1000);r.fire();assert.equal(r.notices().length,1);});
