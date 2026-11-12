@@ -1,5 +1,6 @@
 const TravelQuote=(()=>{
  const T=TravelCost,$=id=>document.getElementById(id),key='TravelSettings_v1';let config=null,settingId=null,busy=false,lastAttached='',routeGeneration=0,lastRoute=null;
+ const siteAddress=()=>T.text($('q-site-address')?.value||'');
  const point=()=>T.coordinates($('travel-point')?.value||'');
  const context=()=>({quoteAddress:$('q-cust-address').value,clientName:$('q-client').value});
  function message(s){$('travel-message').textContent=s;}
@@ -25,7 +26,7 @@ const TravelQuote=(()=>{
  function refresh(){fillOptions();}
  function fillOptions(){
   const attached=quoteItems.find(i=>i.travel);
-  if(attached){const m=attached.travel,signature=String(attached.id)+'|'+m.at;if(lastAttached!==signature){$('travel-destination').value=m.destination;if($('travel-point'))$('travel-point').value=m.routePoint||'';$('travel-area').value=m.area;$('travel-km').value=m.km;$('travel-confirmed').checked=true;lastAttached=signature;}
+  if(attached){const m=attached.travel,signature=String(attached.id)+'|'+m.at;if(lastAttached!==signature){$('travel-destination').value=siteAddress()||m.destination;if($('travel-point'))$('travel-point').value=m.routePoint||'';$('travel-area').value=m.area;$('travel-km').value=m.km;$('travel-confirmed').checked=true;lastAttached=signature;}
    const total=m.version===2?m.actualAmount:m.amount,count=quoteItems.filter(i=>i.travel).length;
    message('รวมค่าเดินทาง '+fmt(total)+' บาท ใน '+count+' รายการแล้ว (ก่อนส่วนลดรายรายการ ส่วนลดรวม และ VAT)'+(m.version===2&&m.actualAmount!==m.totalAmount?' · ยอดตามระยะทาง '+fmt(m.totalAmount)+' บาท ต่างกันจากการปัดราคาต่อหน่วย 2 ตำแหน่ง':'')+'\nอัตราที่ใช้ '+fmt(m.rate)+' บาท/กม. × '+m.km+' กม. × '+m.trips+' เที่ยว');
   }else lastAttached='';
@@ -103,14 +104,15 @@ const TravelQuote=(()=>{
   const tool=document.createElement('button');tool.type='button';tool.id='travel-tool-open';tool.className='btn btn-sm';tool.textContent='ค่าเดินทาง';tool.setAttribute('aria-haspopup','dialog');tool.setAttribute('aria-controls','travel-dialog');$('nq-tools').prepend(tool);
   window.addEventListener('resize',()=>{const fab=$('nq-fab');if(!fab||!fab.getClientRects().length)return;const rect=fab.getBoundingClientRect();if(rect.right>innerWidth||rect.left<0){fab.style.left=Math.max(4,Math.min(rect.left,innerWidth-rect.width-4))+'px';fab.style.right='auto';}if(rect.top>innerHeight-80)fab.style.top=Math.max(4,innerHeight-80)+'px';});
   const openWindow=QuoteTools.floating(dialog,header);
-  tool.addEventListener('click',async()=>{openWindow();try{await load();summary();}catch(e){message(e.message);}if(!$('travel-destination').value)$('travel-destination').value=$('q-cust-address').value;fillOptions();});
+  tool.addEventListener('click',async()=>{openWindow();try{await load();summary();}catch(e){message(e.message);}if(siteAddress())$('travel-destination').value=siteAddress();else if(!$('travel-destination').value)$('travel-destination').value=$('q-cust-address').value;fillOptions();});
   dialog.addEventListener('close',()=>{if(tool.getClientRects().length)tool.focus();});
   const settings=document.createElement('section');settings.id='travel-settings-card';settings.className='card travel-card';settings.hidden=true;settings.innerHTML=`<div class="travel-body"><h3>ตั้งค่าเดินทางนอกกรุงเทพฯ · Admin</h3><label><input id="travel-setting-enabled" type="checkbox"> เปิดใช้ค่าเดินทาง</label><label for="travel-setting-origin">ที่อยู่จุดเริ่มเดินทาง</label><textarea id="travel-setting-origin" rows="2"></textarea><div class="travel-grid"><div><label for="travel-setting-rate">อัตราบาท / กิโลเมตร</label><input id="travel-setting-rate" type="number" min="0" step="0.01"></div><div><label for="travel-setting-trips">จำนวนเที่ยว</label><select id="travel-setting-trips"><option value="1">เที่ยวเดียว</option><option value="2">ไป–กลับ (ระยะทางเที่ยวเดียว × 2)</option></select></div></div><p>คิดเฉพาะระยะทาง ไม่รวมค่าทางด่วนหรือค่าใช้จ่ายอื่น ใบเสนอราคาเก่าไม่เปลี่ยนตามอัตราใหม่</p><button id="travel-setting-save" type="button" class="btn btn-primary btn-sm">บันทึกค่าเดินทาง</button><p id="travel-settings-message" role="status"></p></div>`;$('page-settings').appendChild(settings);
   $('travel-setting-save').addEventListener('click',saveSettings);$('travel-apply').addEventListener('click',apply);$('travel-remove').addEventListener('click',remove);
-  for(const id of ['travel-destination','travel-point'])$(id).addEventListener('input',()=>{routeGeneration++;lastRoute=null;$('travel-km').value='';$('travel-confirmed').checked=false;});
+  if($('q-site-address'))$('q-site-address').addEventListener('input',()=>{$('travel-destination').value=siteAddress()||$('q-cust-address').value;$('travel-point').value='';$('travel-area').value='';routeGeneration++;lastRoute=null;$('travel-km').value='';$('travel-confirmed').checked=false;message('สถานที่หน้างานเปลี่ยน กรุณาตรวจเส้นทางและคำนวณระยะทางใหม่');});
+  for(const id of ['travel-destination','travel-point'])$(id).addEventListener('input',()=>{if(id==='travel-destination'&&$('q-site-address'))$('q-site-address').value=$('travel-destination').value;routeGeneration++;lastRoute=null;$('travel-km').value='';$('travel-confirmed').checked=false;});
   $('travel-km').addEventListener('input',()=>{routeGeneration++;lastRoute=null;$('travel-confirmed').checked=false;});
   $('travel-area').addEventListener('change',()=>{$('travel-confirmed').checked=false;if($('travel-area').value==='bangkok'){remove();message('หน้างานกรุงเทพฯ ไม่คิดค่าเดินทาง');}});
-  $('travel-use-address').addEventListener('click',()=>{$('travel-destination').value=$('q-cust-address').value;routeGeneration++;lastRoute=null;$('travel-point').value='';$('travel-km').value='';$('travel-area').value=T.bangkok($('travel-destination').value)?'bangkok':'';$('travel-confirmed').checked=false;});
+  $('travel-use-address').addEventListener('click',()=>{if($('q-site-address'))$('q-site-address').value='';$('travel-destination').value=$('q-cust-address').value;routeGeneration++;lastRoute=null;$('travel-point').value='';$('travel-km').value='';$('travel-area').value=T.bangkok($('travel-destination').value)?'bangkok':'';$('travel-confirmed').checked=false;});
   $('travel-maps').addEventListener('click',event=>{try{if(!config?.origin)throw Error('โหลดอัตรา Admin ก่อนเปิดเส้นทาง');const target=T.routeTarget($('travel-destination').value,point()),params=new URLSearchParams({api:'1',origin:config.origin,destination:target,travelmode:'driving'});event.currentTarget.href='https://www.google.com/maps/dir/?'+params;}catch(e){event.preventDefault();message(e.message);}});
  }
  document.addEventListener('DOMContentLoaded',init);

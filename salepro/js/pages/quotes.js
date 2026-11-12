@@ -228,6 +228,7 @@ function initNewQuote() {
   document.getElementById('q-phone').value = '';
   document.getElementById('q-email').value = '';
   document.getElementById('q-cust-address').value = '';
+  document.getElementById('q-site-address').value = '';
   document.getElementById('q-cust-taxid').value = '';
   document.getElementById('q-cust-tel').value = '';
   { const _a=document.getElementById('q-client-en'); if(_a)_a.value=''; const _b=document.getElementById('q-cust-address-en'); if(_b)_b.value=''; }
@@ -1176,6 +1177,7 @@ async function editQuote(id) {
     _set('q-phone',         q.Phone);
     _set('q-email',         q.Email);
     _set('q-cust-address',  q.CustomerAddress||q.CustomerAddress);
+    _set('q-site-address',q.SiteAddress||'');
     _set('q-cust-taxid',    q.CustomerTaxID||q.CustomerTaxID);
     _set('q-cust-tel',      q.CustomerTel||q.CustomerTel);
     _set('q-cust-fax',      getQuoteFax(id));
@@ -1497,6 +1499,7 @@ async function duplicateQuote(id) {
     _set('q-phone',        q.Phone);
     _set('q-email',        q.Email);
     _set('q-cust-address', q.CustomerAddress);
+    _set('q-site-address',q.SiteAddress||'');
     _set('q-cust-taxid',   q.CustomerTaxID);
     _set('q-cust-tel',     q.CustomerTel);
     _set('q-cust-fax',     getQuoteFax(id));
@@ -1587,6 +1590,7 @@ async function _saveQuoteImpl(status) {
     SaleTel: document.getElementById('q-sale-tel').value||'',
     SaleEmail: document.getElementById('q-sale-email').value||'',
     CustomerAddress: document.getElementById('q-cust-address').value||'',
+    SiteAddress: document.getElementById('q-site-address').value||'',
     CustomerTaxID: document.getElementById('q-cust-taxid').value||'',
     CustomerTel: document.getElementById('q-cust-tel').value||'',
     ContractStartDate: document.getElementById('q-start').value||null,

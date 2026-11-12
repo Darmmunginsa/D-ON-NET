@@ -278,6 +278,7 @@
               <div class="form-group"><label>Date <span style="color:var(--muted);font-weight:400;font-size:10px">(อัตโนมัติ)</span></label><input id="q-start" type="date" readonly tabindex="-1" style="opacity:0.75;cursor:not-allowed"></div>
               <div class="form-group"><label>Expire <span style="color:var(--muted);font-weight:400;font-size:10px">(อัตโนมัติ)</span></label><input id="q-end" type="date" readonly tabindex="-1" style="opacity:0.75;cursor:not-allowed"></div>
               <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ลูกค้า (สำหรับออกใบ)</label><textarea id="q-cust-address" placeholder="ที่อยู่ลูกค้า..." style="min-height:64px"></textarea></div>
+              <div class="form-group" style="grid-column:1/-1"><label for="q-site-address">สถานที่หน้างานจริง (สำหรับคำนวณเส้นทาง / นัดหมาย)</label><textarea id="q-site-address" placeholder="เช่น โรงงาน สาขา อาคาร หรือที่อยู่ที่ลูกค้านัดให้เข้าบริการ" style="min-height:64px"></textarea><small>ใช้เมื่อหน้างานต่างจากที่อยู่บริษัท · ไม่เปลี่ยนที่อยู่ออกเอกสาร · เว้นว่างเพื่อใช้ที่อยู่ลูกค้า</small></div>
               <div class="form-group"><label>เลขประจำตัวผู้เสียภาษีลูกค้า</label><input id="q-cust-taxid" placeholder="0000000000000"></div>
               <div class="form-group"><label>เบอร์โทรลูกค้า</label><input id="q-cust-tel" placeholder="02-xxx-xxxx"></div>
               <div class="form-group"><label>Fax ลูกค้า</label><input id="q-cust-fax" placeholder="02-xxx-xxxx"></div>
@@ -1635,7 +1636,7 @@
 <script src="js/sync.js?v=billingeditor20261108"></script>
 <script src="js/pages/ui.js?v=billingeditor20261108"></script>
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
-<script src="../shared/travel-cost.js?v=routepin20261108"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=pricecost20261111"></script><script src="js/pages/quotes.js?v=pricecost20261111"></script>
+<script src="../shared/travel-cost.js?v=routepin20261108"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=site20261112"></script><script src="js/pages/quotes.js?v=site20261112"></script>
 <script src="js/pages/approve.js?v=drafts20261108"></script>
 <script src="js/pages/payment.js?v=workflowstatus20261108"></script>
 <script src="js/pages/catalog.js?v=baseprice20261111"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
@@ -1668,7 +1669,7 @@
   <option value="ใบส่งของ">
   <option value="เอกสารอื่น">
 </datalist>
-<script src="js/pages/service-agreements.js?v=conditional20261108"></script><script src="js/pages/prospects-core.js?v=20261101"></script><script src="js/pages/prospects.js?v=teamprospects20261102"></script><script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/queue-core.js?v=workflowstatus20261108"></script><script src="../shared/tech-route.js?v=20261105"></script><script src="../shared/work-calendar.js?v=pendingpo20261108"></script><script src="js/pages/datetime-picker.js?v=dtpall20261107"></script><script src="js/pages/personal-event.js?v=shared20261108"></script><script src="js/pages/queue-planner.js?v=googlebusy20261108"></script><script src="js/pages/queue-dispatch.js?v=20261105"></script><script src="js/pages/google-busy.js?v=googlebusy20261108"></script><script src="js/pages/calendar.js?v=googlebusy20261108"></script>
+<script src="js/pages/service-agreements.js?v=conditional20261108"></script><script src="js/pages/prospects-core.js?v=20261101"></script><script src="js/pages/prospects.js?v=teamprospects20261102"></script><script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/queue-core.js?v=workflowstatus20261108"></script><script src="../shared/tech-route.js?v=20261105"></script><script src="../shared/work-calendar.js?v=pendingpo20261108"></script><script src="js/pages/datetime-picker.js?v=dtpall20261107"></script><script src="js/pages/personal-event.js?v=shared20261108"></script><script src="js/pages/queue-planner.js?v=site20261112"></script><script src="js/pages/queue-dispatch.js?v=20261105"></script><script src="js/pages/google-busy.js?v=googlebusy20261108"></script><script src="js/pages/calendar.js?v=googlebusy20261108"></script>
 <script src="../shared/customer-history-core.js?v=20261108"></script><script src="js/pages/customer-history.js?v=20261108"></script>
 <script src="js/pages/draft-drawer.js?v=draftnames20261108"></script>
 <script src="../shared/local-first-core.js?v=draftnames20261108"></script><script src="../shared/local-first-idb.js?v=20261108"></script><script src="js/local-first.js?v=startup20261108"></script>
