@@ -111,18 +111,23 @@ function customerCodeForQuote(q) {
 // Read fresh CRM data for every saved quote; serialize auto-creates within this tab.
 let _customerAutoSaveQueue=Promise.resolve();
 function quoteCustomerTax(value){return String(value||'').replace(/[๐-๙]/g,c=>String(c.charCodeAt(0)-0x0e50)).replace(/[\s-]/g,'');}
-function autoAddCustomerFromQuote(fields, fax, docEN={}) {
+function autoAddCustomerFromQuote(fields, fax, docEN={}, options={}) {
   const snapshot={...fields},extras={...docEN},owner=currentUser?.email;
+  const allowMissingTax=options.allowMissingTax===true;
   const operation=_customerAutoSaveQueue.then(async()=>{
     const name=String(snapshot.ClientName||'').trim(),tax=quoteCustomerTax(snapshot.CustomerTaxID);
     if(!name||name==='(ไม่ระบุ)')return {state:'skipped',message:'ยังไม่เพิ่ม CRM: กรุณาระบุชื่อลูกค้า'};
-    if(!/^\d{13}$/.test(tax))return {state:'skipped',message:'ยังไม่เพิ่ม CRM: เลขประจำตัวผู้เสียภาษีต้องครบ 13 หลัก'};
+    if(!/^\d{13}$/.test(tax)&&!(allowMissingTax&&!tax))return {state:'skipped',message:'ยังไม่เพิ่ม CRM: เลขประจำตัวผู้เสียภาษีต้องครบ 13 หลัก (หากยังไม่มี ให้เว้นว่าง)'};
     if(!owner||currentUser?.email!==owner)throw Error('บัญชีผู้ใช้งานเปลี่ยน กรุณาตรวจทะเบียนลูกค้า');
     const fresh=await getListItems(CONFIG.lists.customers);
     if(!Array.isArray(fresh))throw Error('โหลดทะเบียนลูกค้าล่าสุดไม่สำเร็จ');
     customersData=fresh;
-    const matches=fresh.filter(c=>quoteCustomerTax(c.TaxID)===tax);
+    const matches=tax?fresh.filter(c=>quoteCustomerTax(c.TaxID)===tax):[];
     if(matches.length)return {state:'existing',customer:matches[0],message:matches.length>1?'พบเลขผู้เสียภาษีซ้ำในทะเบียนเดิม กรุณาตรวจ CRM — ไม่ได้สร้างเพิ่ม':'พบเลขผู้เสียภาษีเดิม ใช้ลูกค้าใน CRM เดิมแล้ว — ไม่สร้างซ้ำ'};
+    const nameKey=v=>String(v||'').normalize('NFKC').trim().toLowerCase().replace(/\s+/g,' ');
+    const sameName=fresh.filter(c=>nameKey(c.Title)===nameKey(name)&&(!tax||!quoteCustomerTax(c.TaxID)));
+    if(sameName.length>1)return {state:'skipped',message:'ยังไม่เพิ่ม CRM: พบชื่อลูกค้าซ้ำหลายราย กรุณาตรวจทะเบียนลูกค้า'};
+    if(sameName.length===1)return {state:'existing',customer:sameName[0],message:'พบชื่อลูกค้าใน CRM แล้ว — ไม่สร้างซ้ำและไม่ทับข้อมูลเดิม'};
     if(currentUser?.email!==owner)throw Error('บัญชีผู้ใช้งานเปลี่ยน กรุณาตรวจทะเบียนลูกค้า');
     const cfields={Title:name,ContactPerson:snapshot.ContactPerson||'',TaxID:tax,Phone:snapshot.CustomerTel||snapshot.Phone||'',Email:snapshot.Email||'',Address:snapshot.CustomerAddress||''};
     const created=await createListItem(CONFIG.lists.customers,cfields);
@@ -137,6 +142,15 @@ function autoAddCustomerFromQuote(fields, fax, docEN={}) {
     return {state:'created',customer,message:extrasFailed?'เพิ่มลูกค้าเข้า CRM แล้ว แต่ข้อมูลเสริมบางส่วนยังบันทึกไม่ครบ กรุณาตรวจทะเบียนลูกค้า':'เพิ่มข้อมูลลูกค้าเข้า CRM อัตโนมัติแล้ว'};
   });
   _customerAutoSaveQueue=operation.catch(()=>{});return operation;
+}
+
+async function syncApprovedQuoteCustomer(quote){
+  if(quote?.Status!=='Approved')return null;
+  try{
+    const fax=typeof getQuoteFax==='function'?getQuoteFax(quote.id):'';
+    const en=typeof getQuoteDocEN==='function'?getQuoteDocEN(quote.id):{};
+    return await autoAddCustomerFromQuote(quote,fax,en,{allowMissingTax:true});
+  }catch(error){return {state:'error',message:'อนุมัติแล้ว แต่เพิ่ม CRM ไม่สำเร็จ: '+error.message+' · กรุณาตรวจทะเบียนลูกค้า'};}
 }
 
 function renderCustomers() {

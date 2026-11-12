@@ -1709,7 +1709,7 @@ async function _saveQuoteImpl(status) {
     // เพิ่มลูกค้าเข้า CRM อัตโนมัติ ถ้ายังไม่มี (ไม่ทับข้อมูลเดิม)
     let customerSyncMessage='';
     if(typeof autoAddCustomerFromQuote==='function'){
-      try{const result=await autoAddCustomerFromQuote(fields,customerExtras.fax,customerExtras);customerSyncMessage=result?.message||'';}
+      try{const result=await autoAddCustomerFromQuote(fields,customerExtras.fax,customerExtras,{allowMissingTax:status==='Approved'});customerSyncMessage=result?.message||'';}
       catch(e){customerSyncMessage='ใบเสนอราคาบันทึกแล้ว แต่ยังเพิ่ม CRM ไม่สำเร็จ: '+e.message;}
     }
     const customerSyncStatus=document.getElementById('quote-customer-sync-status');

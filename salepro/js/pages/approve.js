@@ -109,10 +109,12 @@ async function doApprove(status) {
     } catch(e2) { console.warn('Approvals log skipped:', e2.message); }
     // อัปเดต local cache แทน syncAll
     const qApp = quotesData.find(x => x.id === currentApproveId);
-    if (qApp) qApp.Status = status;
+    if (qApp) Object.assign(qApp,approvalResult?.item||{}, {Status:status});
+    const customerSync=status==='Approved'&&typeof syncApprovedQuoteCustomer==='function'
+      ? await syncApprovedQuoteCustomer({..._qd,...approvalResult?.item,Status:status}) : null;
     renderDash(); renderQuotes(); renderApprove(); renderPayment(); updateBadge();
     closeModal('approve-modal');
-    toast(`${status==='Approved'?'✓ อนุมัติ':'✗ ปฏิเสธ'}เรียบร้อย`, 'success');
+    toast(`${status==='Approved'?'✓ อนุมัติ':'✗ ปฏิเสธ'}เรียบร้อย${customerSync?.message?' · '+customerSync.message:''}`, customerSync&&['error','skipped'].includes(customerSync.state)?'info':'success');
     if (typeof logActivity === 'function') { const _qa = quotesData.find(x=>x.id===currentApproveId); logActivity(status==='Approved'?'อนุมัติใบเสนอราคา':'ปฏิเสธใบเสนอราคา', _qa?.Title||'', status==='Rejected'?('เหตุผล: '+(comment||'-')):(comment||''), { status: status }); }
     // ส่ง Email แจ้ง Sale เมื่ออนุมัติ / แจ้ง Sale+Approver เมื่อปฏิเสธ
     const qNotif = quotesData.find(x => x.id === currentApproveId);
