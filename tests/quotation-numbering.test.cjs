@@ -7,3 +7,17 @@ test('quotation number hooks execute inside all existing server write locks',()=
 
 test('first approval replaces creation date with Bangkok issue date across month and year boundary',()=>{const r=runtime('2026-12-31T17:01:00Z');const q=r.prepare('Quotations',{Status:'Approved',QuoteDate:'2026-12-25'},{SaleName:'Jongrak K',QuoteDate:'2026-12-25'});assert.equal(q.Title,'JK01-01-2027');assert.equal(q.QuoteDate,'2027-01-01');assert.equal(q.QuotationIssuedAt,'2026-12-31T17:01:00.000Z');});
 test('pending keeps creation date and approval retry does not replace an issued date',()=>{const r=runtime();const pending=r.prepare('Quotations',{Status:'Pending',QuoteDate:'2026-11-01'},null);assert.equal(pending.QuoteDate,'2026-11-01');const retry=r.prepare('Quotations',{Status:'Approved'},{Title:'JK01-10-2026',QuoteDate:'2026-10-20'});assert.equal(retry.Title,'JK01-10-2026');assert.equal(Object.hasOwn(retry,'QuoteDate'),false);});
+
+test('revision creation keeps its issued family through save, rejection, resubmission and approval',()=>{
+ const r=runtime();r.rows.push({id:'original',Title:'JK12-11-2026'});
+ const draft=r.prepare('Quotations',{Title:'JK12-11-2026-RV1',RevisionSourceId:'original',Status:'Draft'},null);
+ assert.equal(draft.Title,'JK12-11-2026-RV1');
+ for(const Status of ['Pending','Rejected','Pending','Approved'])assert.equal(r.prepare('Quotations',{Status},draft).Title,draft.Title);
+ assert.equal(r.props.size,0);
+});
+test('revision suffix uses maximum across family and the authoritative source, not client title',()=>{
+ const r=runtime();r.rows.push({id:'original',Title:'JK12-11-2026'},{id:'rv',Title:'JK12-11-2026-RV3'});
+ assert.equal(r.prepare('Quotations',{Title:'wrong-RV1',RevisionSourceId:'rv',Status:'Draft'},null).Title,'JK12-11-2026-RV4');
+ assert.throws(()=>r.prepare('Quotations',{RevisionSourceId:'missing'},null),/Revision source/);
+ r.rows.push({id:'unnumbered',Title:''});assert.throws(()=>r.prepare('Quotations',{RevisionSourceId:'unnumbered'},null),/Revision source/);
+});

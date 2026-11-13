@@ -5,6 +5,15 @@ function prepareQuotationNumberFields(name,fields,existing){
   var title=String(existing.Title||'').trim(),status=fields.Status||existing.Status;
   // Issued and legacy numbers remain stable, including a retry after a lost response.
   if(title){fields.Title=title;return fields;}
+  // Allocate revision suffixes under the same server write lock as new numbers.
+  var sourceId=String(fields.RevisionSourceId||existing.RevisionSourceId||'').trim();
+  if(sourceId){
+    var rows=listRows('Quotations'),source=rows.filter(function(q){return String(q.id)===sourceId;})[0];
+    if(!source||!String(source.Title||'').trim())throw Error('Revision source must have an issued quotation number');
+    var base=String(source.Title).trim().replace(/-RV\d+$/,''),lastRevision=0;
+    rows.forEach(function(q){var t=String(q.Title||'');if(t.indexOf(base+'-RV')===0){var suffix=t.slice((base+'-RV').length);if(/^\d+$/.test(suffix))lastRevision=Math.max(lastRevision,Number(suffix));}});
+    fields.Title=base+'-RV'+(lastRevision+1);fields.NumberingMode='Revision';fields.RevisionSourceId=sourceId;return fields;
+  }
   fields.Title='';fields.NumberingMode='OnApproval';
   if(status!=='Approved')return fields;
   var issuedAt=new Date();

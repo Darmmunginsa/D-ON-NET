@@ -1993,8 +1993,10 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const subTotal = kind==='billing' ? q._billing.totals.net : _manualOn
     ? _manualRows.reduce((s,r)=> s + (_isGN(r)?0:_amtNum(r.amount)), 0)
     : items.reduce((s,it)=>{ const d=parseFloat(it.DiscountPct||0)/100; return s + parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d); }, 0);
-  const vatAmt = kind==='billing' ? q._billing.totals.vat : subTotal * 0.07;
-  const grand = kind==='billing' ? q._billing.totals.total : subTotal + vatAmt;
+  const discountAmt = kind==='billing' ? 0 : subTotal * (Number(q.DiscountPct)||0) / 100;
+  const netTotal = subTotal - discountAmt;
+  const vatAmt = kind==='billing' ? q._billing.totals.vat : netTotal * 0.07;
+  const grand = kind==='billing' ? q._billing.totals.total : netTotal + vatAmt;
   const bahtWords = (typeof bahtText === 'function') ? bahtText(kind==='billing'?q._billing.totals.balance:grand) : '';
 
   // ── คอลัมน์ตาราง (ซ่อน/แสดง + ความกว้าง) — ตั้งค่าจากพรีวิว, เก็บใน manual.cols ──
@@ -2163,9 +2165,10 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   // ── totals block (ขวาล่าง) ──
   const totLabel = (th,en)=>'<td style="background:'+NAVY+';color:#fff;padding:5px 10px;font-size:11px;border:1px solid '+NAVY+'"><b>'+th+'</b> '+en+'</td>';
   const totVal = v=>'<td style="border:1px solid '+NAVY+';padding:5px 10px;text-align:right;font-family:'+F_NUM+';min-width:110px">'+v+'</td>';
+  const discountRows = discountAmt > 0 ? '<tr>'+totLabel('ส่วนลด','DISCOUNT')+totVal(fmt2(discountAmt))+'</tr><tr>'+totLabel('ยอดหลังหักส่วนลด','NET TOTAL')+totVal(fmt2(netTotal))+'</tr>' : '';
   const totalsBox = noPrice ? '' :
     '<table style="border-collapse:collapse;width:100%;font-size:12px">'
-    +'<tr>'+totLabel('รวมเงิน','TOTAL')+totVal(fmt2(subTotal))+'</tr>'
+    +'<tr>'+totLabel('รวมเงิน','TOTAL')+totVal(fmt2(subTotal))+'</tr>'+discountRows
     +'<tr>'+totLabel('ภาษีมูลค่าเพิ่ม','PLUS VAT')+totVal(fmt2(vatAmt))+'</tr>'
     +'<tr>'+totLabel('ยอดเงินสุทธิ','GRAND TOTAL')+'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+';font-weight:700;font-size:14px">'+fmt2(grand)+'</td></tr>'
     +'</table>';
@@ -2211,9 +2214,9 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const totalsRows = noPrice
     ? '<tr><td colspan="'+visCols.length+'" style="border:1px solid '+NAVY+';padding:8px 10px;font-size:10px;line-height:1.55;color:#333;vertical-align:top">'+NOTE_TERMS+'</td></tr>'
     : '<tr>'
-      +'<td colspan="'+(visCols.length-2)+'" rowspan="'+(kind==='billing'?5:3)+'" style="border:1px solid '+NAVY+';padding:8px 10px;vertical-align:top">'+NOTE_TERMS+'<div style="margin-top:8px;font-size:11px;border-top:1px solid '+NAVY+'55;padding-top:5px;text-align:center;font-weight:600">'+esc(bahtWords)+'</div></td>'
+      +'<td colspan="'+(visCols.length-2)+'" rowspan="'+(kind==='billing'?5:(discountAmt>0?5:3))+'" style="border:1px solid '+NAVY+';padding:8px 10px;vertical-align:top">'+NOTE_TERMS+'<div style="margin-top:8px;font-size:11px;border-top:1px solid '+NAVY+'55;padding-top:5px;text-align:center;font-weight:600">'+esc(bahtWords)+'</div></td>'
       +'<td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:6px 10px;font-size:11px"><b>รวมเงิน</b> TOTAL</td>'
-      +'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(subTotal)+'</td></tr>'
+      +'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(subTotal)+'</td></tr>'+discountRows
       +'<tr><td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:6px 10px;font-size:11px"><b>ภาษีมูลค่าเพิ่ม</b> PLUS VAT</td>'
       +'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+'">'+fmt2(vatAmt)+'</td></tr>'
       +'<tr><td style="background:'+NAVY+';color:#fff;border:1px solid '+NAVY+';padding:7px 10px;font-size:11px"><b>ยอดเงินสุทธิ</b> GRAND TOTAL</td>'
@@ -2486,12 +2489,14 @@ async function reviseQuote(id) {
   if (!canEditQuote(q)) { toast('คุณไม่มีสิทธิ์ Revise ใบนี้', 'error'); return; }
 
   const baseTitle = q.Title.replace(/-RV\d+$/, '');
-  const rvNum = quotesData.filter(x => x.Title && x.Title !== baseTitle && x.Title.startsWith(baseTitle + '-RV')).length + 1;
+  const rvNum = Math.max(0,...quotesData.map(x=>{const t=String(x.Title||'');const suffix=t.startsWith(baseTitle+'-RV')?t.slice((baseTitle+'-RV').length):'';return /^\d+$/.test(suffix)?Number(suffix):0;})) + 1;
   const newTitle = baseTitle + '-RV' + rvNum;
 
   if (!confirm('สร้างใบแก้ไข ' + newTitle + ' จาก ' + q.Title + '?\nข้อมูลทั้งหมดจะถูก copy มาพร้อมแก้ไข')) return;
 
   try {
+    const capabilities=await _callRaw({action:'serviceCapabilities'});
+    if(!capabilities.revisionNumbering)throw Error('กรุณาอัปเดต Apps Script รุ่นรองรับเลข Revise ก่อนสร้างใบแก้ไข');
     toast('กำลังสร้างใบ Revise...', 'info');
 
     let oldItems = [];
@@ -2501,7 +2506,7 @@ async function reviseQuote(id) {
     } catch(e) {}
 
     const newFields = {
-      Title: newTitle,
+      Title: newTitle, RevisionSourceId: String(id),
       ClientName: q.ClientName||'', ContactPerson: q.ContactPerson||'',
       Phone: q.Phone||'', Email: q.Email||'',
       QuoteDate: new Date().toISOString().split('T')[0],
@@ -2516,6 +2521,9 @@ async function reviseQuote(id) {
 
     const created = await createListItem(CONFIG.lists.quotations, newFields);
     const newId = created.id;
+    const revisionTitle=created.Title;
+    if(!revisionTitle||!/-RV\d+$/.test(revisionTitle))throw Error('ฐานข้อมูลไม่ได้ส่งเลข Revise กลับมา กรุณา Sync และตรวจรายการก่อนสร้างซ้ำ');
+
 
     if (oldItems.length) {
       await Promise.all(oldItems.map(it =>
@@ -2528,9 +2536,9 @@ async function reviseQuote(id) {
       ));
     }
 
-    quotesData.push({ id: newId, ...newFields });
+    quotesData.push({ ...newFields, ...created, id: newId });
     renderDash(); renderQuotes(); updateBadge();
-    toast('✓ สร้าง ' + newTitle + ' สำเร็จ — กำลังเปิดหน้าแก้ไข', 'success');
+    toast('✓ สร้าง ' + revisionTitle + ' สำเร็จ — กำลังเปิดหน้าแก้ไข', 'success');
     setTimeout(() => editQuote(newId), 600);
 
   } catch(e) { toast('สร้างไม่สำเร็จ: ' + e.message, 'error'); }
