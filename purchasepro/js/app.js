@@ -356,8 +356,22 @@ function purchaseReferenceForm(prefix,d={}){
     +[['general','ใช้งานทั่วไป / บริษัท'],['stock','ซื้อเข้า Stock'],['sale','ซื้อสำหรับงานขาย']].map(([v,t])=>'<option value="'+v+'" '+(purpose===v?'selected':'')+'>'+t+'</option>').join('')+'</select></div>'
     +'<div id="'+prefix+'-reference-box" style="grid-column:1/-1;'+(purpose==='sale'?'':'display:none')+'"><label>Tag ใบเสนอราคาของ Sale</label>'
     +'<input id="'+prefix+'-quote-search" placeholder="ค้นเลขใบเสนอราคา / ชื่อลูกค้า" oninput="filterPurchaseQuotes(this.dataset.prefix)" data-prefix="'+prefix+'">'
+    +'<button type="button" class="btn btn-sm" style="margin-top:6px" onclick="refreshPurchaseQuotes(this.dataset.prefix)" data-prefix="'+prefix+'">โหลดใบเสนอราคาล่าสุด</button><div id="'+prefix+'-quote-status" role="status" style="font-size:11px;margin-top:6px;color:var(--muted)"></div>'
     +'<select id="'+prefix+'-quote" onchange="capturePurchaseReference(this.dataset.prefix)" data-prefix="'+prefix+'" style="margin-top:6px"></select>'
     +'<div style="font-size:11px;color:var(--muted);margin-top:6px">อ้างอิงระดับงาน ชื่ออะไหล่ที่ซื้อไม่จำเป็นต้องตรงกับชื่อ Service และไม่แทนต้นทุนรายสินค้าในใบเสนอราคาอัตโนมัติ</div></div></div></div>';
+}
+let purchaseQuotesRequest=0;
+async function refreshPurchaseQuotes(prefix){
+  const request=++purchaseQuotesRequest,select=document.getElementById(prefix+'-quote'),status=document.getElementById(prefix+'-quote-status');
+  const selected=select?.value|| (prefix==='f'?editingPO?.stageData?.salesReference?.id:'')||'';
+  if(status)status.textContent='กำลังโหลดใบเสนอราคาล่าสุด...';
+  try{
+    const rows=await getListItems(CONFIG.lists.quotations);
+    if(request!==purchaseQuotesRequest||document.getElementById(prefix+'-quote')!==select)return;
+    quotesById=Object.fromEntries(rows.map(q=>[String(q.id),q]));
+    filterPurchaseQuotes(prefix,selected);
+    if(status)status.textContent=rows.some(q=>q.Title&&!['Draft','Cancelled','Rejected'].includes(q.Status))?'โหลดข้อมูลล่าสุดแล้ว · เลือกเลขใบเสนอราคาจากช่องด้านล่าง':'ยังไม่มีใบเสนอราคาที่ออกเลขและใช้งานได้ (ไม่รวม Draft / ยกเลิก / ปฏิเสธ)';
+  }catch(e){if(request!==purchaseQuotesRequest||document.getElementById(prefix+'-quote')!==select)return;if(status)status.textContent='โหลดใบเสนอราคาไม่สำเร็จ: '+e.message+' — กดโหลดใหม่';}
 }
 function filterPurchaseQuotes(prefix,selected){
   const el=document.getElementById(prefix+'-quote');if(!el)return;
@@ -395,6 +409,7 @@ function openNewPurchase(){
   document.getElementById('np-reqdate').value='';
   document.getElementById('np-reference').innerHTML=purchaseReferenceForm('np');
   filterPurchaseQuotes('np');
+  refreshPurchaseQuotes('np');
   renderNpRows();
   openModal('newpo-modal');
 }
@@ -1132,7 +1147,7 @@ function renderStageBody(){
   }
   if(st>=PO_LOCK_FROM_STAGE && poStagesLocked()) body=_lockedNotice();   // ล็อกขั้น 5-8 จนกว่าจะรับ PO ลูกค้า
   document.getElementById('pom-stagebody').innerHTML=body;
-  if(st===1&&editingPO.source==='purchasepro')filterPurchaseQuotes('f',d.salesReference?.id);
+  if(st===1&&editingPO.source==='purchasepro'){filterPurchaseQuotes('f',d.salesReference?.id);refreshPurchaseQuotes('f');}
   if(st!==1)document.getElementById('pom-stagebody').insertAdjacentHTML('afterbegin',purchaseReferenceBadge(editingPO));
   if(editingPO.stage===8 && typeof renderFooter==='function') renderFooter();   // อัปเดตปุ่มปิดงานตามความครบ
   if(_poReadonly) applyReadonly();
