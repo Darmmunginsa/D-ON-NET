@@ -191,7 +191,7 @@ function renderReminders(){
 }
 function rowFor(p){
   return `<tr style="cursor:pointer" onclick="openPO('${p.id}')">
-    <td style="font-family:var(--mono);font-size:12px">${esc(p.quoteTitle||'-')}</td>
+    <td style="font-family:var(--mono);font-size:12px">${esc(p.quoteTitle||'-')}${purchaseReferenceBadge(p)}</td>
     <td>${esc(p.client||'-')}</td><td>${esc(p.vendorName||'-')}</td>
     <td style="font-family:var(--mono)">${fmt(poValue(p))}</td><td>${stageBadge(p.maxStage||p.stage)}</td></tr>`;
 }
@@ -320,7 +320,7 @@ function renderPurchases(){
   // เติมตัวเลือก Vendor ในกรอง
   const vsel=document.getElementById('po-vfilter');
   if(vsel){ const names=[...new Set(getPurchases().map(p=>p.vendorName).filter(Boolean))].sort(); if(vsel.options.length!==names.length+1){ vsel.innerHTML='<option value="">ทุก Vendor</option>'+names.map(n=>`<option>${esc(n)}</option>`).join(''); vsel.value=vf; } }
-  let list=getPurchases().filter(p=>!q||(p.quoteTitle||'').toLowerCase().includes(q)||(p.client||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q));
+  let list=getPurchases().filter(p=>!q||(p.quoteTitle||'').toLowerCase().includes(q)||(p.client||'').toLowerCase().includes(q)||(p.vendorName||'').toLowerCase().includes(q)||purchaseReferenceText(p).toLowerCase().includes(q));
   if(f==='__out__') list=list.filter(p=>!p.closed && (poValue(p)-poPaid(p))>0);
   else if(f) list=list.filter(p=>String(p.stage)===f);
   if(vf) list=list.filter(p=>p.vendorName===vf);
@@ -328,7 +328,7 @@ function renderPurchases(){
   list=list.filter(poPassBasket);
   document.getElementById('purchases-body').innerHTML = list.length ? list.map(p=>`
     <tr>
-      <td style="font-family:var(--mono);font-size:12px">${p.type==='project'?'<span class="badge" style="background:rgba(79,142,247,0.16);color:#4f8ef7;margin-right:5px">🏗 โครงการ</span>':''}${esc(p.quoteTitle||'-')}${poBasketDots(p.id)}</td>
+      <td style="font-family:var(--mono);font-size:12px">${p.type==='project'?'<span class="badge" style="background:rgba(79,142,247,0.16);color:#4f8ef7;margin-right:5px">🏗 โครงการ</span>':''}${esc(p.quoteTitle||'-')}${purchaseReferenceBadge(p)}${poBasketDots(p.id)}</td>
       <td>${esc(p.client||'-')}</td><td>${esc(p.vendorName||'-')}</td>
       <td style="color:var(--muted)">${(p.items||[]).length} รายการ</td>
       <td style="font-family:var(--mono)">${fmt(poValue(p))}</td>
@@ -343,6 +343,48 @@ function renderVendors(){
     : '<tr><td colspan=5 style="text-align:center;padding:28px;color:var(--muted)">ยังไม่มี Vendor</td></tr>';
 }
 
+// References for independently created purchases: never map component names onto Sale service costs.
+function purchaseReferenceText(p){
+  const d=p.stageData||{},r=d.salesReference;
+  return d.purchasePurpose==='sale'&&r ? 'งานขาย: '+r.title+' · '+r.client : d.purchasePurpose==='stock'?'ซื้อเข้า Stock':'';
+}
+function purchaseReferenceBadge(p){const t=purchaseReferenceText(p);return t?'<div style="font-size:11px;color:var(--accent2);margin-top:4px">'+esc(t)+'</div>':'';}
+function purchaseReferenceForm(prefix,d={}){
+  const purpose=d.purchasePurpose||'general';
+  return '<div class="card" style="padding:12px;margin:12px 0"><div class="form-grid">'
+    +'<div class="form-group"><label>ซื้อสำหรับ</label><select id="'+prefix+'-purpose" onchange="purchasePurposeChanged(this.dataset.prefix)" data-prefix="'+prefix+'">'
+    +[['general','ใช้งานทั่วไป / บริษัท'],['stock','ซื้อเข้า Stock'],['sale','ซื้อสำหรับงานขาย']].map(([v,t])=>'<option value="'+v+'" '+(purpose===v?'selected':'')+'>'+t+'</option>').join('')+'</select></div>'
+    +'<div id="'+prefix+'-reference-box" style="grid-column:1/-1;'+(purpose==='sale'?'':'display:none')+'"><label>Tag ใบเสนอราคาของ Sale</label>'
+    +'<input id="'+prefix+'-quote-search" placeholder="ค้นเลขใบเสนอราคา / ชื่อลูกค้า" oninput="filterPurchaseQuotes(this.dataset.prefix)" data-prefix="'+prefix+'">'
+    +'<select id="'+prefix+'-quote" onchange="capturePurchaseReference(this.dataset.prefix)" data-prefix="'+prefix+'" style="margin-top:6px"></select>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:6px">อ้างอิงระดับงาน ชื่ออะไหล่ที่ซื้อไม่จำเป็นต้องตรงกับชื่อ Service และไม่แทนต้นทุนรายสินค้าในใบเสนอราคาอัตโนมัติ</div></div></div></div>';
+}
+function filterPurchaseQuotes(prefix,selected){
+  const el=document.getElementById(prefix+'-quote');if(!el)return;
+  const current=selected||el.value||'',term=(document.getElementById(prefix+'-quote-search')?.value||'').trim().toLowerCase();
+  const options=Object.values(quotesById).filter(q=>q.Title&&!['Draft','Cancelled','Rejected'].includes(q.Status));
+  const saved=prefix==='f'&&editingPO?.stageData?.salesReference;
+  if(saved&&!options.some(q=>String(q.id)===String(saved.id)))options.push({id:saved.id,Title:saved.title,ClientName:saved.client});
+  el.innerHTML='<option value="">— เลือกใบเสนอราคา —</option>'+options.filter(q=>String(q.id)===String(current)||!term||(q.Title+' '+q.ClientName).toLowerCase().includes(term)).map(q=>'<option value="'+esc(q.id)+'" '+(String(q.id)===String(current)?'selected':'')+'>'+esc(q.Title+' · '+(q.ClientName||''))+'</option>').join('');
+  el.value=current;
+}
+function readPurchaseReference(prefix){
+  const purpose=document.getElementById(prefix+'-purpose')?.value||'general';
+  if(purpose!=='sale')return {purchasePurpose:purpose,salesReference:null};
+  const id=document.getElementById(prefix+'-quote')?.value,q=quotesById[String(id)];
+  const old=prefix==='f'&&editingPO?.stageData?.salesReference;
+  if(!q&&old&&String(old.id)===String(id))return {purchasePurpose:purpose,salesReference:old};
+  if(!q||!q.Title||['Draft','Cancelled','Rejected'].includes(q.Status))throw Error('กรุณาเลือกใบเสนอราคาสำหรับงานขาย');
+  return {purchasePurpose:purpose,salesReference:{id:String(q.id),title:q.Title,client:q.ClientName||''}};
+}
+function purchasePurposeChanged(prefix){
+  const sale=document.getElementById(prefix+'-purpose').value==='sale';document.getElementById(prefix+'-reference-box').style.display=sale?'':'none';
+  if(!sale)document.getElementById(prefix+'-quote').value='';
+  const asset=document.getElementById(prefix==='np'?'np-assettype':'f-assettype');if(asset&&document.getElementById(prefix+'-purpose').value!=='general')asset.value='sale';
+  capturePurchaseReference(prefix);
+}
+function capturePurchaseReference(prefix){if(prefix==='f'&&editingPO&&!_poReadonly){try{Object.assign(editingPO.stageData,readPurchaseReference(prefix));}catch(e){editingPO.stageData.purchasePurpose='sale';editingPO.stageData.salesReference=null;}}}
+
 // ── สร้างงานจัดซื้อเอง (ไม่ผ่าน SalePro) ──
 let _npRows=[];
 function openNewPurchase(){
@@ -351,6 +393,8 @@ function openNewPurchase(){
   document.getElementById('np-client').value='';
   document.getElementById('np-assettype').value='asset';
   document.getElementById('np-reqdate').value='';
+  document.getElementById('np-reference').innerHTML=purchaseReferenceForm('np');
+  filterPurchaseQuotes('np');
   renderNpRows();
   openModal('newpo-modal');
 }
@@ -415,6 +459,7 @@ async function saveNewPurchase(){
   if(!title){ toast('กรุณาระบุชื่องาน','error'); return; }
   const items=_npRows.filter(r=>(r.name||'').trim()).map(r=>({name:r.name,qty:+r.qty||1,unit:r.unit||'',cost:+r.cost||0,total:(+r.qty||1)*(+r.cost||0)}));
   if(!items.length){ toast('เพิ่มอย่างน้อย 1 รายการ','error'); return; }
+  let reference;try{reference=readPurchaseReference('np');}catch(e){toast(e.message,'error');return;}
   const id=Date.now();
   const rec={ id, quoteId:null, quoteTitle:title, client:document.getElementById('np-client').value.trim()||'(ซื้อใช้เอง)', vendorName:'', items, total:items.reduce((s,x)=>s+x.total,0), requiredDate:document.getElementById('np-reqdate').value||'', createdBy:currentUser?.displayName||currentUser?.email||'', createdAt:new Date().toISOString(), source:'purchasepro' };
   try{
@@ -423,7 +468,7 @@ async function saveNewPurchase(){
     await putSetting('Procurements', JSON.stringify(procurements));
     // ตั้งประเภทการซื้อไว้ใน Purchase_<id>
     const at=document.getElementById('np-assettype').value||'asset';
-    purchaseExt[String(id)]={sv:2,stage:1,maxStage:1,closed:false,assetType:at,assetCategory:'',stageData:{},history:[]};
+    purchaseExt[String(id)]={sv:2,stage:1,maxStage:1,closed:false,assetType:at,assetCategory:'',stageData:reference,history:[]};
     await putSetting('Purchase_'+id, JSON.stringify(purchaseExt[String(id)]));
     closeModal('newpo-modal');
     renderDash(); renderPurchases();
@@ -1059,7 +1104,7 @@ function renderStageBody(){
   let body='';
   if(st===1){
     const at=editingPO.assetType||'sale';
-    body=itemsTable+`<div class="form-grid">
+    body=itemsTable+(editingPO.source==='purchasepro'?purchaseReferenceForm('f',d):'')+`<div class="form-grid">
       <div class="form-group"><label>Vendor (จาก SalePro)</label><select id="f-vendor">${vendorOptions(editingPO.vendorId)}</select></div>
       ${field('ต้องการของภายใน','f-reqdate',editingPO.requiredDate,'date')}
       <div class="form-group"><label>ประเภทการซื้อ</label><select id="f-assettype"><option value="sale" ${at==='sale'?'selected':''}>เพื่อขาย (ส่งลูกค้า)</option><option value="asset" ${at==='asset'?'selected':''}>ทรัพย์สินบริษัท (เข้า Asset)</option></select></div>
@@ -1083,6 +1128,8 @@ function renderStageBody(){
   }
   if(st>=PO_LOCK_FROM_STAGE && poStagesLocked()) body=_lockedNotice();   // ล็อกขั้น 5-8 จนกว่าจะรับ PO ลูกค้า
   document.getElementById('pom-stagebody').innerHTML=body;
+  if(st===1&&editingPO.source==='purchasepro')filterPurchaseQuotes('f',d.salesReference?.id);
+  if(st!==1)document.getElementById('pom-stagebody').insertAdjacentHTML('afterbegin',purchaseReferenceBadge(editingPO));
   if(editingPO.stage===8 && typeof renderFooter==='function') renderFooter();   // อัปเดตปุ่มปิดงานตามความครบ
   if(_poReadonly) applyReadonly();
 }
@@ -2511,6 +2558,9 @@ async function publishItemCosts(){
 }
 async function savePurchase(){
   if(!editingPO)return;
+  if(editingPO.source==='purchasepro'){
+    try{if(editingPO.stage===1)Object.assign(editingPO.stageData,readPurchaseReference('f'));if(editingPO.stageData.purchasePurpose==='sale'&&!editingPO.stageData.salesReference)throw Error('กรุณาเลือกใบเสนอราคาสำหรับงานขาย');}catch(e){toast(e.message,'error');return;}
+  }
   collectStage();
   editingPO.history=editingPO.history||[];
   editingPO.history.push({ts:new Date().toISOString(),stage:editingPO.stage,by:currentUser?.displayName||currentUser?.email||''});
