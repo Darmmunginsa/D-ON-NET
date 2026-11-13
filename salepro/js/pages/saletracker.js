@@ -504,6 +504,8 @@ function removeExpense(id) {
   saveSTDealData();
 }
 function renderExpenseTab() {
+  ensureExpensePurchases();
+  const purchases=expensePurchaseState?.status==='ready'?expensePurchaseState.summary:null;
   const q = quotesData.find(x => x.id === stQuoteId) || {};
   if (!document.getElementById('exp-date').value) document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
   // ค่าใช้จ่ายฝั่ง Sale (กรอกในแท็บนี้)
@@ -516,10 +518,11 @@ function renderExpenseTab() {
         date:(j.scheduledAt||'').split('T')[0], by:'ช่าง '+(j.techName||''), receiptUrl:e.receiptUrl||'', _src:'tech' });
     });
   });
-  const all = saleExps.concat(techExps);
+  const purchaseExps=(purchases?.rows||[]).filter(r=>r.ordered).map(r=>({id:'purchase-'+r.id,cat:'จัดซื้อ',detail:r.title+' · '+r.vendor+' · '+r.items,amount:r.amount,date:r.date,_src:'purchase'}));
+  const all = saleExps.concat(techExps,purchaseExps);
   const saleTotal = saleExps.reduce((a,e) => a + (+e.amount||0), 0);
   const techTotal = techExps.reduce((a,e) => a + (+e.amount||0), 0);
-  const total = saleTotal + techTotal;
+  const total = saleTotal + techTotal + (purchases?.total||0);
   const quoteVal = +q.TotalAmount || 0;
   const remain = quoteVal - total;
   const pct = quoteVal > 0 ? (total/quoteVal*100) : 0;
@@ -533,14 +536,15 @@ function renderExpenseTab() {
       </div>
       <div style="background:var(--surface2);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:12px 14px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">ค่าใช้จ่ายรวม (${pct.toFixed(1)}%)</div>
-        <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--red)">${fmt(total)}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:3px">Sale ${fmt(saleTotal)} · ช่าง ${fmt(techTotal)}</div>
+        <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--red)">${purchases?fmt(total):'กำลังตรวจยอดจัดซื้อ'}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">Sale ${fmt(saleTotal)} · ช่าง ${fmt(techTotal)} · จัดซื้อ ${purchases?fmt(purchases.total):'—'}</div>
       </div>
       <div style="background:var(--surface2);border:1px solid rgba(52,211,153,0.3);border-radius:8px;padding:12px 14px">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">คงเหลือ (กำไรขั้นต้นโดยประมาณ)</div>
-        <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:${remain>=0?'var(--green)':'var(--red)'}">${fmt(remain)}</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">ส่วนต่างมูลค่าใบขายกับค่าใช้จ่าย</div>
+        <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:${remain>=0?'var(--green)':'var(--red)'}">${purchases?fmt(remain):'—'}</div>
       </div>
     </div>`;
+  if(sum)sum.innerHTML+=`<div style="margin:10px 0;font-size:12px;line-height:1.7"><button class="btn btn-sm" onclick="refreshExpensePurchases()">โหลดรายรับ / ยอดจัดซื้อล่าสุด</button> ${purchases?'รับชำระจากลูกค้าแล้ว '+fmt(purchases.received)+' · จัดซื้อจ่ายแล้ว '+fmt(purchases.paid)+' · งานจัดซื้อรอดำเนินการ '+fmt(purchases.pending):expensePurchaseState?.status==='error'?'โหลดข้อมูลไม่สำเร็จ: '+escHtml(expensePurchaseState.error):'กำลังโหลดข้อมูล...'}<div style="color:var(--muted);font-size:11px">รวมเฉพาะยอดจัดซื้อที่อนุมัติแล้ว / ออก PO แล้ว หรือจ่ายแล้ว ยอดจ่ายไม่บวกซ้ำกับยอดซื้อ · ใช้ยอดตามแต่ละระบบ ยังไม่ใช่กำไรทางบัญชี · ค่าใช้จ่ายที่เคยกรอกเองซ้ำกับจัดซื้อควรตรวจสอบก่อน</div></div>`;
   // list
   const list = document.getElementById('exp-list');
   if (!list) return;
@@ -557,7 +561,7 @@ function renderExpenseTab() {
     ${all.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(e => `
       <tr>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);white-space:nowrap">${fmtDate(e.date)}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid var(--border)"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;background:${(EXP_CAT_COLORS[e.cat]||'#9ca3b5')}22;color:${EXP_CAT_COLORS[e.cat]||'#9ca3b5'}">${escHtml(e.cat||'อื่นๆ')}</span>${e._src==='tech'?'<div style="font-size:9px;color:var(--amber);margin-top:2px">จากงานช่าง</div>':''}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border)"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;background:${(EXP_CAT_COLORS[e.cat]||'#9ca3b5')}22;color:${EXP_CAT_COLORS[e.cat]||'#9ca3b5'}">${escHtml(e.cat||'อื่นๆ')}</span>${e._src==='tech'?'<div style="font-size:9px;color:var(--amber);margin-top:2px">จากงานช่าง</div>':e._src==='purchase'?'<div style="font-size:9px;color:var(--accent2);margin-top:2px">จาก PurchasePro · อ่านอย่างเดียว</div>':''}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text)">${escHtml(e.detail||'-')}${e.by?`<div style="font-size:10px;color:var(--muted)">โดย ${escHtml(e.by)}</div>`:''}${e.receiptUrl?`<div style="margin-top:3px">${docThumb(e.receiptUrl,'ใบเสร็จ',{small:true})}</div>`:(e._src==='sale'?(e.receiptError?`<div style="margin-top:3px;font-size:10px;color:var(--red)">⚠ แนบรูปไม่สำเร็จ: ${escHtml(e.receiptError)}</div>`:`<div style="margin-top:3px;font-size:10px;color:var(--amber)">⚠ ไม่มีรูปแนบ</div>`):'')}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono);color:var(--red)">${fmt(e.amount)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:center">${e._src==='tech'?'<span style="font-size:9px;color:var(--muted)" title="บันทึกโดยช่าง — แก้ไขในแท็บช่าง">🔧</span>':'<span style="font-size:11px;color:var(--muted)" title="ค่าใช้จ่ายถูกบันทึกเป็นหลักฐาน ลบไม่ได้">🔒</span>'}</td>
@@ -2256,6 +2260,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
 
 // Override openSaleTrackerModal เพื่อ apply visibility หลัง render
 function openSaleTrackerModal(id) {
+  if(typeof expensePurchaseState!=='undefined'){expensePurchaseState=null;expensePurchaseRequest++;}
   stQuoteId = id;
   const q = quotesData.find(x => x.id === id);
   if (!q) return;
