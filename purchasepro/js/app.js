@@ -44,7 +44,7 @@ const SALE_PROGRESS = {1:'ส่งจัดซื้อแล้ว',2:'กำ�
 const fmt = n => '฿' + Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
 function toast(msg,type='info'){const w=document.getElementById('toasts');if(!w)return;const e=document.createElement('div');e.className='toast '+type;e.textContent=msg;w.appendChild(e);setTimeout(()=>e.remove(),3500);}
 function openModal(id){document.getElementById(id).classList.add('open');}
-function closeModal(id){document.getElementById(id).classList.remove('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');if(id==='npcat-modal'){document.getElementById('newpo-modal').classList.remove('catalog-open');document.getElementById('np-catalog-open')?.focus();}if(id==='newpo-modal'){document.getElementById('npcat-modal').classList.remove('open');document.getElementById(id).classList.remove('catalog-open');}}
 
 // ── auth: ดู auth.js (Google Sign-In). afterLogin() ถูกเรียกหลังล็อกอินสำเร็จ ──
 async function afterLogin(){
@@ -417,7 +417,9 @@ async function openNpCatalog(){
   if(typeof loadCatalogData==='function' && (!catalogData || !catalogData.length)){ try{ await loadCatalogData(); }catch(e){} }
   const s=document.getElementById('npcat-search'); if(s) s.value='';
   renderNpCatalog();
+  document.getElementById('newpo-modal').classList.add('catalog-open');
   openModal('npcat-modal');
+  document.getElementById('npcat-search')?.focus();
 }
 function renderNpCatalog(){
   const body=document.getElementById('npcat-body'); if(!body) return;
@@ -425,14 +427,16 @@ function renderNpCatalog(){
   const ce=(typeof catExtra==='function')?catExtra:(()=>({}));
   const list=(catalogData||[]).filter(p=>!q||(p.Title||'').toLowerCase().includes(q)||(ce(p.id).pn||p.SKU||'').toLowerCase().includes(q)||(p.Category||'').toLowerCase().includes(q));
   body.innerHTML = list.length ? list.map(p=>{
-    const cost=+ce(p.id).cost||0, on=!!_npCatSel[p.id];
+    const cost=+ce(p.id).cost||0, on=!!_npCatSel[p.id],inPurchase=_npRows.some(r=>String(r.catalogId||'')===String(p.id));
     return `<tr style="cursor:pointer${on?';background:var(--accent-soft)':''}" onclick="npCatToggle('${p.id}')">
       <td style="text-align:center"><input type="checkbox" ${on?'checked':''} onclick="event.stopPropagation();npCatToggle('${p.id}')" style="width:auto"></td>
-      <td>${esc(p.Title||'')}<div style="font-size:10px;color:var(--muted);font-family:var(--mono)">${esc(ce(p.id).pn||p.SKU||'')}</div></td>
+      <td>${esc(p.Title||'')}${inPurchase?'<span style="color:var(--accent2);font-size:10px"> · เพิ่มแล้ว</span>':''}<div style="font-size:10px;color:var(--muted);font-family:var(--mono)">${esc(ce(p.id).pn||p.SKU||'')}</div></td>
       <td style="color:var(--muted)">${esc(p.Category||'')}</td>
       <td style="text-align:right;font-family:var(--mono)">${fmt(cost)}</td></tr>`;
   }).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">ไม่พบสินค้าใน Catalog</td></tr>`;
-  const c=document.getElementById('npcat-count'); if(c) c.textContent='เลือก '+Object.keys(_npCatSel).filter(k=>_npCatSel[k]).length+' รายการ';
+  const n=Object.keys(_npCatSel).filter(k=>_npCatSel[k]).length;
+  const c=document.getElementById('npcat-count');if(c)c.textContent='เลือก '+n+' รายการ';
+  const add=document.getElementById('npcat-add');if(add){add.disabled=!n;add.textContent=n?'เพิ่มที่เลือก ('+n+')':'เพิ่มที่เลือก';}
 }
 function npCatToggle(id){ _npCatSel[id]=!_npCatSel[id]; if(!_npCatSel[id]) delete _npCatSel[id]; renderNpCatalog(); }
 function confirmNpCatalog(){
@@ -445,19 +449,19 @@ function confirmNpCatalog(){
   ids.forEach(id=>{
     const p=(catalogData||[]).find(x=>String(x.id)===String(id)); if(!p) return;
     const nm=(p.Title||'').trim();
-    if(_npRows.some(r=>(r.name||'').trim().toLowerCase()===nm.toLowerCase())) return; // กันซ้ำ
+    if(_npRows.some(r=>r.catalogId?String(r.catalogId)===String(id):(r.name||'').trim().toLowerCase()===nm.toLowerCase())) return; // กันซ้ำ
     _npRows.push({name:nm,qty:1,unit:p.Unit||'ชิ้น',cost:+ce(p.id).cost||0,catalogId:id});
     added++;
   });
   if(!_npRows.length) _npRows.push({name:'',qty:1,unit:'ชิ้น',cost:0});
   renderNpRows();
-  closeModal('npcat-modal');
+  _npCatSel={};renderNpCatalog();
   toast(added?('เพิ่ม '+added+' รายการจาก Catalog'):'รายการที่เลือกมีอยู่แล้ว', added?'success':'info');
 }
 async function saveNewPurchase(){
   const title=document.getElementById('np-title').value.trim();
   if(!title){ toast('กรุณาระบุชื่องาน','error'); return; }
-  const items=_npRows.filter(r=>(r.name||'').trim()).map(r=>({name:r.name,qty:+r.qty||1,unit:r.unit||'',cost:+r.cost||0,total:(+r.qty||1)*(+r.cost||0)}));
+  const items=_npRows.filter(r=>(r.name||'').trim()).map(r=>({name:r.name,...(r.catalogId?{catalogId:r.catalogId}:{}),qty:+r.qty||1,unit:r.unit||'',cost:+r.cost||0,total:(+r.qty||1)*(+r.cost||0)}));
   if(!items.length){ toast('เพิ่มอย่างน้อย 1 รายการ','error'); return; }
   let reference;try{reference=readPurchaseReference('np');}catch(e){toast(e.message,'error');return;}
   const id=Date.now();

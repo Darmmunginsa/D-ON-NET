@@ -9,7 +9,7 @@
 <title>PurchasePro — ระบบจัดซื้อ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link href="assets/style.css?v=g3" rel="stylesheet">
+<link href="assets/style.css?v=catalogdrawer20261113" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"></head>
 <body class="cyber-app">
@@ -289,7 +289,7 @@
       <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:12px;color:var(--muted)">รายการที่จะซื้อ</div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-sm" onclick="openNpCatalog()">📚 เลือกจาก Catalog</button>
+          <button class="btn btn-sm" id="np-catalog-open" onclick="openNpCatalog()">📚 เลือกจาก Catalog</button>
           <button class="btn btn-sm" onclick="npAddRow()">+ เพิ่มรายการ</button>
         </div>
       </div>
@@ -303,10 +303,11 @@
 </div>
 
 <!-- CATALOG PICKER (สำหรับสร้างงานจัดซื้อเอง) -->
-<div class="overlay" id="npcat-modal">
-  <div class="modal" style="width:640px">
-    <div class="modal-header"><h3>📚 เลือกสินค้าจาก Catalog</h3><button class="btn btn-sm" onclick="closeModal('npcat-modal')">✕</button></div>
+<div class="overlay catalog-drawer" id="npcat-modal" onclick="if(event.target===this)closeModal('npcat-modal')">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="npcat-title">
+    <div class="modal-header"><h3 id="npcat-title">เลือกสินค้าจาก Catalog</h3><button class="btn btn-sm" onclick="closeModal('npcat-modal')">✕</button></div>
     <div class="modal-body">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">เลือกสินค้าได้หลายรายการ ระบบใช้ราคาทุนจาก Catalog · ปรับจำนวนและทุนต่อได้ในรายการซื้อ</div>
       <input id="npcat-search" placeholder="ค้นหาชื่อ / Part No. / หมวด..." oninput="renderNpCatalog()" style="margin-bottom:10px">
       <div class="card"><table>
         <thead><tr><th style="width:34px"></th><th>รายการ</th><th>หมวด</th><th style="width:110px;text-align:right">ทุน/หน่วย</th></tr></thead>
@@ -315,7 +316,7 @@
     </div>
     <div style="display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--border)">
       <span id="npcat-count" style="font-size:12px;color:var(--muted)">เลือก 0 รายการ</span>
-      <div style="display:flex;gap:8px"><button class="btn" onclick="closeModal('npcat-modal')">ยกเลิก</button><button class="btn btn-primary" onclick="confirmNpCatalog()">➕ เพิ่มที่เลือก</button></div>
+      <div style="display:flex;gap:8px"><button class="btn" onclick="closeModal('npcat-modal')">เสร็จสิ้น</button><button id="npcat-add" class="btn btn-primary" onclick="confirmNpCatalog()" disabled>เพิ่มที่เลือก</button></div>
     </div>
   </div>
 </div>
@@ -394,7 +395,7 @@
 <script src="js/config.js?v=admin1"></script>
 <script src="js/api.js?v=monitor20261107"></script>
 <script src="js/auth.js?v=idle60-20261104"></script>
-<script src="js/app.js?v=saletag20261113"></script>
+<script src="js/app.js?v=catalogdrawer20261113"></script>
 <script src="js/manage.js?v=internal20261108"></script>
 <script src="js/tour.js?v=admin1"></script>
 <script src="js/catalog-draft-import.js?v=20261101"></script><script src="../shared/workspace-appearance.js?v=20261103"></script></body>

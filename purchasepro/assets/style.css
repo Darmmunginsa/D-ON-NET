@@ -80,3 +80,15 @@ label{font-size:11px;color:var(--muted);display:block;margin-bottom:4px}
 .toast.success{border-left-color:var(--green)} .toast.error{border-left-color:var(--red)}
 
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* Purchase catalog drawer: independent scrolling with a persistent action bar. */
+#npcat-modal.catalog-drawer{z-index:220;padding:0;justify-content:flex-end;align-items:stretch;overflow:hidden;background:rgba(0,0,0,.25)}
+#npcat-modal .modal{width:min(600px,94vw);max-width:94vw;height:100dvh;margin:0;border-radius:16px 0 0 16px;display:flex;flex-direction:column;box-shadow:-16px 0 48px #0005;animation:np-catalog-slide .2s ease-out}
+#npcat-modal .modal-header{flex:none}
+#npcat-modal .modal-body{flex:1;min-height:0;overflow:auto}
+#npcat-modal .modal-body>.card{overflow-x:auto}
+#npcat-modal .modal>div:last-child{flex:none;align-items:center;background:var(--surface)}
+#npcat-modal input[type=checkbox]{accent-color:var(--accent)}
+@keyframes np-catalog-slide{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@media(min-width:1250px){#newpo-modal.catalog-open{justify-content:flex-start;padding-left:max(16px,calc((100vw - 1280px)/2))}#newpo-modal.catalog-open>.modal{margin:auto 0;width:calc(100vw - 660px);max-width:680px}}
+@media(prefers-reduced-motion:reduce){#npcat-modal .modal{animation:none}}
