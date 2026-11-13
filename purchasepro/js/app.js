@@ -2003,7 +2003,7 @@ function buildPOHtml(vid, draft){
     +'</style></head><body>'+(draft?'<div class="po-draft-tag">DRAFT · ฉบับร่าง (ไม่มีตราประทับ)</div>':'')+pagesHtml+'</body></html>';
 }
 // พรีวิว PO ในแอป + เครื่องมือจัดหน้า (แทรกบรรทัด/ขึ้นหน้า) + ปุ่มพิมพ์เปิดแท็บใหม่
-let _poEditVid=null, _poNoteT=null;
+let _poEditVid=null, _poEditDraft=false, _poNoteT=null;
 function _poRefresh(vid){
   if(String(_poEditVid)!==String(vid))return;
   const ed=document.getElementById('_poEditor'); if(ed)ed.innerHTML=renderPOEditor(vid);
@@ -2011,7 +2011,7 @@ function _poRefresh(vid){
 }
 function _poRefreshFrame(vid){
   if(String(_poEditVid)!==String(vid))return;
-  const f=document.getElementById('_poFrame'); if(f)f.srcdoc=buildPOHtml(vid);
+  const f=document.getElementById('_poFrame'); if(f)f.srcdoc=buildPOHtml(vid,_poEditDraft);
 }
 function setPOPrintNote(vid,val){
   poVendorDocs(vid).printNote=val;
@@ -2105,7 +2105,7 @@ function renderPOEditor(vid){
       +'<button onclick="addPOManualRow(\''+vid+'\',\'note\')" style="flex:1;font-size:11px;padding:6px 4px;border:1px dashed #94a3b8;background:none;color:#475569;border-radius:6px;cursor:pointer">+ หมายเหตุ</button>'
       +'</div>';
   }
-  if(COMPANY.stamp){
+  if(COMPANY.stamp&&!_poEditDraft){
     const sw=+vd.stampW||132, sr=+vd.stampRot||0, sx=+vd.stampX||0, sy=+vd.stampY||0;
     const sl=(f,lab,min,max,val,unit)=>'<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:11px;color:#475569"><span>'+lab+'</span><span id="po-stamp-'+f+'-v" style="font-family:monospace">'+val+unit+'</span></div><input type="range" min="'+min+'" max="'+max+'" value="'+val+'" oninput="setPOStamp(\''+vid+'\',\''+f+'\',this.value)" style="width:100%"></div>';
     h+='<div style="font-size:12px;font-weight:600;color:#334155;margin:2px 0 6px">ตราประทับ (ปรับขนาด/หมุน/เลื่อน)</div>';
@@ -2351,24 +2351,24 @@ async function markPORejected(){
 }
 
 function printPO(vid, draft){   // เปิดพรีวิว + เครื่องมือจัดหน้า (draft=true → พรีวิวร่าง ไม่มีตราประทับ)
-  _poEditVid=vid;
+  _poEditVid=vid;_poEditDraft=!!draft;
   const old=document.getElementById('_docOverlay'); if(old)old.remove();
   const ov=document.createElement('div'); ov.id='_docOverlay';
   ov.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(15,23,42,0.62);display:flex;flex-direction:column;padding:10px 12px;gap:8px';
   const bar=document.createElement('div'); bar.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px';
-  bar.innerHTML='<div style="color:#fff;font-size:13px;font-weight:600">'+(draft?'👁 พรีวิว (ร่าง — ไม่มีตราประทับ)':'พรีวิว / จัดหน้าใบสั่งซื้อ')+'</div>';
+  bar.innerHTML='<div style="color:#fff;font-size:13px;font-weight:600">'+(draft?'พรีวิว / จัดหน้าใบสั่งซื้อ (ร่าง — ไม่มีตราประทับ)':'พรีวิว / จัดหน้าใบสั่งซื้อ')+'</div>';
   const btns=document.createElement('div'); btns.style.cssText='display:flex;gap:8px';
   const printBtn=document.createElement('button'); printBtn.textContent=draft?'🖨 พิมพ์ร่าง':'🖨 พิมพ์ / บันทึก PDF'; printBtn.style.cssText='padding:8px 18px;background:#17356b;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer';
   const closeBtn=document.createElement('button'); closeBtn.textContent='✕ ปิด'; closeBtn.style.cssText='padding:8px 16px;background:#fff;color:#334155;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;cursor:pointer';
   btns.appendChild(printBtn); btns.appendChild(closeBtn); bar.appendChild(btns); ov.appendChild(bar);
   const wrap=document.createElement('div'); wrap.style.cssText='flex:1;min-height:0;display:flex;gap:10px';
-  // โหมดร่างไม่ต้องมีเครื่องมือจัดตราประทับ (เพราะไม่แสดงตรา)
-  const ed=document.createElement('div'); ed.id='_poEditor'; ed.style.cssText='width:340px;flex-shrink:0;background:#fff;border-radius:8px;padding:12px;overflow:auto'; if(draft) ed.style.display='none';
+  // Draft preview retains layout controls; buildPOHtml still suppresses the stamp.
+  const ed=document.createElement('div'); ed.id='_poEditor'; ed.style.cssText='width:340px;flex-shrink:0;background:#fff;border-radius:8px;padding:12px;overflow:auto'; if(_poReadonly) ed.style.display='none';
   ed.innerHTML=renderPOEditor(vid);
   const f=document.createElement('iframe'); f.id='_poFrame'; f.style.cssText='flex:1;min-width:0;border:none;border-radius:8px;background:#fff;box-shadow:0 12px 44px rgba(0,0,0,0.45)'; f.srcdoc=buildPOHtml(vid, draft);
   wrap.appendChild(ed); wrap.appendChild(f); ov.appendChild(wrap);
   document.body.appendChild(ov);
-  function close(){ ov.remove(); _poEditVid=null; document.removeEventListener('keydown',onKey); }
+  function close(){ ov.remove(); _poEditVid=null;_poEditDraft=false; document.removeEventListener('keydown',onKey); }
   function onKey(e){ if(e.key==='Escape'){ e.stopPropagation(); close(); } }
   printBtn.onclick=function(){ const w=window.open('','_blank'); if(!w){ if(typeof toast==='function')toast('เบราว์เซอร์บล็อกป๊อปอัป — โปรดอนุญาตแล้วลองใหม่','error'); return; } w.document.open(); w.document.write(buildPOHtml(vid, draft)); w.document.close(); setTimeout(function(){ try{ w.focus(); w.print(); }catch(e){} },500); };
   closeBtn.onclick=close;
