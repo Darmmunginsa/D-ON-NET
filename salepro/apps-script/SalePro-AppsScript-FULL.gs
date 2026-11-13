@@ -83,6 +83,7 @@ function createRow(name, fields) {
     var sh = _sheet(name);
     if(name==='Quotations'&&fields&&fields.LocalDraftId){var priorDraft=listRows(name).filter(function(q){return q.LocalDraftId===fields.LocalDraftId;})[0];if(priorDraft){priorDraft._localDraftReused=true;return priorDraft;}}
     fields = prepareQuotationNumberFields(name,prepareContractNumberFields(name,fields||{},null),null);
+    validatePurchaseDecision(name,fields,null,null);
     var keys = Object.keys(fields);
     var hdr = _ensureCols(sh, [ID_COL].concat(keys));
     var id = _uuid();
@@ -113,6 +114,7 @@ function batchCreate(name, rows) {
     var hdr = _ensureCols(sh, [ID_COL].concat(Object.keys(keySet)));
     var matrix = [];
     rows.forEach(function (f) {
+      validatePurchaseDecision(name,f,null,null);
       f = prepareQuotationNumberFields(name,prepareContractNumberFields(name,f||{},null),null);
       var id = _uuid();
       matrix.push(hdr.map(function (h) {
@@ -139,7 +141,7 @@ function _findRowIndex(sh, id) {
   for (var i = 0; i < ids.length; i++) if (String(ids[i][0]) === String(id)) return i + 2;
   return -1;
 }
-function updateRow(name, id, fields) {
+function updateRow(name, id, fields, actor) {
   validateServiceFields(name,fields);
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
@@ -148,6 +150,7 @@ function updateRow(name, id, fields) {
     var rowIdx = _findRowIndex(sh, id);
     if (rowIdx < 0) throw new Error('ไม่พบรายการ id=' + id + ' ใน ' + name);
     if(name==='Quotations'){var previousQuote=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];fields=prepareQuotationNumberFields(name,fields,previousQuote);}
+    if(name==='Procurement'||name==='Settings'){var oldPurchase=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];validatePurchaseDecision(name,fields,oldPurchase,actor);}
     var hdr = _ensureCols(sh, Object.keys(fields));
     if(name==='Contracts'){var oldRow=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];fields=prepareContractNumberFields(name,fields,oldRow);}
     var rng = sh.getRange(rowIdx, 1, 1, hdr.length);
@@ -232,7 +235,7 @@ function handle(req) {
   if (a === 'multiList')   { var _o = {}; (req.lists || []).forEach(function (n) { _o[n] = listRows(n); }); return { ok: true, lists: _o }; }   // อ่านหลายแท็บในครั้งเดียว
   if (a === 'batchCreate') return { ok: true, items: batchCreate(req.list, req.rows || []) };                                                   // เขียนหลายแถวในครั้งเดียว
   if (a === 'create' || a === 'add') return { ok: true, item: createRow(req.list, req.fields || req.data) };
-  if (a === 'update')      return { ok: true, item: updateRow(req.list, req.id, req.fields || req.data) };
+  if (a === 'update')      return { ok: true, item: updateRow(req.list, req.id, req.fields || req.data, req._actor) };
   if (a === 'delete')      return { ok: true, deleted: deleteRow(req.list, req.id).deleted };
   if (a === 'deleteWhere') return { ok: true, deleted: deleteWhere(req.list, req.field, req.value).deleted };
   if (a === 'sendEmail')   return { ok: true, result: sendEmail(req) };
@@ -494,4 +497,17 @@ function localDraftAppend(req){
     replace.slice(1).forEach(function(v){var at=_findRowIndex(sh,v.row.id);if(at>0)sh.getRange(at,1,1,hdr.length).clearContent();});
     SpreadsheetApp.flush();localDraftReceipt(owner,r.revision,true);return {ok:true,revision:r.revision};
   }finally{lock.releaseLock();}
+}
+
+function validatePurchaseDecision(name,fields,existing,actor){
+  if(name!=='Procurement'&&name!=='Settings')return;
+  var title=String((existing&&existing.Title)||(fields&&fields.Title)||'');if(title.indexOf('Purchase_')!==0||!fields||!Object.prototype.hasOwnProperty.call(fields,'Value'))return;
+  var next=JSON.parse(fields.Value||'{}'),previous=JSON.parse(existing&&existing.Value||'{}');
+  var a=next.stageData&&next.stageData.approval,b=previous.stageData&&previous.stageData.approval;
+  if(!a||['approved','rejected'].indexOf(a.status)<0)return;
+  if(b&&JSON.stringify(a)===JSON.stringify(b))return;
+  var email=String(actor&&actor.email||'').trim().toLowerCase();
+  if(!b||b.status!=='pending'||!email||email!==String(b.approverEmail||'').trim().toLowerCase())throw Error('Only the assigned PO approver may decide this request');
+  if(String(a.approverEmail||'').trim().toLowerCase()!==email||a.at!==b.at||a.amount!==b.amount)throw Error('PO approval request changed; refresh before deciding');
+  a.decidedByEmail=email;a.decidedBy=String(actor.name||email);a.decidedAt=new Date().toISOString();fields.Value=JSON.stringify(next);
 }
