@@ -9,7 +9,7 @@ function toast(msg,type){ const w=document.getElementById('toasts'); if(!w)retur
 function _today(){ return new Date().toISOString().slice(0,10); }
 
 // ── state ──
-let finTx = [], finReq = [], finCat = [], impIncome = [], impExpense = [], impWorkExpense = [];
+let finTx = [], finReq = [], finCat = [], impIncome = [], impExpense = [], impWorkExpense = [],impTax = [];
 let financeQuotes=[];
 let _period = AppStorage.getItem('fin_period') || 'month';
 let _view = 'dash';
@@ -60,6 +60,7 @@ async function loadAll(){
     financeQuotes=await getListItems(CONFIG.lists.quotations);
     // รายรับจาก SalePro (Payments)
     const pays = await getListItems(CONFIG.lists.payments).catch(()=>[]);
+    impTax=(pays||[]).filter(p=>+p.AmountPaid>0).map(p=>({TaxVersion:'1',Date:String(p.PaymentDate||'').slice(0,10),TaxDate:p.TaxDate||String(p.PaymentDate||'').slice(0,10),TaxDoc:p.TaxDoc||p.Title||'',TxType:'income',...FinanceRelationships.resolve(p,financeQuotes),Party:p.ClientName||'',BaseAmount:p.WHTBaseAmount||'',VatAmount:p.PaymentVatAmount||0,VatEligible:'true',WhtRate:p.WHTPercent||0,WhtAmount:p.WHTAmount||0,Amount:SalePaymentCore.cash(p),_source:'SalePro',_vatKnown:p.PaymentVatAmount!==undefined&&p.PaymentVatAmount!=='',_taxDateFallback:!p.TaxDate}));
     impIncome = (pays||[]).filter(p=>+p.AmountPaid>0).map(p=>({
       ...FinanceRelationships.resolve(p,financeQuotes),date:(p.PaymentDate||'').slice(0,10), type:'income', category:'รายรับจากการขาย',
       amount:SalePaymentCore.cash(p),whtAmount:+p.WHTAmount||0,settledAmount:+p.AmountPaid||0, party:p.ClientName||('ใบเสนอราคา '+(p.QuoteID||'')), method:p.PaymentMethod||'',
@@ -84,6 +85,7 @@ async function loadAll(){
           const wht=+(amt*(+p.whtPct||0)/100); const net=+(amt-wht).toFixed(2);
           const purchaseId=row.Title.slice('Purchase_'.length);
           const relation=FinanceRelationships.resolve({purchaseId},financeQuotes,jobs,ext);
+          impTax.push({TaxVersion:'1',Date:String(p.date||'').slice(0,10),TaxDate:p.taxDate||String(p.date||'').slice(0,10),TaxDoc:p.invNo||'',TxType:'expense',...relation,Party:vName(vid),BaseAmount:p.baseAmount||'',VatAmount:p.vatAmount||0,VatEligible:p.vatEligible===true?'true':'false',WhtRate:p.whtPct||0,WhtAmount:wht,Amount:net,_source:'PurchasePro',_vatKnown:p.vatAmount!==undefined&&p.vatAmount!=='',_taxDateFallback:!p.taxDate});
           impExpense.push({ ...relation,...BankDetails.read(vendors.find(v=>String(v.id)===String(vid))), bankFromDirectory:true,date:(p.date||'').slice(0,10), type:'expense', category:'ค่าซื้อสินค้า/วัตถุดิบ',
             amount:net, party:vName(vid), method:p.method||'', note:(p.invNo?'INV '+p.invNo:'')+(ext.quoteTitle?' · '+ext.quoteTitle:''),
             docUrl:p.slipUrl||p.invUrl||'', docName:'หลักฐานจ่าย', source:'PurchasePro' });
