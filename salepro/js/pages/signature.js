@@ -178,6 +178,7 @@ function selectCustomerForQuote(id) {
 
 function openAddCustomer() {
   editingCustomerId = null;
+  document.getElementById('cu-partner').checked=false;
   document.getElementById('cm-title').textContent = 'เพิ่มลูกค้าใหม่';
   ['cu-name','cu-contact','cu-taxid','cu-phone','cu-fax','cu-email','cu-address','cu-name-en','cu-address-en'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const codeEl = document.getElementById('cu-code'); if (codeEl) codeEl.value = (typeof nextCustomerCode==='function') ? nextCustomerCode() : '';
@@ -188,6 +189,7 @@ function editCustomer(id) {
   const c = customersData.find(x=>x.id===id);
   if (!c) return;
   editingCustomerId = id;
+  document.getElementById('cu-partner').checked=isPartnerCustomer(c);
   document.getElementById('cm-title').textContent = 'แก้ไขข้อมูลลูกค้า';
   const codeEl = document.getElementById('cu-code'); if (codeEl) codeEl.value = (typeof getCustomerCode==='function') ? getCustomerCode(id) : '';
   document.getElementById('cu-name').value = c.Title||'';
@@ -206,7 +208,7 @@ function editCustomer(id) {
 async function saveCustomer() {
   const name = document.getElementById('cu-name').value;
   if (!name) { toast('กรุณาระบุชื่อลูกค้า','error'); return; }
-  const fields = { Title:name, ContactPerson:document.getElementById('cu-contact').value, TaxID:document.getElementById('cu-taxid').value, Phone:document.getElementById('cu-phone').value, Email:document.getElementById('cu-email').value, Address:document.getElementById('cu-address').value };
+  const fields = { IsPartner:document.getElementById('cu-partner').checked, Title:name, ContactPerson:document.getElementById('cu-contact').value, TaxID:document.getElementById('cu-taxid').value, Phone:document.getElementById('cu-phone').value, Email:document.getElementById('cu-email').value, Address:document.getElementById('cu-address').value };
   try {
     toast('กำลังบันทึก...','info');
     const code = (document.getElementById('cu-code')?.value || '').trim();

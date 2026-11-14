@@ -153,19 +153,22 @@ async function syncApprovedQuoteCustomer(quote){
   }catch(error){return {state:'error',message:'อนุมัติแล้ว แต่เพิ่ม CRM ไม่สำเร็จ: '+error.message+' · กรุณาตรวจทะเบียนลูกค้า'};}
 }
 
+function isPartnerCustomer(c){return c&&(c.IsPartner===true||String(c.IsPartner).toLowerCase()==='true');}
+const partnerCustomerUpdates=new Set();
+async function toggleCustomerPartner(id){if(partnerCustomerUpdates.has(id))return;const c=customersData.find(x=>String(x.id)===String(id));if(!c)return;partnerCustomerUpdates.add(id);try{const next=!isPartnerCustomer(c);await updateListItem(CONFIG.lists.customers,c.id,{IsPartner:next});c.IsPartner=next;renderCustomers();toast(next?'กำหนดเป็น Partner แล้ว เลือกใน Report ได้':'ยกเลิกสถานะ Partner แล้ว','success');}catch(e){toast('บันทึก Partner ไม่สำเร็จ: '+e.message,'error');}finally{partnerCustomerUpdates.delete(id);}}
 function renderCustomers() {
   const q = (document.getElementById('cust-search')?.value||'').toLowerCase();
   const filtered = customersData.filter(c=>(c.Title||'').toLowerCase().includes(q)||(c.ContactPerson||'').toLowerCase().includes(q)||(c.Email||'').toLowerCase().includes(q));
   document.getElementById('customers-body').innerHTML = filtered.length ? filtered.map(c=>`
     <tr>
       <td style="font-family:var(--mono);font-size:11px;color:var(--accent2)">${escHtml(getCustomerCode(c.id)||'—')}</td>
-      <td style="font-weight:500">${escHtml(c.Title||'')}</td>
+      <td style="font-weight:500">${isPartnerCustomer(c)?'<span title="Partner" aria-label="Partner" style="color:#f6c85f;margin-right:5px">👑</span>':''}${escHtml(c.Title||'')}</td>
       <td>${escHtml(c.ContactPerson||'')}</td>
       <td>${escHtml(c.Phone||'')}</td>
       <td>${escHtml(c.Email||'')}</td>
       <td style="font-family:var(--mono);font-size:11px">${escHtml(c.TaxID||'')}</td>
       <td style="font-size:12px;color:var(--muted);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(c.Address||'')}</td>
-      <td style="display:flex;gap:4px">
+      <td style="display:flex;gap:4px"><button class="action-btn" onclick="toggleCustomerPartner('${c.id}')" aria-pressed="${isPartnerCustomer(c)}" title="${isPartnerCustomer(c)?'ยกเลิก Partner':'กำหนดเป็น Partner'}" style="color:${isPartnerCustomer(c)?'#f6c85f':'var(--muted)'}">👑</button>
         <button class="action-btn" onclick="selectCustomerForQuote('${c.id}')" style="color:var(--accent2)" title="ใช้ในใบเสนอราคา"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         <button class="action-btn" onclick="editCustomer('${c.id}')" title="แก้ไข"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         <button class="action-btn" onclick="deleteCustomer('${c.id}')" style="color:var(--red)" title="ลบ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg></button>
