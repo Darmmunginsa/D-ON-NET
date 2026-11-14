@@ -227,6 +227,8 @@ function uploadFile(req) {
 
 function handle(req) {
   var a = req.action;
+  if(a==='serviceReport')return serviceReport(req);
+  srProtectGeneric(req);
   if(a==='localDraftSync')return localDraftSync(req);
   if(a==='localDraftAppend')return localDraftAppend(req);
   if(a==='serviceCapabilities')return {ok:true,serviceAutomationVersion:1,privateVisitUploads:true,contractNumbering:true,quotationNumbering:true,revisionNumbering:true,localFirstDrafts:true};
@@ -249,6 +251,7 @@ function _json(obj) {
 function doPost(e) {
   try {
     var req = JSON.parse(e.postData.contents || '{}');
+    if(req.action==='publicServiceReport')return _json(lookupPublicServiceReport(req));
     if(req.action==='publicWarrantyLookup')return _json(lookupPublicWarranty(req));
     _authorizeGateway(req);
     return _json(handle(req));
@@ -372,10 +375,10 @@ function lookupPublicWarranty(req) {
   authorizeWarrantyLookup(req);
   if(!ServicePlan.validSerial(req.serial))return {ok:true,found:false};
   var serial=ServicePlan.normalizeSerial(req.serial),matches=[];
-  listRows('Settings').forEach(function(row){if(!/^DealStatus_/.test(row.Title||''))return;var ds;try{ds=JSON.parse(row.Value||'{}');}catch(_){return;}(ds.expiries||[]).forEach(function(e){var record=ServicePlan.publicRecord(e);if(record&&record.serial===serial)matches.push(record);});});
+  listRows('Settings').forEach(function(row){if(!/^DealStatus_/.test(row.Title||''))return;var ds;try{ds=JSON.parse(row.Value||'{}');}catch(_){return;}(ds.expiries||[]).forEach(function(e){var record=ServicePlan.publicRecord(e);if(record&&record.serial===serial){record._quoteId=row.Title.slice(11);matches.push(record);}});});
   // Conflicting registrations need staff review, never guess a customer's warranty.
   if(matches.length!==1)return {ok:true,found:false};
-  return {ok:true,found:true,warranty:matches[0]};
+  var match=matches[0],reports=publicServiceReports(serial,match._quoteId);delete match._quoteId;return {ok:true,found:true,warranty:match,reports:reports};
 }
 function serviceReminderJobs(settings,contracts,today,team) {
   ServicePlan.date(today);var jobs=[];
@@ -510,4 +513,55 @@ function validatePurchaseDecision(name,fields,existing,actor){
   if(!b||b.status!=='pending'||!email||email!==String(b.approverEmail||'').trim().toLowerCase())throw Error('Only the assigned PO approver may decide this request');
   if(String(a.approverEmail||'').trim().toLowerCase()!==email||a.at!==b.at||a.amount!==b.amount)throw Error('PO approval request changed; refresh before deciding');
   a.decidedByEmail=email;a.decidedBy=String(actor.name||email);a.decidedAt=new Date().toISOString();fields.Value=JSON.stringify(next);
+}
+
+// Electronic reports: versioned blobs, immutable signed snapshots and explicit publication.
+function srRows(){return listRows('Settings');}
+function srGet(key){var row=srRows().filter(function(r){return r.Title===key;})[0];return row?JSON.parse(row.Value||'null'):null;}
+function srWrite(key,value){var sh=_sheet('Settings'),hdr=_ensureCols(sh,[ID_COL,'Title','Value']),rows=listRows('Settings'),old=rows.filter(function(r){return r.Title===key;})[0],idx=old?_findRowIndex(sh,old.id):sh.getLastRow()+1;var record={Title:key,Value:JSON.stringify(value)};record[ID_COL]=old?old.id:_uuid();var vals=hdr.map(function(h){return record[h]==null?'':String(record[h]);});sh.getRange(idx,1,1,hdr.length).setNumberFormat('@').setValues([vals]);}
+function srRead(meta){var chunks=[];for(var i=0;i<meta.parts;i++){var v=srGet('ServiceReportBlob_'+meta.id+'_'+meta.revision+'_'+i);if(typeof v!=='string')throw Error('Report data incomplete');chunks.push(v);}return JSON.parse(chunks.join(''));}
+function srStore(meta,data){var text=JSON.stringify(data),parts=Math.ceil(text.length/28000);for(var i=0;i<parts;i++)srWrite('ServiceReportBlob_'+meta.id+'_'+meta.revision+'_'+i,text.slice(i*28000,(i+1)*28000));meta.parts=parts;srWrite('ServiceReportMeta_'+meta.id,meta);}
+function srContext(req){var q=listRows('Quotations').filter(function(q){return String(q.id)===String(req.quoteId);})[0];if(!q)throw Error('ไม่พบใบเสนอราคา');var ds=srGet('DealStatus_'+q.id)||{},job=(ds.techJobs||[]).filter(function(j){return String(j.id)===String(req.jobId);})[0];if(!job)throw Error('ไม่พบงานช่าง');var email=String(req._actor.email||'').toLowerCase(),admin=email==='admin@dongroups.com';if(!admin&&email!==String(job.techEmail||'').toLowerCase())throw Error('เฉพาะช่างที่ได้รับมอบหมายหรือ Admin');return {q:q,ds:ds,job:job,email:email,admin:admin};}
+function srValidate(r,sign){if(!r||r.schema!==1||['service','general'].indexOf(r.type)<0||!r.fields)throw Error('Invalid report');if(!String(r.fields.customer||'').trim()||!/^\d{4}-\d{2}-\d{2}$/.test(r.fields.date||''))throw Error('ระบุลูกค้าและวันที่บริการ');if(JSON.stringify(r).length>350000)throw Error('Report too large');if(!Array.isArray(r.materials)||r.materials.length>60||!Array.isArray(r.photos)||r.photos.length>24)throw Error('Invalid report attachments');if(!Array.isArray(r.strings)||r.strings.length!==2||r.strings.some(function(s){return !Array.isArray(s)||s.length!==40;}))throw Error('Invalid battery strings');if(!Array.isArray(r.backup)||r.backup.length!==6)throw Error('Invalid backup readings');if(sign&&!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(r.signature||''))throw Error('กรุณาเซ็นชื่อช่าง');if(sign&&r.type==='general'&&!String(r.fields.work||'').trim())throw Error('ระบุรายละเอียดการดำเนินงาน');}
+function srPublicCopy(r){var copy=JSON.parse(JSON.stringify(r));copy.fields.contact='';copy.fields.phone='';copy.fields.site='';copy.fields.customerSigner='';copy.customerSignature='';return copy;}
+function srBranding(){var company=listRows('Company')[0]||{},b={company:company.CompanyName||'บริษัท ดี ออน เน็ต จำกัด',logo:company.LogoBase64||'',serviceTitle:'SERVICE RECORD',generalTitle:'ใบงานบริการทั่วไป / JOB SHEET',footer:company.Address||'บริษัท ดี ออน เน็ต จำกัด · เลขที่ 78 หมู่ 11 ต.ผาเลือด อ.ท่าปลา จ.อุตรดิตถ์ 53190',website:'www.dongroups.com',phone:company.Phone||'065-262-9886'},config=srConfig();Object.keys(b).forEach(function(k){if(config[k]!=null)b[k]=config[k];});return b;}
+function srSerial(v){return ServicePlan.normalizeSerial(v);}
+function srWarranty(ctx,serial){return (ctx.ds.expiries||[]).some(function(e){var w=ServicePlan.publicRecord(e);return w&&w.serial===serial;});}
+function serviceReport(req){
+  var lock=LockService.getScriptLock();lock.waitLock(30000);
+  try{
+    if(req.op==='configGet')return {ok:true,config:srConfig()};
+    if(req.op==='configSave'){if(req._actor.email!=='admin@dongroups.com')throw Error('เฉพาะ Admin ที่ตั้งค่ารายงานได้');var c=req.config||{},safe={};['company','logo','serviceTitle','generalTitle','footer','website','phone'].forEach(function(k){safe[k]=String(c[k]||'').slice(0,k==='logo'?160000:1500);});if(safe.logo&&!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(safe.logo))throw Error('Invalid logo');var configMeta={id:'config',revision:Date.now(),parts:0};srStore(configMeta,safe);srWrite('ServiceReportConfig',{blob:true,meta:configMeta});return {ok:true,config:safe};}
+    var ctx=srContext(req),matches=srRows().filter(function(r){return /^ServiceReportMeta_/.test(r.Title||'');}).map(function(r){return JSON.parse(r.Value);}).filter(function(m){return m.id!=='config'&&m.quoteId===String(ctx.q.id)&&m.jobId===String(ctx.job.id);});
+    if(req.op==='list')return {ok:true,reports:matches};
+    var meta=req.id?srGet('ServiceReportMeta_'+req.id):null;
+    if(meta&&(meta.quoteId!==String(ctx.q.id)||meta.jobId!==String(ctx.job.id)))throw Error('Report does not belong to job');
+    if(req.id&&!meta)throw Error('Report not found');
+    if(req.op==='get')return {ok:true,meta:meta,report:srRead(meta)};
+    if(req.op==='publish'||req.op==='unpublish'){
+      if(!meta||meta.status!=='signed')throw Error('ต้องเซ็นยืนยันรายงานก่อนเผยแพร่');
+      if(req.revision!==meta.revision)throw Error('ข้อมูลเปลี่ยน กรุณาโหลดรายงานใหม่');
+      if(req.op==='publish'&&!srWarranty(ctx,meta.serial))throw Error('ต้องเปิดให้ค้น Warranty ด้วย Serial นี้ในงานขายก่อน');
+      meta.published=req.op==='publish';meta.publishedAt=new Date().toISOString();meta.publishedBy=ctx.email;srWrite('ServiceReportMeta_'+meta.id,meta);return {ok:true,meta:meta};
+    }
+    if(['save','sign'].indexOf(req.op)<0)throw Error('Unknown report operation');
+    if(meta&&meta.status==='signed')throw Error('ฉบับเซ็นแล้วแก้ทับไม่ได้ กรุณาสร้างรายงานฉบับแก้ไข');
+    if(meta&&req.revision!==meta.revision)throw Error('รายงานถูกแก้จากอีกหน้าจอ กรุณาเปิดใหม่');
+    if(req.parentId){var parent=srGet('ServiceReportMeta_'+req.parentId);if(!parent||parent.status!=='signed'||parent.quoteId!==String(ctx.q.id)||parent.jobId!==String(ctx.job.id))throw Error('Invalid report revision source');}
+    var data=JSON.parse(JSON.stringify(req.report||{}));data.branding=meta?srRead(meta).branding:srBranding();srValidate(data,req.op==='sign');delete data.signedAt;delete data.number;delete data.signedBy;data.fields.serial=srSerial(data.fields.serial);
+    meta=meta||{id:_uuid(),quoteId:String(ctx.q.id),jobId:String(ctx.job.id),revision:0,createdBy:ctx.email,createdAt:new Date().toISOString(),parentId:req.parentId||''};meta.revision++;meta.type=data.type;meta.serial=data.fields.serial;meta.date=data.fields.date;meta.updatedBy=ctx.email;meta.updatedAt=new Date().toISOString();meta.status=req.op==='sign'?'signed':'draft';meta.published=false;
+    if(req.op==='sign'){var props=PropertiesService.getScriptProperties(),year=Utilities.formatDate(new Date(),'Asia/Bangkok','yyyy'),key='SERVICE_REPORT_SEQUENCE_'+year,n=Number(props.getProperty(key)||0)+1;if(!Number.isSafeInteger(n)||n<1)throw Error('Invalid report sequence');props.setProperty(key,String(n));data.number='DN-SR-'+year+'-'+String(n).padStart(5,'0');data.signedAt=new Date().toISOString();data.signedBy=ctx.email;data.fields.engineer=req._actor.name||ctx.job.techName||ctx.email;meta.number=data.number;meta.signedAt=data.signedAt;meta.signedBy=ctx.email;}
+    srStore(meta,data);return {ok:true,meta:meta,report:data};
+  }finally{lock.releaseLock();}
+}
+function srConfig(){var c=srGet('ServiceReportConfig')||{};return c.blob?srRead(c.meta):c;}
+function publicServiceReports(serial,quoteId){return srRows().filter(function(r){return /^ServiceReportMeta_/.test(r.Title||'');}).map(function(r){return JSON.parse(r.Value);}).filter(function(m){return m.published===true&&m.status==='signed'&&m.serial===serial&&m.quoteId===String(quoteId);}).map(function(m){return {id:m.id,number:m.number,type:m.type,date:m.date};});}
+function lookupPublicServiceReport(req){authorizeWarrantyLookup(req);if(!/^[\w-]{1,80}$/.test(req.reportId||''))return {ok:true,found:false};var serial=srSerial(req.serial),meta=srGet('ServiceReportMeta_'+req.reportId);if(!meta||meta.status!=='signed'||meta.published!==true||meta.serial!==serial)return {ok:true,found:false};var warranty=lookupPublicWarranty(req);if(!warranty.found||!(warranty.reports||[]).some(function(r){return r.id===meta.id;}))return {ok:true,found:false};return {ok:true,found:true,report:srPublicCopy(srRead(meta))};}
+function srProtectGeneric(req){
+  if(req.list!=='Settings'||['create','add','update','batchCreate','delete','deleteWhere'].indexOf(req.action)<0)return;
+  var protectedKey=function(k){return /^ServiceReport/.test(String(k||''));};
+  if(['create','add'].indexOf(req.action)>=0&&protectedKey((req.fields||req.data||{}).Title))throw Error('Use serviceReport operation');
+  if(req.action==='batchCreate'&&(req.rows||[]).some(function(r){return protectedKey(r.Title);}))throw Error('Use serviceReport operation');
+  if(['update','delete'].indexOf(req.action)>=0){var row=srRows().filter(function(r){return String(r.id)===String(req.id);})[0];if(row&&protectedKey(row.Title)||protectedKey((req.fields||req.data||{}).Title))throw Error('รายงานต้องแก้ผ่านระบบ Report เท่านั้น');}
+  if(req.action==='deleteWhere'&&srRows().some(function(r){return protectedKey(r.Title)&&String(r[req.field])===String(req.value);}))throw Error('Cannot delete report records');
 }

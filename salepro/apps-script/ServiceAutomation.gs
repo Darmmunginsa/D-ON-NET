@@ -11,10 +11,10 @@ function lookupPublicWarranty(req) {
   authorizeWarrantyLookup(req);
   if(!ServicePlan.validSerial(req.serial))return {ok:true,found:false};
   var serial=ServicePlan.normalizeSerial(req.serial),matches=[];
-  listRows('Settings').forEach(function(row){if(!/^DealStatus_/.test(row.Title||''))return;var ds;try{ds=JSON.parse(row.Value||'{}');}catch(_){return;}(ds.expiries||[]).forEach(function(e){var record=ServicePlan.publicRecord(e);if(record&&record.serial===serial)matches.push(record);});});
+  listRows('Settings').forEach(function(row){if(!/^DealStatus_/.test(row.Title||''))return;var ds;try{ds=JSON.parse(row.Value||'{}');}catch(_){return;}(ds.expiries||[]).forEach(function(e){var record=ServicePlan.publicRecord(e);if(record&&record.serial===serial){record._quoteId=row.Title.slice(11);matches.push(record);}});});
   // Conflicting registrations need staff review, never guess a customer's warranty.
   if(matches.length!==1)return {ok:true,found:false};
-  return {ok:true,found:true,warranty:matches[0]};
+  var match=matches[0],reports=publicServiceReports(serial,match._quoteId);delete match._quoteId;return {ok:true,found:true,warranty:match,reports:reports};
 }
 function serviceReminderJobs(settings,contracts,today,team) {
   ServicePlan.date(today);var jobs=[];
