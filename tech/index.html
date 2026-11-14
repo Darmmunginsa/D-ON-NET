@@ -434,7 +434,7 @@ function renderJobBody(item) {
   // Photos
   const photos = (job.completionPhotos||[]);
   const photosHtml = photos.map((u,i) =>
-    `<a href="${u}" target="_blank" rel="noopener" class="photo-chip" title="เปิดดูรูป ${i+1}">
+    `<a href="${u}" target="_blank" rel="noopener" data-tech-preview="image" data-preview-name="รูปหลังงาน ${i+1}" class="photo-chip" title="เปิดดูรูป ${i+1}">
        <img class="photo-thumb" src="${_driveThumb(u)}" onerror="this.style.display='none';this.parentElement.classList.add('no-thumb')"/>
        <span class="photo-chip-label">🖼️ รูป ${i+1}</span>
      </a>`
@@ -447,7 +447,7 @@ function renderJobBody(item) {
     <div class="expense-item">
       <span class="expense-cat">${e.category||'-'}</span>
       <span class="expense-desc">${e.desc||''}</span>
-      <span class="expense-receipt">${e.receiptUrl ? '<a href="'+e.receiptUrl+'" target="_blank">ใบเสร็จ</a>' : ''}</span>
+      <span class="expense-receipt">${e.receiptUrl ? '<a href="'+e.receiptUrl+'" target="_blank" rel="noopener" data-tech-preview="document" data-preview-name="ใบเสร็จค่าใช้จ่ายงานช่าง">ใบเสร็จ</a>' : ''}</span>
       <span class="expense-amount">${fmtMoney(e.amount||0)}</span>
     </div>`).join('');
 
@@ -758,5 +758,6 @@ function toast(msg, type='info') {
   setTimeout(() => el.remove(), 3500);
 }
 </script>
+<script src="../shared/tech-document-preview.js?v=preview20261114"></script>
 <script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/tech-route.js?v=20261103"></script><script src="route.js?v=aiplan20261103"></script></body>
 </html>
