@@ -57,6 +57,7 @@ const TechReports=(()=>{
     host.innerHTML=html;bindHistory(host);const pick=host.querySelector('#sr-equipment');if(pick)pick.onchange=()=>{selectEquipment(pick.value);markDirty();render();};
     host.querySelectorAll('[data-report-path]').forEach(el=>{el.disabled=locked;el.oninput=()=>{const path=el.dataset.reportPath.split('.'),last=path.pop();let obj=report;path.forEach(k=>obj=obj[k]);obj[last]=el.value;markDirty();};});
     host.querySelectorAll('[data-report-photo]').forEach(el=>{el.disabled=locked;el.onchange=()=>{const u=item.job.completionPhotos[Number(el.dataset.reportPhoto)];report.photos=report.photos.filter(x=>x!==u);if(el.checked)report.photos.push(u);markDirty();};});
+    if(typeof DateTimePicker!=='undefined')DateTimePicker.attachAll(host);
     if(!locked){pad('sr-engineer-pad','signature');pad('sr-customer-pad','customerSignature');const b=document.getElementById('report-save');if(b)b.className=dirty?'sr-unsaved':'sr-saved';}
   }
   function selectEquipment(id){const e=equipment.find(x=>x.id===id);if(!e){delete report.equipmentSource;return;}report.equipmentSource={id:e.id,serial:e.serial};report.fields.serial=e.serial||'';}
