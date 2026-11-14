@@ -39,9 +39,8 @@ function serviceReport(req){
     if(req.op==='publish'||req.op==='unpublish'){
       if(!meta||meta.status!=='signed')throw Error('ต้องเซ็นยืนยันรายงานก่อนเผยแพร่');
       if(req.revision!==meta.revision)throw Error('ข้อมูลเปลี่ยน กรุณาโหลดรายงานใหม่');
-      if(req.op==='publish'&&!srGet('ServiceReportPassword_'+meta.id))throw Error('ตั้งรหัสผ่านลูกค้าก่อนเผยแพร่รายงาน');
       if(req.op==='publish'&&!srWarranty(ctx,meta.serial))throw Error('ต้องเปิดให้ค้น Warranty ด้วย Serial นี้ในงานขายก่อน');
-      if(req.op==='publish'){var days=Number(req.accessDays==null?7:req.accessDays);if(!Number.isInteger(days)||days<1||days>365)throw Error('กำหนดระยะเวลาเปิด Web 1–365 วัน');meta.expiresAt=new Date(Date.now()+days*86400000).toISOString();meta.accessDays=days;}
+      if(req.op==='publish'){var days=Number(req.accessDays==null?7:req.accessDays);if(!Number.isInteger(days)||days<1||days>365)throw Error('กำหนดระยะเวลาเปิด Web 1–365 วัน');if(req.password!=null){if(typeof req.password!=='string'||req.password.length<12||req.password.length>128)throw Error('ใช้รหัสผ่าน 12–128 ตัวอักษร');var publishSalt=_uuid();srWrite('ServiceReportPassword_'+meta.id,{salt:publishSalt,hash:srPasswordHash(req.password,publishSalt),updatedBy:ctx.email,updatedAt:new Date().toISOString()});}if(!srGet('ServiceReportPassword_'+meta.id))throw Error('ตั้งรหัสผ่านลูกค้าก่อนเผยแพร่รายงาน');meta.expiresAt=new Date(Date.now()+days*86400000).toISOString();meta.accessDays=days;}
       meta.published=req.op==='publish';meta.publishedAt=new Date().toISOString();meta.publishedBy=ctx.email;srWrite('ServiceReportMeta_'+meta.id,meta);return {ok:true,meta:meta};
     }
     if(['save','sign'].indexOf(req.op)<0)throw Error('Unknown report operation');
