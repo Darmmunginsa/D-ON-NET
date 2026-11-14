@@ -804,7 +804,7 @@ async function renderSTPayHistory(q) {
         <span style="color:${_isCredit?'var(--amber)':'var(--green)'};font-family:var(--mono)">${_isCredit?'▼ ':''}${fmt(p.AmountPaid||0)}</span>
         <span style="color:var(--muted)">${fmtDate(p.PaymentDate)}</span>
         <span class="badge badge-draft" style="font-size:10px${_isCredit?';background:rgba(251,191,36,0.15);color:var(--amber)':''}">${p.PaymentMethod||''}</span>
-        ${(+p.WHTAmount>0)?`<span style="color:var(--amber);font-size:11px" title="ลูกค้าหัก ณ ที่จ่าย ${p.WHTPercent||''}%">หัก ${fmt(p.WHTAmount)}</span>`:''}
+        ${(+p.WHTAmount>0)?`<span style="color:var(--green);font-size:11px">รับเงินจริง ${fmt(SalePaymentCore.cash(p))}</span><span style="color:var(--amber);font-size:11px" title="ลูกค้าหัก ณ ที่จ่าย ${p.WHTPercent||''}%">หัก ${fmt(p.WHTAmount)}</span>`:''}
         ${p.Reference?`<span style="color:var(--muted);font-size:11px">${escHtml(p.Reference)}</span>`:''}
         ${p.SlipURL && p.SlipURL.startsWith('http')?`<span style="margin-left:auto">${docThumb(p.SlipURL,'สลิปโอนเงิน',{small:true})}</span>`:''}
       </div>`; }).join('');
@@ -837,6 +837,8 @@ async function saveSTPayment(){
   const amt=+document.getElementById('st-pay-amount').value;
   if(!amt||amt<=0){toast('กรุณาระบุจำนวนเงิน','error');return;}
   const q=quotesData.find(x=>x.id===stQuoteId);if(!q)return;
+  if(q.Status==='Cancelled'){toast('ใบเสนอราคานี้ถูกยกเลิกแล้ว','error');return;}
+  let payment;try{payment=SalePaymentCore.calculate(amt,+document.getElementById('st-pay-wht')?.value||0);}catch(e){toast(e.message,'error');return;}
   try{
     toast('กำลังบันทึก...','info');
     const payRef='PAY-'+Date.now();
@@ -851,9 +853,8 @@ async function saveSTPayment(){
         slipUrl=slipRes.fileUrl||'';
       }catch(e2){toast('อัปโหลดสลิปไม่สำเร็จ: '+e2.message,'error');}
     }
-    const whtPct=+document.getElementById('st-pay-wht')?.value||0;
-    const whtAmt=+(amt*whtPct/100).toFixed(2);
-    await createListItem(CONFIG.lists.payments,{Title:payRef,QuoteID:stQuoteId,AmountPaid:amt,PaymentDate:document.getElementById('st-pay-date').value,PaymentMethod:document.getElementById('st-pay-method').value,Reference:document.getElementById('st-pay-ref').value,Note:document.getElementById('st-pay-note').value,SlipURL:slipUrl,WHTPercent:whtPct,WHTAmount:whtAmt});
+
+    await createListItem(CONFIG.lists.payments,{Title:payRef,QuoteID:stQuoteId,...payment.fields,PaymentDate:document.getElementById('st-pay-date').value,PaymentMethod:document.getElementById('st-pay-method').value,Reference:document.getElementById('st-pay-ref').value,Note:document.getElementById('st-pay-note').value,SlipURL:slipUrl});
     const isNowFullyPaid = newPaid >= (q.TotalAmount||0) && (q.TotalAmount||0) > 0;
     const statusUpdate = isNowFullyPaid ? { PaidAmount: newPaid, Status: 'Closed' } : { PaidAmount: newPaid };
     await updateListItem(CONFIG.lists.quotations,stQuoteId,statusUpdate);
@@ -867,7 +868,7 @@ async function saveSTPayment(){
     stDealData.notes.push({id:Date.now(),user:currentUser?.displayName||'User',text:`บันทึกชำระ ${fmt(amt)} (${document.getElementById('st-pay-method').value})${isNowFullyPaid?' — ชำระครบแล้ว ✓ Closed':''}`,ts:new Date().toISOString(),type:'payment'});
     await saveSTDealData();
     // อัปเดต paymentsCache ใน memory แทนการ syncAll ทั้งก้อน
-    if (paymentsCache) paymentsCache.push({QuoteID:stQuoteId,AmountPaid:amt,PaymentDate:document.getElementById('st-pay-date').value,PaymentMethod:document.getElementById('st-pay-method').value,Reference:document.getElementById('st-pay-ref').value,Note:document.getElementById('st-pay-note').value,SlipURL:slipUrl,Title:payRef});
+    if (paymentsCache) paymentsCache.push({QuoteID:stQuoteId,...payment.fields,PaymentDate:document.getElementById('st-pay-date').value,PaymentMethod:document.getElementById('st-pay-method').value,Reference:document.getElementById('st-pay-ref').value,Note:document.getElementById('st-pay-note').value,SlipURL:slipUrl,Title:payRef});
     // อัปเดต quotesData ใน memory
     const qLocal=quotesData.find(x=>x.id===stQuoteId);
     if(qLocal){qLocal.PaidAmount=newPaid;if(isNowFullyPaid)qLocal.Status='Closed';}
@@ -2406,10 +2407,10 @@ function renderWHTHint() {
   const amt = +document.getElementById('st-pay-amount')?.value || 0;
   const pct = +document.getElementById('st-pay-wht')?.value || 0;
   if (amt <= 0) { el.innerHTML = '—'; return; }
-  const wht = +(amt * pct / 100).toFixed(2);
-  const net = +(amt - wht).toFixed(2);
+  let payment;try{payment=SalePaymentCore.calculate(amt,pct);}catch(e){el.textContent=e.message;return;}
+  const wht=payment.wht,net=payment.cash;
   el.innerHTML = pct > 0
-    ? `หัก ${fmt(wht)} · <b style="color:var(--green)">รับจริง ${fmt(net)}</b>`
+    ? `ฐานก่อน VAT ${fmt(payment.base)} · VAT ${fmt(payment.vat)}<br>หัก ณ ที่จ่าย ${fmt(wht)} · <b style="color:var(--green)">รับจริง ${fmt(net)}</b>`
     : `<span style="color:var(--muted)">ไม่มีการหัก · รับ ${fmt(amt)}</span>`;
 }
 

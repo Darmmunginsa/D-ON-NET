@@ -62,7 +62,7 @@ async function loadAll(){
     const pays = await getListItems(CONFIG.lists.payments).catch(()=>[]);
     impIncome = (pays||[]).filter(p=>+p.AmountPaid>0).map(p=>({
       ...FinanceRelationships.resolve(p,financeQuotes),date:(p.PaymentDate||'').slice(0,10), type:'income', category:'รายรับจากการขาย',
-      amount:+p.AmountPaid||0, party:p.ClientName||('ใบเสนอราคา '+(p.QuoteID||'')), method:p.PaymentMethod||'',
+      amount:SalePaymentCore.cash(p),whtAmount:+p.WHTAmount||0,settledAmount:+p.AmountPaid||0, party:p.ClientName||('ใบเสนอราคา '+(p.QuoteID||'')), method:p.PaymentMethod||'',
       note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:'สลิป', source:'SalePro'
     }));
     // รายจ่ายจาก PurchasePro (Procurement → Purchase_<id> JSON → payment.vendors)
@@ -184,7 +184,7 @@ function renderLedger(){
     <td>${fmtDate(e.date)}</td>
     <td>${e.type==='income'?'<span style="color:var(--green)">▲ รับ</span>':'<span style="color:var(--red)">▼ จ่าย</span>'}</td>
     <td>${esc(e.category)}</td>
-    <td>${esc(e.party)}${e.bankAccountNumber?`<div>${e.bankFromDirectory?'<small>บัญชีปัจจุบันจากทะเบียน Vendor</small>':''}${BankDetails.html(e,esc)}</div>`:''}<div style="font-size:10px;color:var(--muted)">${esc(e.note)}</div></td>
+    <td>${esc(e.party)}${e.bankAccountNumber?`<div>${e.bankFromDirectory?'<small>บัญชีปัจจุบันจากทะเบียน Vendor</small>':''}${BankDetails.html(e,esc)}</div>`:''}<div style="font-size:10px;color:var(--muted)">${esc(e.note)}</div>${e.source==='SalePro'&&e.whtAmount>0?`<div style="font-size:11px;color:var(--amber)">หัก ณ ที่จ่าย ${fmt(e.whtAmount)} · ตัดยอดหนี้ ${fmt(e.settledAmount)}</div>`:''}</td>
     <td style="text-align:right;font-family:var(--mono);color:${e.type==='income'?'var(--green)':'var(--red)'}">${e.type==='income'?'+':'-'}${fmt0(e.amount)}</td>
     <td>${e.quoteId?'<div style="font-size:12px;color:var(--accent2)">'+esc(e.quoteTitle||e.quoteId)+'</div><div style="font-size:10px;color:var(--muted)">'+esc(e.quoteCustomer)+'</div>':'<span style="color:var(--muted)">ไม่ผูกใบเสนอราคา</span>'}${e.purchaseId?'<div style="font-size:10px;color:var(--muted)">งานจัดซื้อ '+esc(e.purchaseId)+'</div>':''}</td>
     <td>${srcBadge(e.source)}</td>

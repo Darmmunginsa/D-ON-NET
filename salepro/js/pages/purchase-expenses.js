@@ -17,7 +17,7 @@ const PurchaseExpenseSummary=(()=>{
       const value=sd.po?.total!=null?amount(sd.po.total):p.total!=null?amount(p.total):(p.items||[]).reduce((n,i)=>n+amount(i.qty)*amount(i.cost),0);
       rows.push({id:String(p.id),title:p.quoteTitle||'',vendor:ext.vendorName||p.vendorName||'',amount:value,paid,ordered,date:String(p.createdAt||'').split('T')[0],items:(p.items||[]).map(i=>i.name||'').join(', ')});
     }
-    return {rows,total:rows.filter(r=>r.ordered).reduce((n,r)=>n+r.amount,0),paid:rows.reduce((n,r)=>n+r.paid,0),pending:rows.filter(r=>!r.ordered).reduce((n,r)=>n+r.amount,0),received:payments.filter(p=>String(p.QuoteID)===String(quoteId)).reduce((n,p)=>n+amount(p.AmountPaid),0)};
+    return {rows,total:rows.filter(r=>r.ordered).reduce((n,r)=>n+r.amount,0),paid:rows.reduce((n,r)=>n+r.paid,0),pending:rows.filter(r=>!r.ordered).reduce((n,r)=>n+r.amount,0),received:payments.filter(p=>String(p.QuoteID)===String(quoteId)).reduce((n,p)=>n+SalePaymentCore.cash(p),0)};
   }
   return {build};
 })();
