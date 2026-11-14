@@ -509,17 +509,21 @@ function renderExpenseTab() {
   const q = quotesData.find(x => x.id === stQuoteId) || {};
   if (!document.getElementById('exp-date').value) document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
   // ค่าใช้จ่ายฝั่ง Sale (กรอกในแท็บนี้)
-  const saleExps = (stDealData.expenses || []).map(e => ({ ...e, _src:'sale' }));
+  const financeExps=(purchases?.finance||[]).filter(e=>e.type!=='income').map(e=>({...e,_src:'finance'}));
+  const saleExps = (stDealData.expenses || []).map(e => ({ ...e, _src:'sale' })).concat(financeExps);
   // ค่าใช้จ่ายฝั่งช่าง (ดึงจากงานช่างทุกงาน — อ่านอย่างเดียว)
   const techExps = [];
   (stDealData.techJobs || []).forEach(j => {
     (j.expenses || []).forEach(e => {
       techExps.push({ id:e.id, cat:(e.category||'อื่นๆ'), detail:(e.desc||e.description||''), amount:+e.amount||0,
-        date:(j.scheduledAt||'').split('T')[0], by:'ช่าง '+(j.techName||''), receiptUrl:e.receiptUrl||'', _src:'tech' });
+        date:String(e.date||e.ts||j.scheduledAt||'').split('T')[0], by:'ช่าง '+(j.techName||''), receiptUrl:e.receiptUrl||'', _src:'tech' });
     });
   });
   const purchaseExps=(purchases?.rows||[]).filter(r=>r.ordered).map(r=>({id:'purchase-'+r.id,cat:'จัดซื้อ',detail:r.title+' · '+r.vendor+' · '+r.items,amount:r.amount,date:r.date,_src:'purchase'}));
-  const all = saleExps.concat(techExps,purchaseExps);
+  const incomeRows=(purchases?.receipts||[]).map(r=>({id:'receipt-'+r.id,cat:'รับชำระจากลูกค้า',detail:r.reference+(r.wht?' · หัก ณ ที่จ่าย '+fmt(r.wht):''),amount:r.cash,date:r.date,receiptUrl:r.docUrl,_src:'income'}));
+  const financeIncome=(purchases?.finance||[]).filter(e=>e.type==='income').map(e=>({...e,_src:'income'}));
+  const pendingRows=(purchases?.rows||[]).filter(r=>!r.ordered).map(r=>({id:'pending-'+r.id,cat:'จัดซื้อ (รอดำเนินการ)',detail:r.title+' · '+r.items+' — ยังไม่รวมค่าใช้จ่าย',amount:r.amount,date:r.date,_src:'pending'}));
+  const all = incomeRows.concat(financeIncome,saleExps,techExps,purchaseExps,pendingRows);
   const saleTotal = saleExps.reduce((a,e) => a + (+e.amount||0), 0);
   const techTotal = techExps.reduce((a,e) => a + (+e.amount||0), 0);
   const total = saleTotal + techTotal + (purchases?.total||0);
@@ -537,7 +541,7 @@ function renderExpenseTab() {
       <div style="background:var(--surface2);border:1px solid rgba(248,113,113,0.3);border-radius:8px;padding:12px 14px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">ค่าใช้จ่ายรวม (${pct.toFixed(1)}%)</div>
         <div style="font-size:18px;font-weight:600;font-family:var(--mono);color:var(--red)">${purchases?fmt(total):'กำลังตรวจยอดจัดซื้อ'}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:3px">Sale ${fmt(saleTotal)} · ช่าง ${fmt(techTotal)} · จัดซื้อ ${purchases?fmt(purchases.total):'—'}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">Sale / Finance ${fmt(saleTotal)} · ช่าง ${fmt(techTotal)} · จัดซื้อ ${purchases?fmt(purchases.total):'—'}</div>
       </div>
       <div style="background:var(--surface2);border:1px solid rgba(52,211,153,0.3);border-radius:8px;padding:12px 14px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:4px">ส่วนต่างมูลค่าใบขายกับค่าใช้จ่าย</div>
@@ -548,7 +552,7 @@ function renderExpenseTab() {
   // list
   const list = document.getElementById('exp-list');
   if (!list) return;
-  if (!all.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:10px;text-align:center">ยังไม่มีรายการค่าใช้จ่าย</div>'; return; }
+  if (!all.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:10px;text-align:center">ยังไม่มีรายการรับ–จ่ายของงานนี้</div>'; return; }
   const canManage = canManageSaleActions(q);
   list.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead><tr style="color:var(--muted);font-size:11px">
@@ -563,7 +567,7 @@ function renderExpenseTab() {
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);white-space:nowrap">${fmtDate(e.date)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border)"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;background:${(EXP_CAT_COLORS[e.cat]||'#9ca3b5')}22;color:${EXP_CAT_COLORS[e.cat]||'#9ca3b5'}">${escHtml(e.cat||'อื่นๆ')}</span>${e._src==='tech'?'<div style="font-size:9px;color:var(--amber);margin-top:2px">จากงานช่าง</div>':e._src==='purchase'?'<div style="font-size:9px;color:var(--accent2);margin-top:2px">จาก PurchasePro · อ่านอย่างเดียว</div>':''}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text)">${escHtml(e.detail||'-')}${e.by?`<div style="font-size:10px;color:var(--muted)">โดย ${escHtml(e.by)}</div>`:''}${e.receiptUrl?`<div style="margin-top:3px">${docThumb(e.receiptUrl,'ใบเสร็จ',{small:true})}</div>`:(e._src==='sale'?(e.receiptError?`<div style="margin-top:3px;font-size:10px;color:var(--red)">⚠ แนบรูปไม่สำเร็จ: ${escHtml(e.receiptError)}</div>`:`<div style="margin-top:3px;font-size:10px;color:var(--amber)">⚠ ไม่มีรูปแนบ</div>`):'')}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono);color:var(--red)">${fmt(e.amount)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono);color:${e._src==='income'?'var(--green)':'var(--red)'}">${e._src==='income'?'+':e._src==='pending'?'ประมาณ ':'-'}${fmt(e.amount)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:center">${e._src==='tech'?'<span style="font-size:9px;color:var(--muted)" title="บันทึกโดยช่าง — แก้ไขในแท็บช่าง">🔧</span>':'<span style="font-size:11px;color:var(--muted)" title="ค่าใช้จ่ายถูกบันทึกเป็นหลักฐาน ลบไม่ได้">🔒</span>'}</td>
       </tr>`).join('')}
     </tbody></table>`;

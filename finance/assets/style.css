@@ -135,3 +135,11 @@ a{color:var(--accent2)}
   .fab{display:flex;align-items:center;justify-content:center}
 }
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* Wide ledger with summary of the exact filtered rows. */
+.view:has(.ledger-workspace){max-width:none}
+.ledger-workspace{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+.ledger-table{overflow:auto}.ledger-summary{padding:18px;position:sticky;top:80px}
+.ledger-summary h3{font-size:15px}.ledger-summary p,.ledger-summary small{color:var(--muted);font-size:11px;line-height:1.6}.ledger-summary p{margin:6px 0 14px}
+.ledger-summary>div{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--border);font-size:12px}.ledger-summary b{font-family:var(--mono);white-space:nowrap}
+@media(max-width:1150px){.ledger-workspace{grid-template-columns:minmax(0,1fr)}.ledger-summary{position:static;grid-row:1}}

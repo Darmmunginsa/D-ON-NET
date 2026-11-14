@@ -1196,7 +1196,8 @@
       <!-- ════ TAB: ค่าใช้จ่าย / งบประมาณ ════ -->
       <div id="st-tab-expense" style="display:none">
         <div id="exp-summary" style="margin-bottom:14px"></div>
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px">รายการรับ–จ่ายของงานนี้</div><div id="exp-list" style="overflow-x:auto;margin-bottom:16px"></div>
+        <details><summary style="cursor:pointer;margin:10px 0">+ บันทึกค่าใช้จ่ายเพิ่มเติม</summary><div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px">
           <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:10px">➕ บันทึกค่าใช้จ่าย</div>
           <div class="form-grid">
             <div class="form-group"><label>ประเภท</label>
@@ -1224,8 +1225,8 @@
             <button id="exp-save-btn" class="btn btn-primary" onclick="addExpense()">บันทึกค่าใช้จ่าย</button>
           </div>
         </div>
-        <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">รายการค่าใช้จ่าย</div>
-        <div id="exp-list" style="max-height:300px;overflow-y:auto"></div>
+        </details>
+
       </div>
 
       <!-- ════ TAB: PO ลูกค้า ════ -->
@@ -1646,8 +1647,8 @@
 <script src="js/pages/company.js?v=startup20261108"></script>
 <script src="js/pages/pdf.js?v=drafts20261108"></script>
 <script src="../shared/sale-payment-core.js?v=whtbase20261114"></script>
-<script src="js/pages/purchase-expenses.js?v=whtbase20261114"></script>
-<script src="js/pages/saletracker.js?v=whtbase20261114"></script>
+<script src="js/pages/purchase-expenses.js?v=workledger20261114"></script>
+<script src="js/pages/saletracker.js?v=workledger20261114"></script>
 <script src="../shared/billing-core.js?v=billingbaskets20261108"></script>
 <script src="js/pages/billing.js?v=billingbaskets20261108"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>

@@ -9,7 +9,7 @@ function toast(msg,type){ const w=document.getElementById('toasts'); if(!w)retur
 function _today(){ return new Date().toISOString().slice(0,10); }
 
 // ── state ──
-let finTx = [], finReq = [], finCat = [], impIncome = [], impExpense = [];
+let finTx = [], finReq = [], finCat = [], impIncome = [], impExpense = [], impWorkExpense = [];
 let financeQuotes=[];
 let _period = AppStorage.getItem('fin_period') || 'month';
 let _view = 'dash';
@@ -66,9 +66,10 @@ async function loadAll(){
       note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:'สลิป', source:'SalePro'
     }));
     // รายจ่ายจาก PurchasePro (Procurement → Purchase_<id> JSON → payment.vendors)
-    impExpense = [];
+    impExpense = [];impWorkExpense=[];
     try{
       const legacy=await getListItems(CONFIG.lists.settings);
+      impWorkExpense=FinanceRelationships.workExpenses(legacy,financeQuotes);
       const current=await getListItems(CONFIG.lists.procurement);
       const proc=[...new Map([...legacy,...current].map(r=>[r.Title,r])).values()];
       const jobRow=proc.find(r=>r.Title==='Procurements');
@@ -98,7 +99,7 @@ function catNames(kind){ const fromSheet=finCat.filter(c=>(c.Kind||'')===kind).m
 function allEntries(){
   const manual = finTx.map(t=>({ ...FinanceRelationships.resolve(t,financeQuotes),_id:t._id||t.id, date:(t.Date||'').slice(0,10), type:t.TxType||'expense', category:t.Category||'', amount:+t.Amount||0, party:t.Party||'', method:t.Method||'', note:t.Note||'', docUrl:t.DocURL||'', docName:t.DocName||'', ...BankDetails.read(t),source:'Manual', taxKnown:t.TaxVersion==='1', editable:true }));
   const reqPaid = finReq.filter(r=>r.Status==='Paid').map(r=>({ ...FinanceRelationships.resolve(r,financeQuotes),date:(r.PaidDate||r.ApprovedAt||r.Date||'').slice(0,10), type:'expense', category:r.Category||'เบิกจ่าย', amount:+r.Amount||0, party:r.Requester||'', method:r.PaidMethod||'', note:'ใบเบิก '+(r.ReqNo||'')+(r.Reason?' · '+r.Reason:''), docUrl:r.DocURL||'', docName:r.DocName||'', source:'เบิกจ่าย' }));
-  return manual.concat(reqPaid, impIncome, impExpense).filter(e=>e.date);
+  return manual.concat(reqPaid, impIncome, impExpense,impWorkExpense).filter(e=>e.date);
 }
 function periodRange(){
   const now=new Date(); let start=null;
@@ -179,7 +180,7 @@ function renderLedger(){
   if(f.type!=='all') ents=ents.filter(e=>e.type===f.type);
   if(f.source!=='all') ents=ents.filter(e=>e.source===f.source);
   if(f.q){ const q=f.q.toLowerCase(); ents=ents.filter(e=>(e.party+' '+e.category+' '+e.note+' '+e.quoteTitle+' '+e.quoteCustomer+' '+e.purchaseId+' '+e.quoteId).toLowerCase().includes(q)); }
-  const srcBadge=s=>{ const c={Manual:'#94a3b8',SalePro:'#4f8ef7',PurchasePro:'#2dd4bf','เบิกจ่าย':'#a78bfa'}[s]||'#94a3b8'; return `<span style="font-size:10px;background:${c}22;color:${c};padding:1px 6px;border-radius:8px">${s}</span>`; };
+  const srcBadge=s=>{ const c={Manual:'#94a3b8',SalePro:'#4f8ef7',PurchasePro:'#2dd4bf',TechPro:'#fbbf24',SaleExpense:'#a78bfa','เบิกจ่าย':'#a78bfa'}[s]||'#94a3b8'; return `<span style="font-size:10px;background:${c}22;color:${c};padding:1px 6px;border-radius:8px">${s}</span>`; };
   const rows=ents.length?ents.map(e=>`<tr>
     <td>${fmtDate(e.date)}</td>
     <td>${e.type==='income'?'<span style="color:var(--green)">▲ รับ</span>':'<span style="color:var(--red)">▼ จ่าย</span>'}</td>
@@ -191,17 +192,20 @@ function renderLedger(){
     <td>${docChip(e.docUrl,e.docName)}</td>
     <td style="text-align:right">${e.editable?`<button class="ic" onclick="editTx('${e._id}')" title="แก้ไข">✏️</button><button class="ic" onclick="delTx('${e._id}')" title="ลบ" style="color:var(--red)">✕</button>`:''}</td>
   </tr>`).join(''):'<tr><td colspan="9" class="empty">ไม่มีรายการ</td></tr>';
-  const srcOpts=['all','Manual','SalePro','PurchasePro','เบิกจ่าย'].map(s=>`<option value="${s}" ${f.source===s?'selected':''}>${s==='all'?'ทุกแหล่ง':s}</option>`).join('');
+  const srcOpts=['all','Manual','SalePro','PurchasePro','TechPro','SaleExpense','เบิกจ่าย'].map(s=>`<option value="${s}" ${f.source===s?'selected':''}>${s==='all'?'ทุกแหล่ง':s}</option>`).join('');
+  const income=ents.filter(e=>e.type==='income').reduce((n,e)=>n+(+e.amount||0),0),expense=ents.filter(e=>e.type==='expense').reduce((n,e)=>n+(+e.amount||0),0),withheld=ents.reduce((n,e)=>n+(+e.whtAmount||0),0);
+  const summary=`<aside class="ledger-summary card"><h3>สรุปรายการที่แสดง</h3><p>${ents.length} รายการ · ตามตัวกรองปัจจุบัน</p><div>รับเงินจริง <b style="color:var(--green)">${fmt(income)}</b></div><div>รายจ่าย <b style="color:var(--red)">${fmt(expense)}</b></div><div>คงเหลือสุทธิ <b>${fmt(income-expense)}</b></div><div>ลูกค้าหัก ณ ที่จ่าย <b>${fmt(withheld)}</b></div><small>ยอดหัก ณ ที่จ่ายแสดงประกอบ ไม่บวกซ้ำในเงินรับจริง · ค่าใช้จ่าย Sale/ช่างอิงยอดที่บันทึกไว้</small></aside>`;
   return `<div class="page-head"><h2>รายการรับ-จ่าย</h2>
     <div style="display:flex;gap:8px"><button class="btn btn-sm" onclick="openTx('income')" style="border-color:var(--green);color:var(--green)">+ รายรับ</button><button class="btn btn-primary btn-sm" onclick="openTx('expense')">+ รายจ่าย</button></div></div>
     <div class="toolbar">
       <select onchange="_ledgerFilter.type=this.value;go('ledger')"><option value="all">ทุกประเภท</option><option value="income" ${f.type==='income'?'selected':''}>รายรับ</option><option value="expense" ${f.type==='expense'?'selected':''}>รายจ่าย</option></select>
       <select onchange="_ledgerFilter.source=this.value;go('ledger')">${srcOpts}</select>
-      <input placeholder="ค้นหาเลขใบเสนอราคา / ลูกค้า / รายละเอียด..." value="${esc(f.q)}" oninput="_ledgerFilter.q=this.value" onkeydown="if(event.key==='Enter')go('ledger')">
+      <input placeholder="ค้นหาเลขใบเสนอราคา / ลูกค้า / รายละเอียด..." value="${esc(f.q)}" id="ledger-search" oninput="if(!event.isComposing)updateLedgerSearch(this)" oncompositionend="updateLedgerSearch(this)">
     </div>
-    <div class="card"><table class="tbl"><thead><tr><th>วันที่</th><th>ประเภท</th><th>หมวดหมู่</th><th>รายละเอียด</th><th style="text-align:right">จำนวนเงิน</th><th>ใบเสนอราคา / งานที่เกี่ยวข้อง</th><th>แหล่ง</th><th>เอกสาร</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <div class="ledger-workspace"><div class="card ledger-table"><table class="tbl"><thead><tr><th>วันที่</th><th>ประเภท</th><th>หมวดหมู่</th><th>รายละเอียด</th><th style="text-align:right">จำนวนเงิน</th><th>ใบเสนอราคา / งานที่เกี่ยวข้อง</th><th>แหล่ง</th><th>เอกสาร</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${summary}</div>`;
 }
 
+function updateLedgerSearch(input){const start=input.selectionStart,end=input.selectionEnd;_ledgerFilter.q=input.value;go('ledger');const next=document.getElementById('ledger-search');if(next){next.focus();next.setSelectionRange(start,end);}}
 // ── Tx modal ──
 let _editTxId=null, _txDoc=null;
 function openTx(type,row){ _editTxId=row?row._id:null; _txDoc=row?{url:row.docUrl,name:row.docName}:null;
