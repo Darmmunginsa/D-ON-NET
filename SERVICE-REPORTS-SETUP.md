@@ -16,3 +16,11 @@
 
 ## Verification
 Automated tests cover draft/sign/version checks, immutable signed reports, Warranty publication eligibility, escaping and public-field redaction. Browser/printed-page verification is still pending because Computer Use could not establish the Chrome URL. No production report data has been created by this implementation.
+
+## Partner and protected customer access update (2026-11-15)
+- Admin manages Partner profiles in Tech Report settings. Drafts can switch company; signed copies retain their original branding snapshot.
+- Tech sets a per-report password (12–128 characters; random generator available), then publishes with an access period of 1–365 days (default 7). Share the password separately with the customer. Passwords are salted, peppered HMAC hashes; preserve REPORT_PASSWORD_PEPPER in Script Properties when backing up or migrating.
+- Customer report access requires the password and an unexpired publication. Customers may withdraw public access early after unlocking. This only changes publication metadata; Tech's signed original remains stored.
+- Existing published reports without an expiry/password must be configured and published again. The updated Worker rejects report payloads from older backends lacking access validation.
+- Downloaded files and previously shared Drive photo URLs cannot be revoked by this report-page access control.
+- Deploy the updated FULL Apps Script bundle and Worker. Git pushes publish frontend files only; Apps Script must be updated separately.
