@@ -143,3 +143,44 @@ a{color:var(--accent2)}
 .ledger-summary h3{font-size:15px}.ledger-summary p,.ledger-summary small{color:var(--muted);font-size:11px;line-height:1.6}.ledger-summary p{margin:6px 0 14px}
 .ledger-summary>div{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--border);font-size:12px}.ledger-summary b{font-family:var(--mono);white-space:nowrap}
 @media(max-width:1150px){.ledger-workspace{grid-template-columns:minmax(0,1fr)}.ledger-summary{position:static;grid-row:1}}
+
+.finance-progress {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11999;
+  width: min(380px, calc(100vw - 24px));
+  padding: 10px 14px;
+  background: #102b43;
+  border: 1px solid #3d91bf;
+  border-radius: 8px;
+  box-shadow: 0 3px 12px #0005;
+  pointer-events: none;
+}
+.finance-progress[hidden] { display: none; }
+.finance-progress span {
+  display: block;
+  margin-bottom: 7px;
+  color: #d2efff;
+  font-size: 12px;
+}
+.finance-progress progress {
+  display: block;
+  width: 100%;
+  height: 9px;
+  appearance: none;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #244157 20%, #20c8e6 50%, #244157 80%);
+  background-size: 200% 100%;
+  animation: finance-progress-slide 1.2s linear infinite;
+}
+.finance-progress progress::-webkit-progress-bar { background: transparent; }
+@keyframes finance-progress-slide {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .finance-progress progress { animation: none; }
+}

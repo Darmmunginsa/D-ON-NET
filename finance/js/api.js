@@ -7,7 +7,40 @@
 // เรียก Apps Script web app — ใช้ content-type text/plain เพื่อเลี่ยง CORS preflight
 // มี auto-retry กัน CORS/redirect ของ Apps Script หลุดเป็นครั้งคราว
 function _sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-async function _call(payload) { return GatewayClient.call(CONFIG.appsScriptUrl,payload); }
+const financeProgress = (() => {
+  const active = new Map();
+  const panel = document.getElementById('finance-progress');
+  const label = document.getElementById('finance-progress-label');
+
+  async function run(message, operation) {
+    const task = Symbol();
+    active.set(task, message);
+    label.textContent = message;
+    panel.hidden = false;
+    try {
+      return await operation();
+    } finally {
+      active.delete(task);
+      panel.hidden = active.size === 0;
+      label.textContent = Array.from(active.values()).at(-1) || '';
+    }
+  }
+  return { run };
+})();
+
+async function _call(payload) {
+  const messages = {
+    create: 'กำลังบันทึกข้อมูล…',
+    update: 'กำลังบันทึกการเปลี่ยนแปลง…',
+    delete: 'กำลังลบรายการ…',
+    deleteWhere: 'กำลังลบรายการ…',
+    uploadFile: 'กำลังอัปโหลดเอกสาร…',
+    sendEmail: 'กำลังส่งอีเมล…'
+  };
+  const request = () => GatewayClient.call(CONFIG.appsScriptUrl, payload);
+  const message = messages[payload.action];
+  return message ? financeProgress.run(message, request) : request();
+}
 
 // แปลงชนิดข้อมูลตัวเลข/บูลีน ให้เก็บใน Sheet เป็นค่าที่ถูกต้อง
 // หมายเหตุ: ห้ามใส่ฟิลด์ที่เป็น "id อ้างอิง" (เช่น QuoteID) เพราะ Google version ใช้ UUID

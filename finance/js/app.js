@@ -42,8 +42,10 @@ async function afterLogin(){
   document.getElementById('user-avatar').textContent = (currentUser.displayName||'U')[0].toUpperCase();
   document.getElementById('login-screen').style.display='none';
   document.getElementById('app-screen').style.display='flex';
-  await loadAll();
-  await loadUserRoles();
+  await financeProgress.run('กำลังโหลดข้อมูล Finance…', async () => {
+    await loadAll();
+    await loadUserRoles();
+  });
   document.getElementById('role-badge').innerHTML = isApproverUser()
     ? '<span style="background:rgba(251,191,36,.2);color:var(--amber);padding:1px 7px;border-radius:10px;font-size:10px">ผู้อนุมัติ</span>'
     : '<span style="background:rgba(79,142,247,.15);color:var(--accent2);padding:1px 7px;border-radius:10px;font-size:10px">ผู้ใช้</span>';
