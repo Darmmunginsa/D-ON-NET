@@ -92,6 +92,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:1
 /* ── PHOTO UPLOAD ── */
 .photo-section{background:var(--card2);border-radius:8px;padding:12px}
 .job-photo-group{margin-top:8px;padding:10px;border:1px solid var(--border);border-radius:8px}.job-photo-group summary{cursor:pointer;font-weight:600}
+.job-photo-select{display:grid;gap:4px}.job-photo-select label{font-size:11px;cursor:pointer}.job-photo-move{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin-top:10px}
 .photo-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .photo-thumb{width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block}
 .photo-chip{position:relative;display:inline-flex;align-items:flex-end;width:80px;height:80px;border-radius:6px;overflow:hidden;text-decoration:none;border:1px solid var(--border);background:var(--card)}
@@ -668,15 +669,32 @@ function jobPhotoGroups(item) {
   ].filter(Boolean));
   return [...serials, ''].map(serial => {
     const photos = jobPhotosForSerial(job, serial);
-    const photosHtml = photos.map((u,i) =>
+    const canMove = !serial && photos.length > 0 && serials.size > 0;
+    const photosHtml = photos.map((u,i) => {
+      const thumbnail =
     `<a href="${DonnetReport.esc(u)}" target="_blank" rel="noopener" data-tech-preview="image" data-preview-name="รูปหลังงาน ${i+1}" class="photo-chip" title="เปิดดูรูป ${i+1}">
        <img class="photo-thumb" src="${DonnetReport.esc(_driveThumb(u))}" onerror="this.style.display='none';this.parentElement.classList.add('no-thumb')"/>
        <span class="photo-chip-label">🖼️ รูป ${i+1}</span>
-     </a>`
-  ).join('');
+     </a>`;
+      return canMove
+        ? `<div class="job-photo-select">${thumbnail}<label><input type="checkbox" name="photo" value="${DonnetReport.esc(u)}"> เลือกรูป ${i+1}</label></div>`
+        : thumbnail;
+    }).join('');
+    const grid = '<div class="photo-grid">'+photosHtml+'</div>';
+    const photoContent = canMove ? `
+      <form data-job-id="${DonnetReport.esc(job.id)}" onsubmit="event.preventDefault();moveGeneralPhotos(this)">
+        ${grid}
+        <div class="job-photo-move">
+          <label>Serial ปลายทาง <select class="form-control" name="serial" required>
+            <option value="">เลือก Serial</option>
+            ${[...serials].map(value => '<option>'+DonnetReport.esc(value)+'</option>').join('')}
+          </select></label>
+          <button type="submit" class="btn btn-primary btn-sm">ย้ายรูปที่เลือก</button>
+        </div>
+      </form>` : grid;
     return `<details class="job-photo-group" ${photos.length || !serial ? 'open' : ''}>
       <summary>${serial ? 'Serial ' + DonnetReport.esc(serial) : 'รูปทั่วไป'} · ${photos.length} รูป</summary>
-      <div class="photo-grid">${photosHtml}</div>
+      ${photoContent}
       <label class="upload-box" style="display:block;margin-top:8px">📷 แนบรูปในกลุ่มนี้
         <input type="file" accept="image/*" multiple data-job-id="${DonnetReport.esc(job.id)}" data-serial="${DonnetReport.esc(serial)}" onchange="uploadPhotos(this)">
       </label>
@@ -684,6 +702,47 @@ function jobPhotoGroups(item) {
   }).join('');
 }
 const photoUploads = new Set();
+async function moveGeneralPhotos(form) {
+  const item = allJobs.find(entry => String(entry.job.id) === form.dataset.jobId);
+  if (!item) return;
+  const quoteId = String(item.q.id);
+  if (photoUploads.has(quoteId)) {
+    toast('กรุณารอให้การจัดการรูปก่อนหน้าเสร็จ', 'info');
+    return;
+  }
+  const serial = DonnetReport.serial(form.elements.namedItem('serial').value);
+  const targets = [...(item.ds.expiries || []), ...(item.job.completionPhotoGroups || [])];
+  if (!serial || !targets.some(entry => DonnetReport.serial(entry.serial) === serial)) {
+    toast('กรุณาเลือก Serial ปลายทาง', 'error');
+    return;
+  }
+  const available = new Set(jobPhotosForSerial(item.job, ''));
+  const selected = new Set([...form.querySelectorAll('input[name="photo"]:checked')].map(input => input.value));
+  const urls = [...selected].filter(url => available.has(url));
+  if (!urls.length) {
+    toast('กรุณาเลือกรูปที่ต้องการย้าย', 'error');
+    return;
+  }
+
+  const originalGroups = item.job.completionPhotoGroups;
+  const controls = [...form.elements];
+  photoUploads.add(quoteId);
+  controls.forEach(control => { control.disabled = true; });
+  try {
+    const groups = (originalGroups || []).filter(entry => !selected.has(entry.url) || !available.has(entry.url));
+    item.job.completionPhotoGroups = [...groups, ...urls.map(url => ({url, serial}))];
+    await saveDealStatus(item);
+  } catch (error) {
+    item.job.completionPhotoGroups = originalGroups;
+    toast('ย้ายรูปไม่สำเร็จ: ' + error.message, 'error');
+    return;
+  } finally {
+    photoUploads.delete(quoteId);
+    controls.forEach(control => { control.disabled = false; });
+  }
+  toast('ย้าย ' + urls.length + ' รูปเข้า Serial ' + serial + ' แล้ว', 'success');
+  renderJobList();
+}
 async function uploadPhotos(input) {
   const files = Array.from(input.files);
   const item = allJobs.find(entry => String(entry.job.id) === input.dataset.jobId);
