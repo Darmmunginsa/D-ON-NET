@@ -23,7 +23,7 @@ const TechReports=(()=>{
     drawer=document.createElement('aside');drawer.id='sr-reference';drawer.className='sr-reference';drawer.setAttribute('aria-label','ข้อมูลอ้างอิงจาก SalePro และรูปหน้างาน');root.append(drawer);root.classList.add('sr-reference-open');root.querySelector('#sr-reference-toggle').setAttribute('aria-expanded','true');
     const current=item;const selected=report?.equipmentSource?.id;
     const entries=(item.ds.expiries||[]).filter(e=>!selected||String(e.id)===String(selected));
-    const photos=(item.job.completionPhotos||[]).filter(u=>typeof u==='string'&&u.startsWith('https://'));
+    const photos=report ? jobPhotosForSerial(item.job,report.fields.serial) : jobPhotoUrls(item.job);
     drawer.innerHTML='<header><b>ข้อมูลอ้างอิงหน้างาน</b><button type="button" onclick="TechReports.toggleReference()">✕ ปิด</button></header><p>'+E(item.quoteTitle)+'<br>'+E(item.customer)+'</p><h3>Serial / รายละเอียดจาก SalePro</h3>'+entries.map(e=>'<article><b>'+E(e.name)+'</b><p>S/N: '+E(e.serial||'—')+'</p><div class="sr-reference-detail">'+E(e.sourceDetail||e.note||'ไม่มีรายละเอียดเพิ่มเติม')+'</div></article>').join('')+'<h3>รายการในใบเสนอราคา</h3><div id="sr-reference-items"><label>กำลังโหลดรายละเอียด...<progress aria-label="กำลังโหลดรายละเอียดรายการ"></progress></label></div><h3>รูปหน้างาน ('+photos.length+')</h3><p>กดรูปเพื่อเปิดดูขนาดใหญ่</p><div class="sr-reference-photos">'+photos.map((u,i)=>'<a href="'+E(u)+'" target="_blank" rel="noopener" data-tech-preview="image" data-preview-name="รูปหน้างาน '+(i+1)+'"><img loading="lazy" src="'+E(_driveThumb(u))+'" alt="รูปหน้างาน '+(i+1)+'"><span>รูป '+(i+1)+'</span></a>').join('')+'</div>';
     try{const rows=await _getQuoteItems(current.q.id);if(item!==current||!drawer.isConnected)return;drawer.querySelector('#sr-reference-items').innerHTML=rows.filter(r=>!String(r.Title||'').startsWith('__')).map(r=>'<article><b>'+E(r.Title||'รายการ')+'</b><small>จำนวน '+E(r.Quantity||'—')+' '+E(r.Unit||'')+'</small><div class="sr-reference-detail">'+E(r.Description||'ไม่มีรายละเอียดเพิ่มเติม')+'</div></article>').join('')||'<p>ไม่มีรายการ</p>';}catch(e){if(drawer.isConnected)drawer.querySelector('#sr-reference-items').textContent='โหลดรายการไม่ได้ กรุณาปิดแล้วเปิด Report ใหม่';}
   }
@@ -53,12 +53,12 @@ const TechReports=(()=>{
     html+='<div class="sr-grid">'+fields.filter(x=>report.type==='general'||!['problem','work','status','nextDate'].includes(x[0])).map(x=>input('fields.'+x[0],x[1],report.fields[x[0]]||'',x[2])).join('')+'</div>';
     if(report.type==='general'){html+='<h3>วัสดุ / อะไหล่ที่ใช้</h3><div class="sr-table"><table><tr><th>รายการ</th><th>จำนวน</th><th>หน่วย</th><th>หมายเหตุ</th></tr>'+report.materials.map((v,i)=>'<tr>'+['name','qty','unit','note'].map(k=>'<td>'+input('materials.'+i+'.'+k,'',v[k])+'</td>').join('')+'</tr>').join('')+'</table></div>'+(!locked?'<button onclick="TechReports.addMaterial()">+ เพิ่มรายการอะไหล่</button>':'');}
     else{html+='<h3>Safety / UPS Status</h3><div class="sr-grid">'+DonnetReport.serviceFields.map(x=>'<label>'+E(x[1])+'<select data-report-path="checks.'+x[0]+'">'+['','Normal','Abnormal','N/A','Checked','Not checked'].map(v=>'<option '+(report.checks[x[0]]===v?'selected':'')+'>'+E(v)+'</option>').join('')+'</select></label>').join('')+'</div><h3>ค่าตรวจวัดไฟฟ้า / Electrical Measurements</h3>'+measurementGroups()+'<h3>Battery / Environment</h3><div class="sr-grid">'+[['brand','ยี่ห้อแบตเตอรี่'],['model','รุ่นแบตเตอรี่'],['volts','Volt'],['ah','Ah'],['quantity','Blocks / String'],['strings','จำนวน String'],['installed','วันที่ติดตั้ง'],['mode','Float / Boost'],['chargeVoltage','Charger Voltage (VDC)'],['batteryVoltage','Battery Voltage (VDC)'],['temperature','Battery Temp (°C)'],['environment','Air Condition / Ventilation / Dusty / Humid'],['upsTemp','UPS Temp (°C)'],['ambient','Ambient (°C)']].map(x=>input('battery.'+x[0],x[1],report.battery[x[0]]||'',x[0]==='installed'?'date':undefined)).join('')+'</div><h3>Backup Test</h3><div class="sr-table"><table><tr><th>Time (min)</th><th>Volt DC 1</th><th>Volt DC 2</th></tr>'+report.backup.map((v,i)=>'<tr>'+['time','v1','v2'].map(k=>'<td>'+input('backup.'+i+'.'+k,'',v[k])+'</td>').join('')+'</tr>').join('')+'</table></div><h3>Battery Readings · 2 String × 44 ลูก</h3><div class="sr-grid">'+report.strings.map((str,n)=>'<div class="sr-table"><h4>String '+(n+1)+'</h4><table><tr><th>No.</th><th>On Charge</th><th>On Test</th></tr>'+str.map((v,i)=>'<tr><td>'+(i+1)+'</td><td>'+input('strings.'+n+'.'+i+'.charge','',v.charge)+'</td><td>'+input('strings.'+n+'.'+i+'.test','',v.test)+'</td></tr>').join('')+'</table></div>').join('')+'</div>';}
-    html+='<h3>รูปประกอบรายงาน (เลือกจากรูปงาน)</h3><div class="sr-grid">'+(item.job.completionPhotos||[]).map((u,i)=>'<label><input type="checkbox" data-report-photo="'+i+'" '+(report.photos.includes(u)?'checked':'')+'> รูป '+(i+1)+'</label>').join('')+'</div>';
+    html+='<h3>รูปประกอบรายงาน</h3><div id="sr-report-photo-options"></div>';
     if(locked){html+='<p>เซ็นโดย '+E(report.signedBy)+' เมื่อ '+E(report.signedAt)+' · ฉบับนี้แก้ทับไม่ได้</p>';}
     else html+='<div class="sr-grid"><div><h3>ลายเซ็นช่าง</h3><canvas id="sr-engineer-pad" width="600" height="180"></canvas><button onclick="TechReports.clearSignature(\'signature\')">ล้างลายเซ็นช่าง</button></div><div><h3>ลายเซ็นผู้รับมอบ (ถ้ามี)</h3><canvas id="sr-customer-pad" width="600" height="180"></canvas><button onclick="TechReports.clearSignature(\'customerSignature\')">ล้างลายเซ็นผู้รับมอบ</button></div></div><p>กดเซ็นยืนยันเพื่อเก็บฉบับสมบูรณ์ การเผยแพร่เป็นอีกขั้นตอนหลังเซ็น</p>';
     host.innerHTML=html;bindHistory(host);const pick=host.querySelector('#sr-equipment');if(pick)pick.onchange=()=>{selectEquipment(pick.value);markDirty();render();};
-    host.querySelectorAll('[data-report-path]').forEach(el=>{el.disabled=locked;el.oninput=()=>{const path=el.dataset.reportPath.split('.'),last=path.pop();let obj=report;path.forEach(k=>obj=obj[k]);obj[last]=el.value;markDirty();};});
-    host.querySelectorAll('[data-report-photo]').forEach(el=>{el.disabled=locked;el.onchange=()=>{const u=item.job.completionPhotos[Number(el.dataset.reportPhoto)];report.photos=report.photos.filter(x=>x!==u);if(el.checked)report.photos.push(u);markDirty();};});
+    host.querySelectorAll('[data-report-path]').forEach(el=>{el.disabled=locked;el.oninput=()=>{const path=el.dataset.reportPath.split('.'),last=path.pop();let obj=report;path.forEach(k=>obj=obj[k]);if(el.dataset.reportPath==='fields.serial'){setReportSerial(el.value);return;}obj[last]=el.value;markDirty();};});
+    renderReportPhotos();
     host.querySelectorAll('[data-picker-path]').forEach(button=>{const el=Array.from(host.querySelectorAll('[data-report-path]')).find(x=>x.dataset.reportPath===button.dataset.pickerPath);button.disabled=locked;button.onclick=()=>{if(busy||locked||!el)return;if(typeof DateTimePicker==='undefined'){notice('โหลดตัวเลือกวันที่ไม่สำเร็จ กรุณารีเฟรชหน้า');return;}DateTimePicker.open(el);};if(el){const original=el.oninput;el.oninput=()=>{original();button.querySelector('.sr-picker-value').textContent=pickerLabel(el.value,el.dataset.dtp);};}});
     if(typeof DateTimePicker!=='undefined')DateTimePicker.attachAll(host);
     if(!locked){pad('sr-engineer-pad','signature');pad('sr-customer-pad','customerSignature');const b=document.getElementById('report-save');if(b)b.className=dirty?'sr-unsaved':'sr-saved';}
@@ -67,7 +67,39 @@ const TechReports=(()=>{
     const groups=[{title:'INPUT · ไฟฟ้าขาเข้า',description:'ค่าที่วัดก่อนเข้า UPS',keys:['inputVoltage','inputCurrent']},{title:'OUTPUT · ไฟฟ้าขาออก',description:'ค่าที่วัดจาก UPS ไปยังอุปกรณ์',keys:['outputVoltage','outputCurrent']},{title:'LOAD & FREQUENCY · โหลดและความถี่',description:'ภาระโหลดและความถี่ของแต่ละเฟส',keys:['load','frequency']}];
     return '<div class="sr-measurement-groups">'+groups.map(g=>'<fieldset class="sr-measurement-group"><legend>'+E(g.title)+'</legend><p>'+E(g.description)+'</p><div class="sr-measurement-scroll"><table><thead><tr><th scope="col">รายการตรวจวัด</th>'+['R','S','T'].map(phase=>'<th scope="col">เฟส '+phase+'</th>').join('')+'</tr></thead><tbody>'+g.keys.map(key=>{const label=DonnetReport.values.find(x=>x[0]===key)[1];return '<tr><th scope="row">'+E(label)+'</th>'+['R','S','T'].map(phase=>'<td>'+input('measurements.'+key+phase,label+' · เฟส '+phase,report.measurements[key+phase]||'')+'</td>').join('')+'</tr>';}).join('')+'</tbody></table></div></fieldset>').join('')+'</div>';
   }
-  function selectEquipment(id){const e=equipment.find(x=>x.id===id);if(!e){delete report.equipmentSource;return;}report.equipmentSource={id:e.id,serial:e.serial};report.fields.serial=e.serial||'';}
+  function renderReportPhotos(){
+    const area=document.getElementById('sr-report-photo-options');
+    if(!area||!report)return;
+    const locked=meta?.status==='signed';
+    const serial=DonnetReport.serial(report.fields.serial);
+    const photos=locked?report.photos:jobPhotosForSerial(item.job,serial);
+    area.innerHTML='<p>'+E(serial?'Serial '+serial:'รูปทั่วไป')+'</p><div class="sr-grid">'+photos.map((url,index)=>
+      '<label><input type="checkbox" data-report-photo="'+index+'" '+(report.photos.includes(url)?'checked':'')+'> รูป '+(index+1)+'</label>'
+    ).join('')+'</div>'+(!photos.length?'<p>ยังไม่มีรูปในกลุ่มนี้</p>':'');
+    if(!locked&&report.photos.some(url=>!photos.includes(url)))area.insertAdjacentHTML('beforeend','<p>ฉบับนี้มีรูปที่เคยแนบไว้จากกลุ่มอื่น ดูได้ใน Preview รูปเหล่านี้จะถูกเอาออกเมื่อเปลี่ยน Serial</p>');
+    area.querySelectorAll('[data-report-photo]').forEach(input=>{
+      input.disabled=locked;
+      input.onchange=()=>{
+        const url=photos[Number(input.dataset.reportPhoto)];
+        report.photos=report.photos.filter(photo=>photo!==url);
+        if(input.checked)report.photos.push(url);
+        markDirty();
+      };
+    });
+  }
+  function setReportSerial(value){
+    if(DonnetReport.serial(report.fields.serial)!==DonnetReport.serial(value)){
+      const available=jobPhotosForSerial(item.job,value);
+      report.photos=report.photos.filter(url=>available.includes(url));
+      report.fields.serial=value;
+      const drawer=document.getElementById('sr-reference');
+      if(drawer&&!drawer.hidden){drawer.remove();toggleReference();}
+    }
+    report.fields.serial=value;
+    renderReportPhotos();
+    markDirty();
+  }
+  function selectEquipment(id){const e=equipment.find(x=>x.id===id);if(!e){delete report.equipmentSource;return;}report.equipmentSource={id:e.id,serial:e.serial};setReportSerial(e.serial||'');}
   function bindHistory(host){const brand=host.querySelector('#sr-brand-profile');if(brand)brand.onchange=()=>{if(busy||meta?.status==='signed')return;selectedProfile=brand.value;if(report){report.brandingProfileId=selectedProfile;report.branding=Object.assign({},DonnetReport.defaults,selectedProfile?profiles.find(p=>p.id===selectedProfile).branding:config);markDirty();}};host.querySelectorAll('[data-load-report]').forEach(b=>b.onclick=()=>load(b.dataset.loadReport));}
   function markDirty(){dirty=true;const active=document.querySelector('.sr-history-active .sr-active-label');if(active)active.textContent='● กำลังแก้ไข · ยังไม่บันทึก';const b=document.getElementById('report-save');if(b)b.className='sr-unsaved';}
   function pad(id,key){const canvas=document.getElementById(id);if(!canvas)return;const ctx=canvas.getContext('2d');ctx.lineWidth=2.5;ctx.lineCap='round';ctx.strokeStyle='#101828';ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);if(DonnetReport.validate&&report[key]){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,canvas.width,canvas.height);img.src=report[key];}let drawing=false,moved=false;const point=e=>{const r=canvas.getBoundingClientRect();return [(e.clientX-r.left)*canvas.width/r.width,(e.clientY-r.top)*canvas.height/r.height];};canvas.onpointerdown=e=>{drawing=true;moved=false;canvas.setPointerCapture(e.pointerId);ctx.beginPath();ctx.moveTo(...point(e));};canvas.onpointermove=e=>{if(!drawing)return;moved=true;ctx.lineTo(...point(e));ctx.stroke();};canvas.onpointerup=canvas.onpointercancel=()=>{if(drawing&&moved){report[key]=canvas.toDataURL('image/png');markDirty();}drawing=false;};}
