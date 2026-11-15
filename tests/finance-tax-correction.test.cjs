@@ -3,6 +3,44 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
+test('tax editor attaches the sale certificate separately and retries without repeating the tax write', async () => {
+  const file={name:'certificate.pdf',type:'application/pdf',size:100};
+  const message={},submit={},form={isConnected:true,elements:[{}],querySelector:()=>message};
+  const actions=[];
+  let uploads=0, attachmentAttempts=0;
+  const ctx=vm.createContext({
+    ledgerAttachmentRows:[{source:'SalePro',gross:9095,whtCertificateUrl:'old-cert',taxCorrection:{},attachmentTarget:{id:'p',source:'SalePro'}}],
+    isAdminUser:()=>true,fmt:String,esc:String,modal(){},
+    document:{getElementById:()=>form,querySelector:()=>submit},
+    FormData:class{ *[Symbol.iterator](){yield ['certificateFile',file];yield ['reason','checked'];} },
+    financeProgress:{run:async (label,work)=>work()},
+    uploadDoc:async (input,isPrivate,folder)=>{
+      assert.equal(input.files[0],file);
+      assert.equal(isPrivate,true);
+      assert.equal(folder,'PaymentCertificates');
+      uploads++;
+      return {url:'new-cert',name:file.name};
+    },
+    _call:async request=>{
+      actions.push(request.action);
+      if(request.action==='correctFinanceTax'){ assert.equal(request.data.certificateFile,undefined); return; }
+      assert.equal(request.previousUrl,'old-cert');
+      assert.equal(request.url,'new-cert');
+      if(++attachmentAttempts===1)throw Error('try again');
+    },
+    refreshFinanceTaxData:async ()=>actions.push('refresh'),
+    closeModal(){},toast(){},
+  });
+  vm.runInContext(fs.readFileSync('finance/js/tax-correction.js','utf8'),ctx);
+  ctx.openFinanceTaxCorrection(0);
+  const event={preventDefault(){}};
+  await form.onsubmit(event);
+  assert.match(submit.textContent,/ลองแนบหนังสือรับรองอีกครั้ง/);
+  await form.onsubmit(event);
+  assert.deepEqual(actions,['correctFinanceTax','attachFinanceWhtCertificate','attachFinanceWhtCertificate','refresh']);
+  assert.equal(uploads,1);
+});
+
 test('tax correction keeps progress active through refresh and retries a failed read without saving twice', async () => {
   const message={};
   const submit={disabled:false};

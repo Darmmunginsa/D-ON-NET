@@ -17,6 +17,8 @@ function openFinanceTaxCorrection(index){
       <label>เลขที่ใบกำกับภาษี<input name="taxDoc" maxlength="100" value="${esc(row.taxDoc||'')}"></label>
       <label>วันที่ใบกำกับภาษี<input name="documentDate" type="date" value="${esc(row.taxCorrection.documentDate||'')}"></label>
       <label>แนบหรือเปลี่ยนไฟล์ใบกำกับภาษี<input name="invoiceFile" type="file" accept="image/*,.pdf"></label>
+      ${sale?`<label>หนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ)<input name="certificateFile" type="file" accept="image/*,.pdf">
+        ${row.whtCertificateUrl?'<small>มีไฟล์แนบแล้ว · เลือกไฟล์ใหม่เพื่อเปลี่ยน</small>':''}</label>`:''}
       ${sale?`<label>วันที่เกิดภาษี<input name="taxDate" type="date" value="${esc(row.taxCorrection.taxDate||'')}"></label>
       ${money('invoiceBase','ยอดก่อน VAT ทั้งใบกำกับ',invoice?.BaseAmount)}
       ${money('invoiceVat','VAT ทั้งใบกำกับ',invoice?.VatAmount)}
@@ -27,8 +29,18 @@ function openFinanceTaxCorrection(index){
   const form=document.getElementById('finance-tax-correction-form');
   const submit=document.querySelector('[form="finance-tax-correction-form"]');
   const message=form.querySelector('[role="status"]');
-  let uploadedFile=null, invoiceUrl='';
-  let saved=false;
+  const uploaded=new Map();
+  let taxSaved=false, pendingCertificate=null;
+  async function uploadTaxFile(file,folder,label){
+    const previous=uploaded.get(folder);
+    if(previous?.file===file)return previous.document;
+    if(file.size>5*1024*1024||(!file.type.startsWith('image/')&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name)))throw Error(label+' ต้องเป็นรูปภาพหรือ PDF ขนาดไม่เกิน 5 MB');
+    message.textContent='กำลังอัปโหลด'+label+'…';
+    const document=await uploadDoc({files:[file]},true,folder);
+    if(!document?.url)throw Error('อัปโหลด'+label+'ไม่สำเร็จ');
+    uploaded.set(folder,{file,document});
+    return document;
+  }
   form.oninput=()=>{
     const data=Object.fromEntries(new FormData(form));
     if(work||data.whtRate==='')return;
@@ -42,24 +54,27 @@ function openFinanceTaxCorrection(index){
     submit.disabled=true;
     message.textContent='กำลังบันทึกข้อมูลภาษี…';
     try{
-      await financeProgress.run(saved?'กำลังโหลดข้อมูลภาษีล่าสุด…':'กำลังบันทึกข้อมูลภาษี…',async()=>{
-        if(!saved){
-          const file=data.invoiceFile;
+      const progressLabel=!taxSaved?'กำลังบันทึกข้อมูลภาษี…':pendingCertificate?'กำลังบันทึกหนังสือรับรอง…':'กำลังโหลดข้อมูลภาษีล่าสุด…';
+      await financeProgress.run(progressLabel,async()=>{
+        if(!taxSaved){
+          const invoiceFile=data.invoiceFile;
+          const certificateFile=sale?data.certificateFile:null;
           delete data.invoiceFile;
-          if(file?.name){
+          delete data.certificateFile;
+          if(invoiceFile?.name){
             if(!data.taxDoc.trim())throw Error('ระบุเลขที่ใบกำกับก่อนแนบไฟล์');
-            if(file.size>5*1024*1024||(!file.type.startsWith('image/')&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name)))throw Error('เลือกไฟล์รูปภาพหรือ PDF ขนาดไม่เกิน 5 MB');
-            if(file!==uploadedFile){
-              message.textContent='กำลังอัปโหลดใบกำกับภาษี…';
-              invoiceUrl=(await uploadDoc(form.elements.invoiceFile,true,'FinanceTaxInvoices'))?.url;
-              if(!invoiceUrl)throw Error('อัปโหลดไฟล์ไม่สำเร็จ');
-              uploadedFile=file;
-            }
-            data.invoiceUrl=invoiceUrl;
+            data.invoiceUrl=(await uploadTaxFile(invoiceFile,'FinanceTaxInvoices','ใบกำกับภาษี')).url;
           }
+          pendingCertificate=certificateFile?.name?await uploadTaxFile(certificateFile,'PaymentCertificates','หนังสือรับรองหัก ณ ที่จ่าย'):null;
+          message.textContent='กำลังบันทึกข้อมูลภาษี…';
           await _call({action:'correctFinanceTax',target:row.attachmentTarget,data,expected:{gross:row.gross,revision:row.taxCorrection.revision,invoiceId:invoice?.id||'',invoiceRevision:invoice?.TaxRevision||''}});
-          saved=true;
+          taxSaved=true;
           for(const control of form.elements)control.disabled=true;
+        }
+        if(pendingCertificate){
+          message.textContent='กำลังบันทึกหนังสือรับรองหัก ณ ที่จ่าย…';
+          await _call({action:'attachFinanceWhtCertificate',target:row.attachmentTarget,previousUrl:row.whtCertificateUrl||'',url:pendingCertificate.url,filename:pendingCertificate.name});
+          pendingCertificate=null;
         }
         message.textContent='บันทึกแล้ว กำลังโหลดข้อมูลล่าสุด…';
         await refreshFinanceTaxData();
@@ -67,8 +82,13 @@ function openFinanceTaxCorrection(index){
       if(form.isConnected)closeModal();
       toast('บันทึกข้อมูลภาษีกลับไปที่รายการต้นทางแล้ว','success');
     }catch(error){
-      message.textContent=saved?'บันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่: '+error.message:error.message;
-      if(saved)submit.textContent='โหลดข้อมูลใหม่';
+      if(taxSaved&&pendingCertificate){
+        message.textContent='บันทึกข้อมูลภาษีแล้ว แต่ยังแนบหนังสือรับรองไม่สำเร็จ: '+error.message;
+        submit.textContent='ลองแนบหนังสือรับรองอีกครั้ง';
+      }else if(taxSaved){
+        message.textContent='บันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่: '+error.message;
+        submit.textContent='โหลดข้อมูลใหม่';
+      }else message.textContent=error.message;
     }
     finally{submit.disabled=false;}
   };
