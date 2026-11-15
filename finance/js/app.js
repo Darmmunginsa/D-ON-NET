@@ -63,11 +63,16 @@ async function loadAll(){
     // รายรับจาก SalePro (Payments)
     const pays = await getListItems(CONFIG.lists.payments).catch(()=>[]);
     impTax=(pays||[]).filter(p=>+p.AmountPaid>0).map(p=>({TaxVersion:'1',Date:String(p.PaymentDate||'').slice(0,10),TaxDate:p.TaxDate||String(p.PaymentDate||'').slice(0,10),TaxDoc:p.TaxDoc||p.Title||'',TxType:'income',...FinanceRelationships.resolve(p,financeQuotes),Party:p.ClientName||'',BaseAmount:p.WHTBaseAmount||'',VatAmount:p.PaymentVatAmount||0,VatEligible:'true',WhtRate:p.WHTPercent||0,WhtAmount:p.WHTAmount||0,Amount:SalePaymentCore.cash(p),_source:'SalePro',_vatKnown:p.PaymentVatAmount!==undefined&&p.PaymentVatAmount!=='',_taxDateFallback:!p.TaxDate}));
-    impIncome = (pays||[]).filter(p=>+p.AmountPaid>0).map(p=>({
-      ...FinanceRelationships.resolve(p,financeQuotes),date:(p.PaymentDate||'').slice(0,10), type:'income', category:'รายรับจากการขาย',
-      amount:SalePaymentCore.cash(p),whtAmount:+p.WHTAmount||0,settledAmount:+p.AmountPaid||0, party:p.ClientName||('ใบเสนอราคา '+(p.QuoteID||'')), method:p.PaymentMethod||'',
-      note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:'สลิป', source:'SalePro'
-    }));
+    impIncome = (pays||[]).filter(p=>+p.AmountPaid>0).map(p=>{
+      const relation=FinanceRelationships.resolve(p,financeQuotes);
+      const quoteLabel=relation.quoteTitle ? 'ใบเสนอราคา '+relation.quoteTitle : 'รายรับจากการขาย';
+      const party=String(p.ClientName||'').trim() || relation.quoteCustomer || quoteLabel;
+      return {
+        ...relation,date:(p.PaymentDate||'').slice(0,10), type:'income', category:'รายรับจากการขาย',
+        amount:SalePaymentCore.cash(p),whtAmount:+p.WHTAmount||0,settledAmount:+p.AmountPaid||0, party, method:p.PaymentMethod||'',
+        note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:'สลิป', source:'SalePro'
+      };
+    });
     // รายจ่ายจาก PurchasePro (Procurement → Purchase_<id> JSON → payment.vendors)
     impExpense = [];impWorkExpense=[];
     try{
