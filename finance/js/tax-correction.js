@@ -28,6 +28,7 @@ function openFinanceTaxCorrection(index){
   const submit=document.querySelector('[form="finance-tax-correction-form"]');
   const message=form.querySelector('[role="status"]');
   let uploadedFile=null, invoiceUrl='';
+  let saved=false;
   form.oninput=()=>{
     const data=Object.fromEntries(new FormData(form));
     if(work||data.whtRate==='')return;
@@ -41,25 +42,34 @@ function openFinanceTaxCorrection(index){
     submit.disabled=true;
     message.textContent='กำลังบันทึกข้อมูลภาษี…';
     try{
-      const file=data.invoiceFile;
-      delete data.invoiceFile;
-      if(file?.name){
-        if(!data.taxDoc.trim())throw Error('ระบุเลขที่ใบกำกับก่อนแนบไฟล์');
-        if(file.size>5*1024*1024||(!file.type.startsWith('image/')&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name)))throw Error('เลือกไฟล์รูปภาพหรือ PDF ขนาดไม่เกิน 5 MB');
-        if(file!==uploadedFile){
-          message.textContent='กำลังอัปโหลดใบกำกับภาษี…';
-          invoiceUrl=(await uploadDoc(form.elements.invoiceFile,true,'FinanceTaxInvoices'))?.url;
-          if(!invoiceUrl)throw Error('อัปโหลดไฟล์ไม่สำเร็จ');
-          uploadedFile=file;
+      await financeProgress.run(saved?'กำลังโหลดข้อมูลภาษีล่าสุด…':'กำลังบันทึกข้อมูลภาษี…',async()=>{
+        if(!saved){
+          const file=data.invoiceFile;
+          delete data.invoiceFile;
+          if(file?.name){
+            if(!data.taxDoc.trim())throw Error('ระบุเลขที่ใบกำกับก่อนแนบไฟล์');
+            if(file.size>5*1024*1024||(!file.type.startsWith('image/')&&file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name)))throw Error('เลือกไฟล์รูปภาพหรือ PDF ขนาดไม่เกิน 5 MB');
+            if(file!==uploadedFile){
+              message.textContent='กำลังอัปโหลดใบกำกับภาษี…';
+              invoiceUrl=(await uploadDoc(form.elements.invoiceFile,true,'FinanceTaxInvoices'))?.url;
+              if(!invoiceUrl)throw Error('อัปโหลดไฟล์ไม่สำเร็จ');
+              uploadedFile=file;
+            }
+            data.invoiceUrl=invoiceUrl;
+          }
+          await _call({action:'correctFinanceTax',target:row.attachmentTarget,data,expected:{gross:row.gross,revision:row.taxCorrection.revision,invoiceId:invoice?.id||'',invoiceRevision:invoice?.TaxRevision||''}});
+          saved=true;
+          for(const control of form.elements)control.disabled=true;
         }
-        data.invoiceUrl=invoiceUrl;
-      }
-      await _call({action:'correctFinanceTax',target:row.attachmentTarget,data,expected:{gross:row.gross,revision:row.taxCorrection.revision,invoiceId:invoice?.id||'',invoiceRevision:invoice?.TaxRevision||''}});
+        message.textContent='บันทึกแล้ว กำลังโหลดข้อมูลล่าสุด…';
+        await refreshFinanceTaxData();
+      });
       if(form.isConnected)closeModal();
-      await loadAll();
-      if(_view==='ledger')go('ledger');
       toast('บันทึกข้อมูลภาษีกลับไปที่รายการต้นทางแล้ว','success');
-    }catch(error){message.textContent=error.message;}
+    }catch(error){
+      message.textContent=saved?'บันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ กรุณากดโหลดใหม่: '+error.message:error.message;
+      if(saved)submit.textContent='โหลดข้อมูลใหม่';
+    }
     finally{submit.disabled=false;}
   };
 }

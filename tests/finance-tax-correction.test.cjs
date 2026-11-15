@@ -3,6 +3,36 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 
+test('tax correction keeps progress active through refresh and retries a failed read without saving twice', async () => {
+  const message={};
+  const submit={disabled:false};
+  const form={isConnected:true,elements:[{}],querySelector:()=>message};
+  const events=[];
+  let failRefresh=true;
+  let progressDepth=0;
+  const ctx=vm.createContext({
+    ledgerAttachmentRows:[{source:'TechPro',gross:1850,taxCorrection:{},attachmentTarget:{id:'expense'}}],
+    isAdminUser:()=>true,fmt:String,esc:String,modal(){},
+    document:{getElementById:()=>form,querySelector:()=>submit},
+    FormData:class { *[Symbol.iterator](){yield ['reason','checked'];} },
+    financeProgress:{run:async (label,work)=>{progressDepth++;try{await work();}finally{progressDepth--;}}},
+    _call:async ()=>{assert.equal(progressDepth,1);events.push('save');},
+    refreshFinanceTaxData:async ()=>{assert.equal(progressDepth,1);events.push('refresh');if(failRefresh)throw Error('connection lost');},
+    closeModal:()=>events.push('close'),
+    toast(){},
+  });
+  vm.runInContext(fs.readFileSync('finance/js/tax-correction.js','utf8'),ctx);
+  ctx.openFinanceTaxCorrection(0);
+  const event={preventDefault(){}};
+  await form.onsubmit(event);
+  assert.deepEqual(events,['save','refresh']);
+  assert.match(message.textContent,/บันทึกแล้ว/);
+  assert.equal(submit.textContent,'โหลดข้อมูลใหม่');
+  failRefresh=false;
+  await form.onsubmit(event);
+  assert.deepEqual(events,['save','refresh','refresh','close']);
+});
+
 test('Finance correction requires Admin and recalculates the source receipt using its original gross', () => {
   const path='salepro/apps-script/Code.gs';
   const source=fs.readFileSync(path,'utf8');

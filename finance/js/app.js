@@ -57,17 +57,18 @@ async function afterLogin(){
 }
 
 // ── data ──
-async function loadAll(){
+async function loadAll({strict=false}={}){
+  const optionalList=list=>getListItems(list).catch(error=>{if(strict)throw error;return [];});
   try{
-    finTx  = await getListItems(CONFIG.lists.financeTx).catch(()=>[]);
-    finReq = await getListItems(CONFIG.lists.financeReq).catch(()=>[]);
-    finCat = await getListItems(CONFIG.lists.financeCat).catch(()=>[]);
+    finTx  = await optionalList(CONFIG.lists.financeTx);
+    finReq = await optionalList(CONFIG.lists.financeReq);
+    finCat = await optionalList(CONFIG.lists.financeCat);
     finParties = await getListItems('FinanceParty');
     financeQuotes=await getListItems(CONFIG.lists.quotations);
     // รายรับจาก SalePro (Payments)
-    const pays = await getListItems(CONFIG.lists.payments).catch(()=>[]);
+    const pays = await optionalList(CONFIG.lists.payments);
     let invoices=[];
-    try{invoices=await getListItems('SalesTaxInvoices');}catch(error){toast('โหลดใบกำกับภาษีขายไม่สำเร็จ: '+error.message,'error');}
+    try{invoices=await getListItems('SalesTaxInvoices');}catch(error){if(strict)throw error;toast('โหลดใบกำกับภาษีขายไม่สำเร็จ: '+error.message,'error');}
     const invoiceById=new Map(invoices.map(i=>[String(i.id),i]));
     const distinctInvoices=new Map(invoices.filter(i=>i.Title).map(i=>[String(i.Title).trim().toLowerCase(),i]));
     impTax=[...distinctInvoices.values()].map(i=>({TaxVersion:'1',TaxDate:i.TaxDate,TaxDoc:i.Title,TxType:'income',...FinanceRelationships.resolve(i,financeQuotes),BaseAmount:i.BaseAmount,VatAmount:i.VatAmount,VatEligible:'true',_source:'SalePro'}));
@@ -114,8 +115,8 @@ async function loadAll(){
             docUrl:p.slipUrl||p.invUrl||'', docName:(p.slipUrl?p.slipName:p.invName)||'หลักฐานจ่าย', source:'PurchasePro', taxCorrection:{revision:p.taxRevision,whtRate:p.whtPct,whtBase:p.whtBaseAmount,documentDate:p.taxDate}, attachmentTarget:{source:'PurchasePro',id:purchaseId,vendorId:vid} });
         });
       });
-    }catch(e){ console.warn('load purchasepro expense',e.message); }
-  }catch(e){ toast('โหลดข้อมูลไม่สำเร็จ: '+e.message,'error'); }
+    }catch(e){ if(strict)throw e;console.warn('load purchasepro expense',e.message); }
+  }catch(e){ if(strict)throw e;toast('โหลดข้อมูลไม่สำเร็จ: '+e.message,'error'); }
 }
 function catNames(kind){ const fromSheet=finCat.filter(c=>(c.Kind||'')===kind).map(c=>c.Name).filter(Boolean);
   return fromSheet.length?fromSheet:(DEFAULT_CATEGORIES[kind]||[]); }
@@ -206,13 +207,27 @@ function workExpenseTaxRow(entry){
     VatEligible:String(entry.vatStatus==='credit'),Amount:entry.amount,_source:entry.source,
     _vatKnown:entry.vatStatus==='credit'||entry.vatStatus==='excluded'};
 }
+function refreshFinanceTaxData(){
+  return financeProgress.run('กำลังโหลดข้อมูลภาษีล่าสุด…',async()=>{
+    await loadAll({strict:true});
+    go(_view);
+  });
+}
 async function reviewTechExpenseTax(index,status){
   const row=ledgerAttachmentRows[index];
   if(!isAdminUser()||row?.source!=='TechPro'||!row.attachmentTarget||!row.taxDoc)return;
+  let saved=false;
   try{
-    await _call({action:'reviewTechExpenseTax',target:row.attachmentTarget,status,taxDoc:row.taxDoc,taxDate:row.taxDate,vat:row.vat,previousStatus:row.vatStatus});
-    await loadAll();go('ledger');toast('บันทึกผลตรวจภาษีซื้อแล้ว','success');
-  }catch(error){go('ledger');toast(error.message,'error');}
+    await financeProgress.run('กำลังบันทึกผลตรวจภาษีซื้อ…',async()=>{
+      await _call({action:'reviewTechExpenseTax',target:row.attachmentTarget,status,taxDoc:row.taxDoc,taxDate:row.taxDate,vat:row.vat,previousStatus:row.vatStatus});
+      saved=true;
+      await refreshFinanceTaxData();
+    });
+    toast('บันทึกผลตรวจภาษีซื้อแล้ว','success');
+  }catch(error){
+    go(_view);
+    toast((saved?'บันทึกแล้ว แต่โหลดข้อมูลล่าสุดไม่สำเร็จ: ':'')+error.message,'error');
+  }
 }
 function ledgerTaxAmount(amount){return amount==null?'<span style="color:var(--muted)">รอตรวจ</span>':fmt(amount);}
 function renderLedger(){
