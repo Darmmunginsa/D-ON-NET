@@ -607,6 +607,7 @@ function openPaymentCorrection(){
   const vendor=document.getElementById('correction-vendor');
   const amount=document.getElementById('correction-amount');
   const rate=document.getElementById('correction-rate');
+  const noWithholding=document.getElementById('correction-no-wht');
   const reason=document.getElementById('correction-reason');
   const status=document.getElementById('correction-status');
   let saving=false;
@@ -621,10 +622,20 @@ function openPaymentCorrection(){
   vendor.onchange=()=>{
     const payment=vendors[vendor.value];
     amount.value=payment.amount||'';
-    rate.value=payment.whtPct||0;
+    rate.value=payment.whtPct ?? '';
+    noWithholding.checked=rate.value!=='' && rate.valueAsNumber===0;
     updateNet();
   };
-  amount.oninput=rate.oninput=updateNet;
+  amount.oninput=updateNet;
+  rate.oninput=()=>{
+    noWithholding.checked=rate.valueAsNumber===0;
+    updateNet();
+  };
+  noWithholding.onchange=()=>{
+    rate.value=noWithholding.checked?'0':'';
+    updateNet();
+    if(!noWithholding.checked)rate.focus();
+  };
   reason.value='';
   status.textContent='';
   vendor.onchange();
@@ -1166,7 +1177,7 @@ function _payVendorCard(vid, opt){ opt=opt||{}; const v=getVendorById(vid), p=pa
           <div class="form-group"><label>เทอมเครดิต (วัน)</label><input type="number" min="0" value="${p.termDays||''}" placeholder="เช่น 30" oninput="payTermChange('${vid}','termDays',this.value)"></div>
           <div class="form-group"><label>ครบกำหนดจ่าย</label><input value="${due?fmtDate(due):'—'}" readonly style="opacity:0.8;background:var(--surface)"></div>
           <div class="form-group"><label>จำนวนเงิน (ก่อนหัก)</label><input type="number" value="${p.amount||''}" oninput="payInput('${vid}','amount',this.value)"></div>
-          <div class="form-group"><label>หัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><input type="number" min="0" max="100" step="0.5" value="${p.whtPct||''}" placeholder="0" oninput="payInput('${vid}','whtPct',this.value)" style="max-width:70px"><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',1);renderStageBody()" title="ค่าขนส่ง/เช่า 1%">1%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',3);renderStageBody()" title="ค่าบริการ 3%">3%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',7);renderStageBody()" title="7%">7%</button></div></div>
+          <div class="form-group"><label>หัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><input type="number" min="0" max="100" step="0.5" value="${p.whtPct??''}" placeholder="0" oninput="payWithholdingInput(this,'${vid}')" style="max-width:70px"><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',1);renderStageBody()" title="ค่าขนส่ง/เช่า 1%">1%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',3);renderStageBody()" title="ค่าบริการ 3%">3%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',7);renderStageBody()" title="7%">7%</button><label style="display:inline-flex;align-items:center;gap:5px;margin:0"><input type="checkbox" data-no-wht style="width:auto;margin:0" ${p.whtPct!=null&&p.whtPct!==''&&Number(p.whtPct)===0?'checked':''} onchange="setNoPayWithholding(this,'${vid}')"> ไม่หัก ณ ที่จ่าย</label></div></div>
           <div class="form-group" style="grid-column:1/-1"><div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:12px;display:flex;gap:18px;flex-wrap:wrap"><span>หัก ณ ที่จ่าย: <b style="font-family:var(--mono)">${fmt(whtAmt)}</b></span><span>ยอดจ่ายสุทธิ: <b style="font-family:var(--mono);color:var(--accent2)">${fmt(net)}</b></span></div></div>
           <div class="form-group"><label>วันที่จ่ายจริง</label><input type="date" value="${p.date||''}" oninput="payInput('${vid}','date',this.value)"></div>
           <div class="form-group"><label>วิธีจ่าย</label><select onchange="payInput('${vid}','method',this.value)">${['เงินโอน','เงินสด','เช็ค','เครดิต'].map(m=>`<option ${p.method===m?'selected':''}>${m}</option>`).join('')}</select></div>
@@ -2501,7 +2512,7 @@ function renderPayStage(){
           <div class="form-group"><label>เทอมเครดิต (วัน)</label><input type="number" min="0" value="${p.termDays||''}" placeholder="เช่น 30" oninput="payTermChange('${vid}','termDays',this.value)"></div>
           <div class="form-group"><label>ครบกำหนดจ่าย</label><input value="${due?fmtDate(due):'—'}" readonly style="opacity:0.8;background:var(--surface)"></div>
           <div class="form-group"><label>จำนวนเงิน (ก่อนหัก)</label><input type="number" value="${p.amount||''}" oninput="payInput('${vid}','amount',this.value)"></div>
-          <div class="form-group"><label>หัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><input type="number" min="0" max="100" step="0.5" value="${p.whtPct||''}" placeholder="0" oninput="payInput('${vid}','whtPct',this.value)" style="max-width:70px"><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',1);renderStageBody()" title="ค่าขนส่ง/เช่า 1%">1%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',3);renderStageBody()" title="ค่าบริการ 3%">3%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',7);renderStageBody()" title="7%">7%</button></div></div>
+          <div class="form-group"><label>หัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><input type="number" min="0" max="100" step="0.5" value="${p.whtPct??''}" placeholder="0" oninput="payWithholdingInput(this,'${vid}')" style="max-width:70px"><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',1);renderStageBody()" title="ค่าขนส่ง/เช่า 1%">1%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',3);renderStageBody()" title="ค่าบริการ 3%">3%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',7);renderStageBody()" title="7%">7%</button><label style="display:inline-flex;align-items:center;gap:5px;margin:0"><input type="checkbox" data-no-wht style="width:auto;margin:0" ${p.whtPct!=null&&p.whtPct!==''&&Number(p.whtPct)===0?'checked':''} onchange="setNoPayWithholding(this,'${vid}')"> ไม่หัก ณ ที่จ่าย</label></div></div>
           <div class="form-group" style="grid-column:1/-1"><div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:12px;display:flex;gap:18px;flex-wrap:wrap"><span>หัก ณ ที่จ่าย: <b style="font-family:var(--mono)">${fmt(whtAmt)}</b></span><span>ยอดจ่ายสุทธิ: <b style="font-family:var(--mono);color:var(--accent2)">${fmt(net)}</b></span></div></div>
           <div class="form-group"><label>วันที่จ่ายจริง</label><input type="date" value="${p.date||''}" oninput="payInput('${vid}','date',this.value)"></div>
           <div class="form-group"><label>วิธีจ่าย</label><select onchange="payInput('${vid}','method',this.value)">${['เงินโอน','เงินสด','เช็ค','เครดิต'].map(m=>`<option ${p.method===m?'selected':''}>${m}</option>`).join('')}</select></div>
@@ -2512,6 +2523,16 @@ function renderPayStage(){
         <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">เอกสารอื่น (เพิ่มได้ไม่จำกัด)</div>${docs||''}<button class="btn btn-sm" onclick="addPayDoc('${vid}')">+ เพิ่มเอกสาร</button></div>
       </div></div>`;
   }).join('');
+}
+function payWithholdingInput(input, vendorId){
+  payInput(vendorId,'whtPct',input.value);
+  input.parentElement.querySelector('[data-no-wht]').checked=input.valueAsNumber===0;
+}
+function setNoPayWithholding(checkbox, vendorId){
+  const input=checkbox.closest('label').parentElement.querySelector('input[type="number"]');
+  input.value=checkbox.checked?'0':'';
+  payWithholdingInput(input,vendorId);
+  renderStageBody();
 }
 function payInput(vid,f,val){ const p=payFor(vid); p[f]=((f==='amount'||f==='whtPct')?(val===''?'':+val):val); }
 function _addDays(ds,n){ if(!ds)return''; const d=new Date(ds+'T00:00:00'); if(isNaN(d))return''; d.setDate(d.getDate()+(+n||0)); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
