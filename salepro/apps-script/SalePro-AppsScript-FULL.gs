@@ -356,7 +356,7 @@ function keepTechExpenseTaxReviews(fields, previous) {
     (job.expenses||[]).forEach(function(expense){
       var old=expenses.get(String(expense.id));
       if(old?.taxRevision&&old.taxRevision!==expense.taxRevision){
-        ['taxDoc','taxDocUrl','taxDate','vatAmount','baseAmount','vatStatus','taxDocumentType','taxRevision','taxEditReason','taxEditedBy','taxEditedAt','vatReviewedBy','vatReviewedAt'].forEach(function(key){expense[key]=old[key];});
+        ['taxDoc','taxDocUrl','taxDate','vatAmount','baseAmount','vatStatus','taxDocumentType','whtStatus','taxRevision','taxEditReason','taxEditedBy','taxEditedAt','vatReviewedBy','vatReviewedAt'].forEach(function(key){expense[key]=old[key];});
       }
       if(expense.taxDocumentType!=='invoice')return;
       var unchanged=old&&old.vatReviewedBy&&['taxDoc','taxDocUrl','taxDate','vatAmount','receiptUrl','amount'].every(function(key){return old[key]===expense[key];});
@@ -409,6 +409,8 @@ function correctFinanceTax(req) {
   var number=function(value){if(value==null||String(value).trim()==='')return null;var n=Number(value);if(!Number.isFinite(n)||n<0)throw Error('ยอดภาษีหรืออัตราภาษีไม่ถูกต้อง');return Math.round(n*100)/100;};
   var vat=number(input.vat), rate=number(input.whtRate), whtBase=number(input.whtBase);
   var status=String(input.vatStatus||'');
+  var whtStatus=input.whtStatus;
+  if(whtStatus!=null&&(target.source!=='TechPro'||!['pending','none'].includes(whtStatus)))throw Error('สถานะหัก ณ ที่จ่ายไม่ถูกต้อง');
   if(!sale&&!['pending','credit','excluded','none'].includes(status))throw Error('เลือกสถานะ VAT ซื้อ');
   if(!sale&&status==='none')vat=0;
   if(!sale&&['credit','excluded'].includes(status)&&(!taxDoc||!documentDate||vat==null))throw Error('กรอกเลขที่ วันที่ และยอด VAT ตามใบกำกับ');
@@ -478,6 +480,7 @@ function correctFinanceTax(req) {
     }else{
       Object.assign(record,{taxDoc:taxDoc,taxDate:documentDate,vatStatus:status,vatAmount:vat,baseAmount:base,taxRevision:nextRevision,taxEditReason:reason,taxEditedBy:email,taxEditedAt:now});
       if(invoiceUrl)record.taxDocUrl=invoiceUrl;
+      if(whtStatus!=null)record.whtStatus=whtStatus;
       if(purchase)Object.assign(record,{taxCapture:'1',whtBaseAmount:whtBase,whtPct:rate});
       else Object.assign(record,{taxDocumentType:taxDoc?'invoice':(status==='none'?'none':record.taxDocumentType||'receipt'),vatReviewedBy:email,vatReviewedAt:now});
       writeFinanceTaxFields(sheetName,row.id,{Value:JSON.stringify(detail)});
@@ -507,6 +510,7 @@ function writeFinanceTaxFields(name,id,fields,create) {
 function handle(req) {
   var a = req.action;
   if(a==='replaceFinanceAttachment')return replaceFinanceAttachment(req);
+  if(a==='correctTechExpenseTax'&&req.target?.source==='TechPro')return correctFinanceTax(req);
   if(a==='correctFinanceTax')return correctFinanceTax(req);
   if(a==='reviewTechExpenseTax')return reviewTechExpenseTax(req);
   if(a==='attachFinanceWhtCertificate')return replaceFinanceAttachment(req,true);

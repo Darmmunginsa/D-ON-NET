@@ -107,9 +107,17 @@ test('Finance correction requires Admin and recalculates the source receipt usin
   assert.equal(vendor.whtBaseAmount,5310);
   assert.equal(vendor.slipUrl,'unchanged');
   assert.equal(vendor.vatStatus,'credit');
-  ctx.correctFinanceTax({_actor:actor,target:{source:'TechPro',id:'expense-1',quoteId:'q',jobId:'job-1'},expected:{gross:1070},data:{vat:70,vatStatus:'credit',taxDoc:'T-1',documentDate:'2026-11-14',reason:'checked'}});
+  ctx.correctFinanceTax({_actor:actor,target:{source:'TechPro',id:'expense-1',quoteId:'q',jobId:'job-1'},expected:{gross:1070},data:{vat:70,vatStatus:'credit',whtStatus:'none',taxDoc:'T-1',documentDate:'2026-11-14',reason:'checked'}});
   const expense=JSON.parse(settings[0].Value).techJobs[0].expenses[0];
   assert.equal(expense.amount,1070);
   assert.equal(expense.vatAmount,70);
   assert.equal(expense.vatStatus,'credit');
+  assert.equal(expense.whtStatus,'none');
+  vm.runInContext(fs.readFileSync('finance/js/relationships.js','utf8'),ctx);
+  const confirmed=vm.runInContext("FinanceRelationships.workExpenses(listRows('Settings'),[])[0]",ctx);
+  assert.equal(confirmed.whtAmount,0);
+  delete expense.whtStatus;
+  settings[0].Value=JSON.stringify({techJobs:[{id:'job-1',expenses:[expense]}]});
+  const legacy=vm.runInContext("FinanceRelationships.workExpenses(listRows('Settings'),[])[0]",ctx);
+  assert.equal(legacy.whtAmount,null);
 });

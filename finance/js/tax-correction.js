@@ -3,6 +3,7 @@ function openFinanceTaxCorrection(index){
   if(!isAdminUser()||!row?.taxCorrection)return;
   const source=row.source;
   const sale=source==='SalePro';
+  const tech=source==='TechPro';
   const work=source==='TechPro'||source==='SaleExpense';
   const invoice=row.taxCorrection.invoice;
   const money=(name,label,value,required=false)=>'<label>'+label+'<input name="'+name+'" type="number" min="0" step="0.01" value="'+esc(value??'')+'" '+(required?'required':'')+'></label>';
@@ -13,6 +14,7 @@ function openFinanceTaxCorrection(index){
     <form id="finance-tax-correction-form" class="tax-correction-form">
       ${money('vat',sale?'VAT ของยอดรับชำระงวดนี้':'VAT ตามเอกสาร',row.vat,sale)}
       ${sale?'':'<label>สถานะ VAT ซื้อ<select name="vatStatus">'+status+'</select></label>'}
+      ${tech?'<label>หัก ณ ที่จ่าย<select name="whtStatus"><option value="pending">รอตรวจ</option><option value="none" '+(row.whtAmount===0?'selected':'')+'>ไม่หัก (฿0.00)</option></select></label>':''}
       ${work?'':money('whtRate','อัตราหัก ณ ที่จ่าย (%)',row.taxCorrection.whtRate,true)+money('whtBase','ฐานหัก ณ ที่จ่าย (บาท)',row.taxCorrection.whtBase)}
       <label>เลขที่ใบกำกับภาษี<input name="taxDoc" maxlength="100" value="${esc(row.taxDoc||'')}"></label>
       <label>วันที่ใบกำกับภาษี<input name="documentDate" type="date" value="${esc(row.taxCorrection.documentDate||'')}"></label>
@@ -67,7 +69,7 @@ function openFinanceTaxCorrection(index){
           }
           pendingCertificate=certificateFile?.name?await uploadTaxFile(certificateFile,'PaymentCertificates','หนังสือรับรองหัก ณ ที่จ่าย'):null;
           message.textContent='กำลังบันทึกข้อมูลภาษี…';
-          await _call({action:'correctFinanceTax',target:row.attachmentTarget,data,expected:{gross:row.gross,revision:row.taxCorrection.revision,invoiceId:invoice?.id||'',invoiceRevision:invoice?.TaxRevision||''}});
+          await _call({action:tech&&data.whtStatus?'correctTechExpenseTax':'correctFinanceTax',target:row.attachmentTarget,data,expected:{gross:row.gross,revision:row.taxCorrection.revision,invoiceId:invoice?.id||'',invoiceRevision:invoice?.TaxRevision||''}});
           taxSaved=true;
           for(const control of form.elements)control.disabled=true;
         }
