@@ -598,12 +598,72 @@ function canClosePurchase(){
   const vids=poVendorList(); if(!vids.length) return false;
   return vids.every(vid=>{ const pay=(sd().payment&&sd().payment.vendors&&sd().payment.vendors[vid])||{}; const sh=(sd().shipping&&sd().shipping.vendors&&sd().shipping.vendors[vid])||{}; const rc=(sd().receive&&sd().receive.vendors&&sd().receive.vendors[vid])||{}; return (+pay.amount>0) && sh.date && rc.date; });
 }
+function openPaymentCorrection(){
+  const purchase=editingPO;
+  if(!purchase?.closed||!CONFIG.adminEmails.includes(currentUser?.email?.toLowerCase())) return;
+  const vendors=purchase.stageData?.payment?.vendors||{};
+  const dialog=document.getElementById('payment-correction');
+  const form=document.getElementById('payment-correction-form');
+  const vendor=document.getElementById('correction-vendor');
+  const amount=document.getElementById('correction-amount');
+  const rate=document.getElementById('correction-rate');
+  const reason=document.getElementById('correction-reason');
+  const status=document.getElementById('correction-status');
+  let saving=false;
+  vendor.replaceChildren(...Object.keys(vendors).map(id=>{
+    const name=getVendorById(id)?.name||id;
+    return new Option(vendors[id].invNo?name+' · '+vendors[id].invNo:name,id);
+  }));
+  const updateNet=()=>{
+    const withheld=Number((Number(amount.value)*Number(rate.value)/100).toFixed(2));
+    document.getElementById('correction-net').textContent='ยอดจ่ายสุทธิ '+fmt(Number(amount.value)-withheld);
+  };
+  vendor.onchange=()=>{
+    const payment=vendors[vendor.value];
+    amount.value=payment.amount||'';
+    rate.value=payment.whtPct||0;
+    updateNet();
+  };
+  amount.oninput=rate.oninput=updateNet;
+  reason.value='';
+  status.textContent='';
+  vendor.onchange();
+  document.getElementById('correction-cancel').onclick=()=>dialog.close();
+  dialog.oncancel=e=>{if(saving)e.preventDefault();};
+  form.onsubmit=async e=>{
+    e.preventDefault();
+    if(saving)return;
+    const payment=vendors[vendor.value];
+    const request={action:'correctClosedPurchasePayment',purchaseId:purchase.id,vendorId:vendor.value,
+      amount:amount.valueAsNumber,whtPct:rate.valueAsNumber,reason:reason.value,
+      previousAmount:Number(payment.amount||0),previousWhtPct:Number(payment.whtPct||0)};
+    const controls=Array.from(form.elements);
+    saving=true;
+    controls.forEach(control=>control.disabled=true);
+    status.textContent='กำลังบันทึก…';
+    try{
+      const result=await _call(request);
+      if(!result?.purchase)throw Error('ระบบยังไม่ยืนยันยอดใหม่');
+      const key='Purchase_'+purchase.id;
+      const cached=_settingsCache.find(row=>row.Title===key);
+      if(cached)cached.Value=JSON.stringify(result.purchase);
+      purchaseExt[String(purchase.id)]=result.purchase;
+      dialog.close();
+      openPO(purchase.id,true);
+      toast('แก้ยอดจ่ายแล้ว โหลด Finance ใหม่เพื่อดูยอดล่าสุด','success');
+    }catch(error){status.textContent=error.message;}
+    finally{saving=false;controls.forEach(control=>control.disabled=false);}
+  };
+  dialog.showModal();
+}
 function renderFooter(){
   const f=document.getElementById('pom-footer'); if(!f)return;
   // ปุ่ม "เพิ่มเข้า Catalog" แยกจาก 8 ขั้น — ใช้ได้ทุกโหมด/ทุกสถานะ (footer ไม่โดน readonly)
   const catBtn='<button class="btn btn-sm" onclick="addPurchaseToCatalog()">➕ เพิ่มเข้า Catalog</button>';
   const docBtn='<button class="btn btn-sm" onclick="openAllDocs()">📂 เอกสารทั้งงาน</button>';
-  if(_poReadonly){ f.innerHTML='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+docBtn+catBtn+'<span style="font-size:12px;color:var(--muted)">📖 ดูอย่างเดียว</span></div><button class="btn" onclick="closeModal(\'po-modal\')">ปิด</button>'; return; }
+  const canCorrect=editingPO.closed&&CONFIG.adminEmails.includes(currentUser?.email?.toLowerCase())&&Object.keys(editingPO.stageData?.payment?.vendors||{}).length;
+  const correctionButton=canCorrect?'<button class="btn btn-sm" onclick="openPaymentCorrection()">แก้ยอดจ่ายหลังปิดงาน</button>':'';
+  if(_poReadonly){ f.innerHTML='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+docBtn+catBtn+correctionButton+'<span style="font-size:12px;color:var(--muted)">📖 ดูอย่างเดียว</span></div><button class="btn" onclick="closeModal(\'po-modal\')">ปิด</button>'; return; }
   if(editingPO.type==='project'){
     const ok=canClosePurchase();
     const right='<button class="btn" onclick="savePurchase()">💾 บันทึก</button>'

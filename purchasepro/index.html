@@ -179,6 +179,19 @@
 </div>
 
 <!-- PURCHASE DETAIL MODAL -->
+<dialog id="payment-correction" style="margin:auto;width:min(460px,92vw);max-height:90vh;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:20px">
+  <form id="payment-correction-form">
+    <h3>แก้ยอดจ่ายหลังปิดงาน</h3>
+    <div class="form-group"><label for="correction-vendor">Vendor</label><select id="correction-vendor" required></select></div>
+    <div class="form-group"><label for="correction-amount">ยอดรวมก่อนหัก ณ ที่จ่าย (บาท)</label><input id="correction-amount" type="number" min="0.01" step="0.01" required></div>
+    <div class="form-group"><label for="correction-rate">หัก ณ ที่จ่าย (%)</label><input id="correction-rate" type="number" min="0" max="100" step="0.01" required></div>
+    <p id="correction-net"></p>
+    <div class="form-group"><label for="correction-reason">เหตุผลที่แก้ไข</label><textarea id="correction-reason" maxlength="500" required></textarea></div>
+    <p id="correction-status" role="status"></p>
+    <button type="button" class="btn" id="correction-cancel">ยกเลิก</button>
+    <button class="btn btn-primary" type="submit">บันทึกการแก้ไข</button>
+  </form>
+</dialog>
 <div class="overlay" id="po-modal">
   <div class="modal">
     <div class="modal-header">
@@ -395,7 +408,7 @@
 <script src="js/config.js?v=admin1"></script>
 <script src="js/api.js?v=monitor20261107"></script>
 <script src="js/auth.js?v=idle60-20261104"></script>
-<script src="js/app.js?v=purchasedetails20261113"></script>
+<script src="js/app.js?v=paymentcorrection20261115"></script>
 <script src="js/manage.js?v=internal20261108"></script>
 <script src="js/tour.js?v=admin1"></script>
 <script src="js/catalog-draft-import.js?v=20261101"></script><script src="../shared/workspace-appearance.js?v=20261103"></script></body>

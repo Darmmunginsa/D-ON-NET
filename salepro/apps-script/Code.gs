@@ -225,8 +225,43 @@ function uploadFile(req) {
   return { fileUrl: file.getUrl(), id: file.getId() };
 }
 
+function correctClosedPurchasePayment(req) {
+  var email=String(req._actor && req._actor.email || '').toLowerCase();
+  if(email!=='admin@dongroups.com') throw Error('เฉพาะ Admin ที่แก้ยอดหลังปิดงานได้');
+  var amount=req.amount, rate=req.whtPct, reason=String(req.reason||'').trim();
+  if(!Number.isFinite(amount)||amount<=0||!Number.isFinite(rate)||rate<0||rate>100||!reason||reason.length>500)
+    throw Error('ตรวจยอดก่อนหัก อัตราหัก ณ ที่จ่าย และเหตุผล');
+  var lock=LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var title='Purchase_'+String(req.purchaseId||'');
+    var name='Procurement';
+    var row=listRows(name).find(function(item){return item.Title===title;});
+    if(!row){name='Settings';row=listRows(name).find(function(item){return item.Title===title;});}
+    if(!row) throw Error('ไม่พบงานจัดซื้อ');
+    var purchase=JSON.parse(row.Value||'{}');
+    var vendors=purchase.stageData && purchase.stageData.payment && purchase.stageData.payment.vendors;
+    var vendorId=String(req.vendorId||'');
+    var payment=vendors && Object.prototype.hasOwnProperty.call(vendors,vendorId) && vendors[vendorId];
+    if(purchase.closed!==true||!payment) throw Error('แก้ได้เฉพาะรายการจ่ายที่มีอยู่ในงานปิดแล้ว');
+    var oldAmount=Number(payment.amount||0), oldRate=Number(payment.whtPct||0);
+    if(oldAmount!==req.previousAmount||oldRate!==req.previousWhtPct)
+      throw Error('ยอดถูกแก้จากอีกหน้าจอ กรุณาโหลดข้อมูลใหม่');
+    if(oldAmount===amount&&oldRate===rate) return {ok:true,purchase:purchase};
+    payment.amount=amount;
+    payment.whtPct=rate;
+    purchase.history=purchase.history||[];
+    purchase.history.push({ts:new Date().toISOString(),stage:purchase.stage,by:email,action:'paymentCorrection',vendorId:vendorId,reason:reason,previousAmount:oldAmount,previousWhtPct:oldRate,amount:amount,whtPct:rate});
+    var sheet=_sheet(name), column=_headers(sheet).indexOf('Value')+1, position=_findRowIndex(sheet,row.id);
+    if(!column||position<0) throw Error('ไม่พบช่องข้อมูลจัดซื้อ');
+    sheet.getRange(position,column).setValue(JSON.stringify(purchase));
+    return {ok:true,purchase:purchase};
+  } finally {lock.releaseLock();}
+}
+
 function handle(req) {
   var a = req.action;
+  if(a==='correctClosedPurchasePayment')return correctClosedPurchasePayment(req);
   if(a==='serviceReport')return serviceReport(req);
   srProtectGeneric(req);
   if(a==='localDraftSync')return localDraftSync(req);
