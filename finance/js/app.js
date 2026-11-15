@@ -66,14 +66,24 @@ async function loadAll(){
     financeQuotes=await getListItems(CONFIG.lists.quotations);
     // รายรับจาก SalePro (Payments)
     const pays = await getListItems(CONFIG.lists.payments).catch(()=>[]);
-    impTax=(pays||[]).filter(p=>+p.AmountPaid>0).map(p=>({TaxVersion:'1',Date:String(p.PaymentDate||'').slice(0,10),TaxDate:p.TaxDate||String(p.PaymentDate||'').slice(0,10),TaxDoc:p.TaxDoc||p.Title||'',TxType:'income',...FinanceRelationships.resolve(p,financeQuotes),Party:p.ClientName||'',BaseAmount:p.WHTBaseAmount||'',VatAmount:p.PaymentVatAmount||0,VatEligible:'true',WhtRate:p.WHTPercent||0,WhtAmount:p.WHTAmount||0,Amount:SalePaymentCore.cash(p),_source:'SalePro',_vatKnown:p.PaymentVatAmount!==undefined&&p.PaymentVatAmount!=='',_taxDateFallback:!p.TaxDate}));
+    let invoices=[];
+    try{invoices=await getListItems('SalesTaxInvoices');}catch(error){toast('โหลดใบกำกับภาษีขายไม่สำเร็จ: '+error.message,'error');}
+    const invoiceById=new Map(invoices.map(i=>[String(i.id),i]));
+    const distinctInvoices=new Map(invoices.filter(i=>i.Title).map(i=>[String(i.Title).trim().toLowerCase(),i]));
+    impTax=[...distinctInvoices.values()].map(i=>({TaxVersion:'1',TaxDate:i.TaxDate,TaxDoc:i.Title,TxType:'income',...FinanceRelationships.resolve(i,financeQuotes),BaseAmount:i.BaseAmount,VatAmount:i.VatAmount,VatEligible:'true',_source:'SalePro'}));
     impIncome = (pays||[]).filter(p=>+p.AmountPaid>0).map(p=>{
       const relation=FinanceRelationships.resolve(p,financeQuotes);
       const quoteLabel=relation.quoteTitle ? 'ใบเสนอราคา '+relation.quoteTitle : 'รายรับจากการขาย';
       const party=String(p.ClientName||'').trim() || relation.quoteCustomer || quoteLabel;
+      const date=String(p.PaymentDate||'').slice(0,10);
+      const invoice=invoiceById.get(String(p.TaxInvoiceId||''));
+      const taxDate=p.TaxDocumentMode==='document'||invoice||distinctInvoices.has(String(p.TaxDoc||'').trim().toLowerCase())?'':p.TaxDate||'';
+      const vat=SalePaymentCore.optional(p.PaymentVatAmount),wht=SalePaymentCore.optional(p.WHTAmount);
+      const base=SalePaymentCore.optional(p.PaymentBaseAmount)??(vat==null?null:Math.round((Number(p.AmountPaid)-vat)*100)/100);
+      impTax.push({TaxVersion:'1',Date:date,TaxDate:taxDate,TaxDoc:invoice?.Title||p.TaxDoc||'',TxType:'income',...relation,Party:party,BaseAmount:base,VatAmount:vat,VatEligible:'true',WhtRate:p.WHTPercent,WhtAmount:wht,Amount:SalePaymentCore.cash(p),_source:'SalePro',_vatKnown:!!taxDate&&vat!=null});
       return {
         ...relation,date:(p.PaymentDate||'').slice(0,10), type:'income', category:'รายรับจากการขาย',
-        amount:SalePaymentCore.cash(p),whtAmount:+p.WHTAmount||0,settledAmount:+p.AmountPaid||0, party, method:p.PaymentMethod||'',
+        amount:SalePaymentCore.cash(p),whtAmount:wht,settledAmount:+p.AmountPaid||0,base,vat,gross:Number(p.AmountPaid),vatStatus:invoice||taxDate?'':'pending',taxKnown:!!(invoice||taxDate)&&wht!=null,taxDoc:invoice?.Title||p.TaxDoc,taxDocUrl:invoice?.DocURL,party, method:p.PaymentMethod||'',
         note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:p.SlipName||'สลิป', whtCertificateUrl:p.WHTCertificateURL||'', source:'SalePro', attachmentTarget:p.id?{source:'SalePro',id:p.id}:null
       };
     });
@@ -82,6 +92,7 @@ async function loadAll(){
     try{
       const legacy=await getListItems(CONFIG.lists.settings);
       impWorkExpense=FinanceRelationships.workExpenses(legacy,financeQuotes);
+      impWorkExpense.filter(e=>e.source==='TechPro'&&e.taxDoc).forEach(e=>impTax.push(workExpenseTaxRow(e)));
       const current=await getListItems(CONFIG.lists.procurement);
       const proc=[...new Map([...legacy,...current].map(r=>[r.Title,r])).values()];
       const jobRow=proc.find(r=>r.Title==='Procurements');
@@ -93,12 +104,13 @@ async function loadAll(){
         let ext={}; try{ ext=JSON.parse(row.Value||'{}'); }catch(e){ return; }
         const vs=(ext.stageData&&ext.stageData.payment&&ext.stageData.payment.vendors)||{};
         Object.keys(vs).forEach(vid=>{ const p=vs[vid]; const amt=+p.amount||0; if(amt<=0)return;
-          const wht=+(amt*(+p.whtPct||0)/100); const net=+(amt-wht).toFixed(2);
+          const {wht,net,base,vat,gross,status}=SalePaymentCore.purchase(p);
+          const vatReviewed=status==='none'||(['credit','excluded'].includes(status)&&!!p.taxDoc&&!!p.taxDate&&vat!=null&&base>=0);
           const purchaseId=row.Title.slice('Purchase_'.length);
           const relation=FinanceRelationships.resolve({purchaseId},financeQuotes,jobs,ext);
-          impTax.push({TaxVersion:'1',Date:String(p.date||'').slice(0,10),TaxDate:p.taxDate||String(p.date||'').slice(0,10),TaxDoc:p.invNo||'',TxType:'expense',...relation,Party:vName(vid),BaseAmount:p.baseAmount||'',VatAmount:p.vatAmount||0,VatEligible:p.vatEligible===true?'true':'false',WhtRate:p.whtPct||0,WhtAmount:wht,Amount:net,_source:'PurchasePro',_vatKnown:p.vatAmount!==undefined&&p.vatAmount!=='',_taxDateFallback:!p.taxDate});
+          impTax.push({TaxVersion:'1',Date:String(p.date||'').slice(0,10),TaxDate:p.taxDate||'',TaxDoc:p.taxDoc||'',TxType:'expense',...relation,Party:vName(vid),BaseAmount:base,VatAmount:vat,VatEligible:String(status==='credit'),WhtRate:p.whtPct,WhtAmount:wht,Amount:net,_source:'PurchasePro',_vatKnown:vatReviewed&&status!=='none'});
           impExpense.push({ ...relation,...BankDetails.read(vendors.find(v=>String(v.id)===String(vid))), bankFromDirectory:true,date:(p.date||'').slice(0,10), type:'expense', category:'ค่าซื้อสินค้า/วัตถุดิบ',
-            amount:net, party:vName(vid), method:p.method||'', note:(p.invNo?'INV '+p.invNo:'')+(ext.quoteTitle?' · '+ext.quoteTitle:''),
+            amount:net,base,vat,gross,whtAmount:wht,taxKnown:vatReviewed&&wht!=null,taxDoc:p.taxDoc,taxDocUrl:p.taxDocUrl,vatStatus:status,whtCertificateUrl:p.whtUrl,party:vName(vid), method:p.method||'', note:(p.invNo?'INV '+p.invNo:'')+(ext.quoteTitle?' · '+ext.quoteTitle:''),
             docUrl:p.slipUrl||p.invUrl||'', docName:(p.slipUrl?p.slipName:p.invName)||'หลักฐานจ่าย', source:'PurchasePro', attachmentTarget:{source:'PurchasePro',id:purchaseId,vendorId:vid} });
         });
       });
@@ -110,7 +122,7 @@ function catNames(kind){ const fromSheet=finCat.filter(c=>(c.Kind||'')===kind).m
 
 // รวมทุกแหล่งเป็น ledger เดียว
 function allEntries(){
-  const manual = finTx.map(t=>({ ...FinanceRelationships.resolve(t,financeQuotes),_id:t._id||t.id, date:(t.Date||'').slice(0,10), type:t.TxType||'expense', category:t.Category||'', amount:+t.Amount||0, party:t.Party||'', method:t.Method||'', note:t.Note||'', docUrl:t.DocURL||'', docName:t.DocName||'', ...BankDetails.read(t),source:'Manual', taxKnown:t.TaxVersion==='1', editable:true }));
+  const manual = finTx.map(t=>({ ...FinanceRelationships.resolve(t,financeQuotes),_id:t._id||t.id, date:(t.Date||'').slice(0,10), type:t.TxType||'expense', category:t.Category||'', amount:+t.Amount||0, party:t.Party||'', method:t.Method||'', note:t.Note||'', docUrl:t.DocURL||'', docName:t.DocName||'', ...BankDetails.read(t),source:'Manual',base:SalePaymentCore.optional(t.BaseAmount),vat:SalePaymentCore.optional(t.VatAmount),gross:SalePaymentCore.optional(t.GrossAmount),whtAmount:SalePaymentCore.optional(t.WhtAmount),taxDoc:t.TaxDoc,taxKnown:t.TaxVersion==='1', editable:true }));
   const reqPaid = finReq.filter(r=>r.Status==='Paid').map(r=>({ ...FinanceRelationships.resolve(r,financeQuotes),date:(r.PaidDate||r.ApprovedAt||r.Date||'').slice(0,10), type:'expense', category:r.Category||'เบิกจ่าย', amount:+r.Amount||0, party:r.Requester||'', method:r.PaidMethod||'', note:'ใบเบิก '+(r.ReqNo||'')+(r.Reason?' · '+r.Reason:''), docUrl:r.DocURL||'', docName:r.DocName||'', source:'เบิกจ่าย' }));
   return manual.concat(reqPaid, impIncome, impExpense,impWorkExpense).filter(e=>e.date);
 }
@@ -188,6 +200,21 @@ function drawCharts(){
 
 // ── Ledger ──
 let ledgerAttachmentRows=[];
+function workExpenseTaxRow(entry){
+  return {TaxVersion:'1',TxType:'expense',Date:entry.date,TaxDate:entry.taxDate,TaxDoc:entry.taxDoc,
+    quoteTitle:entry.quoteTitle,Party:entry.party,BaseAmount:entry.base,VatAmount:entry.vat,
+    VatEligible:String(entry.vatStatus==='credit'),Amount:entry.amount,_source:'TechPro',
+    _vatKnown:entry.vatStatus==='credit'||entry.vatStatus==='excluded'};
+}
+async function reviewTechExpenseTax(index,status){
+  const row=ledgerAttachmentRows[index];
+  if(!isAdminUser()||row?.source!=='TechPro'||!row.attachmentTarget||!row.taxDoc)return;
+  try{
+    await _call({action:'reviewTechExpenseTax',target:row.attachmentTarget,status,taxDoc:row.taxDoc,taxDate:row.taxDate,vat:row.vat,previousStatus:row.vatStatus});
+    await loadAll();go('ledger');toast('บันทึกผลตรวจภาษีซื้อแล้ว','success');
+  }catch(error){go('ledger');toast(error.message,'error');}
+}
+function ledgerTaxAmount(amount){return amount==null?'<span style="color:var(--muted)">รอตรวจ</span>':fmt(amount);}
 function renderLedger(){
   let ents=allEntries().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const f=_ledgerFilter;
@@ -201,12 +228,16 @@ function renderLedger(){
     <td>${e.type==='income'?'<span style="color:var(--green)">▲ รับ</span>':'<span style="color:var(--red)">▼ จ่าย</span>'}</td>
     <td>${esc(e.category)}</td>
     <td>${esc(e.party)}${e.bankAccountNumber?`<div>${e.bankFromDirectory?'<small>บัญชีปัจจุบันจากทะเบียน Vendor</small>':''}${BankDetails.html(e,esc)}</div>`:''}<div style="font-size:10px;color:var(--muted)">${esc(e.note)}</div>${e.source==='SalePro'&&e.whtAmount>0?`<div style="font-size:11px;color:var(--amber)">หัก ณ ที่จ่าย ${fmt(e.whtAmount)} · ตัดยอดหนี้ ${fmt(e.settledAmount)}</div>`:''}</td>
-    <td style="text-align:right;font-family:var(--mono);color:${e.type==='income'?'var(--green)':'var(--red)'}">${e.type==='income'?'+':'-'}${fmt0(e.amount)}</td>
+    <td style="text-align:right">${ledgerTaxAmount(e.base)}</td>
+    <td style="text-align:right">${ledgerTaxAmount(e.vat)}${e.vatStatus&&e.vatStatus!=='none'?'<small style="display:block">'+({pending:'รอตรวจ',credit:'ใช้เครดิตได้',excluded:'ใช้เครดิตไม่ได้'}[e.vatStatus]||'')+'</small>':''}</td>
+    <td style="text-align:right">${ledgerTaxAmount(e.gross)}</td>
+    <td style="text-align:right">${ledgerTaxAmount(e.whtAmount)}${e.whtAmount>0?'<small style="display:block">'+(e.type==='income'?'ลูกค้าหักเรา':'เราหักผู้ขาย')+'</small>':''}</td>
+    <td style="text-align:right;font-family:var(--mono);color:${e.type==='income'?'var(--green)':'var(--red)'}">${e.type==='income'?'+':'-'}${fmt(e.amount)}${e.source==='PurchasePro'&&e.whtAmount==null?'<small style="display:block">รอตรวจยอดหัก</small>':''}</td>
     <td>${e.quoteId?'<div style="font-size:12px;color:var(--accent2)">'+esc(e.quoteTitle||e.quoteId)+'</div><div style="font-size:10px;color:var(--muted)">'+esc(e.quoteCustomer)+'</div>':'<span style="color:var(--muted)">ไม่ผูกใบเสนอราคา</span>'}${e.purchaseId?'<div style="font-size:10px;color:var(--muted)">งานจัดซื้อ '+esc(e.purchaseId)+'</div>':''}</td>
     <td>${srcBadge(e.source)}</td>
-    <td>${docChip(e.docUrl,e.docName)} ${docChip(e.whtCertificateUrl,'หนังสือรับรองหัก ณ ที่จ่าย')} ${e.attachmentTarget&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+')">'+(e.source==='SalePro'?'แก้สลิป':'แก้ไฟล์แนบ')+'</button>':''} ${e.attachmentTarget?.source==='SalePro'&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+',true)">'+(e.whtCertificateUrl?'เปลี่ยนหนังสือรับรอง':'แนบหนังสือรับรองหัก ณ ที่จ่าย')+'</button>':''}</td>
+    <td>${docChip(e.docUrl,e.docName)} ${docChip(e.whtCertificateUrl,'หนังสือรับรองหัก ณ ที่จ่าย')} ${docChip(e.taxDocUrl,e.taxDoc?'ใบกำกับ '+e.taxDoc:'ใบกำกับภาษี')} ${e.taxDoc&&!e.taxDocUrl?'<small>'+esc(e.taxDoc)+'</small>':''} ${e.source==='TechPro'&&e.taxDoc&&e.attachmentTarget&&isAdminUser()?'<select class="btn btn-sm" aria-label="ผลตรวจภาษีซื้อ" onchange="reviewTechExpenseTax('+index+',this.value)"><option value="pending" '+(e.vatStatus==='pending'?'selected':'')+'>รอตรวจ</option><option value="credit" '+(e.vatStatus==='credit'?'selected':'')+'>ใช้เครดิตได้</option><option value="excluded" '+(e.vatStatus==='excluded'?'selected':'')+'>ใช้เครดิตไม่ได้</option></select>':''} ${e.attachmentTarget&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+')">'+(e.source==='SalePro'?'แก้สลิป':'แก้ไฟล์แนบ')+'</button>':''} ${e.attachmentTarget?.source==='SalePro'&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+',true)">'+(e.whtCertificateUrl?'เปลี่ยนหนังสือรับรอง':'แนบหนังสือรับรองหัก ณ ที่จ่าย')+'</button>':''}</td>
     <td style="text-align:right">${e.editable?`<button class="ic" onclick="editTx('${e._id}')" title="แก้ไข">✏️</button><button class="ic" onclick="delTx('${e._id}')" title="ลบ" style="color:var(--red)">✕</button>`:''}</td>
-  </tr>`).join(''):'<tr><td colspan="9" class="empty">ไม่มีรายการ</td></tr>';
+  </tr>`).join(''):'<tr><td colspan="13" class="empty">ไม่มีรายการ</td></tr>';
   const srcOpts=['all','Manual','SalePro','PurchasePro','TechPro','SaleExpense','เบิกจ่าย'].map(s=>`<option value="${s}" ${f.source===s?'selected':''}>${s==='all'?'ทุกแหล่ง':s}</option>`).join('');
   const income=ents.filter(e=>e.type==='income').reduce((n,e)=>n+(+e.amount||0),0),expense=ents.filter(e=>e.type==='expense').reduce((n,e)=>n+(+e.amount||0),0),withheld=ents.reduce((n,e)=>n+(+e.whtAmount||0),0);
   const summary=`<aside class="ledger-summary card"><h3>สรุปรายการที่แสดง</h3><p>${ents.length} รายการ · ตามตัวกรองปัจจุบัน</p><div>รับเงินจริง <b style="color:var(--green)">${fmt(income)}</b></div><div>รายจ่าย <b style="color:var(--red)">${fmt(expense)}</b></div><div>คงเหลือสุทธิ <b>${fmt(income-expense)}</b></div><div>ลูกค้าหัก ณ ที่จ่าย <b>${fmt(withheld)}</b></div><small>ยอดหัก ณ ที่จ่ายแสดงประกอบ ไม่บวกซ้ำในเงินรับจริง · ค่าใช้จ่าย Sale/ช่างอิงยอดที่บันทึกไว้</small></aside>`;
@@ -217,7 +248,7 @@ function renderLedger(){
       <select onchange="_ledgerFilter.source=this.value;go('ledger')">${srcOpts}</select>
       <input placeholder="ค้นหาเลขใบเสนอราคา / ลูกค้า / รายละเอียด..." value="${esc(f.q)}" id="ledger-search" oninput="if(!event.isComposing)updateLedgerSearch(this)" oncompositionend="updateLedgerSearch(this)">
     </div>
-    <div class="ledger-workspace"><div class="card ledger-table"><table class="tbl"><thead><tr><th>วันที่</th><th>ประเภท</th><th>หมวดหมู่</th><th>รายละเอียด</th><th style="text-align:right">จำนวนเงิน</th><th>ใบเสนอราคา / งานที่เกี่ยวข้อง</th><th>แหล่ง</th><th>เอกสาร</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${summary}</div>`;
+    <div class="ledger-workspace"><div class="card ledger-table"><table class="tbl"><thead><tr><th>วันที่</th><th>ประเภท</th><th>หมวดหมู่</th><th>รายละเอียด</th><th>ก่อน VAT</th><th>VAT</th><th>รวมก่อนหัก</th><th>หัก ณ ที่จ่าย</th><th>รับ/จ่ายจริง</th><th>ใบเสนอราคา / งานที่เกี่ยวข้อง</th><th>แหล่ง</th><th>เอกสาร</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${summary}</div>`;
 }
 
 function editLedgerAttachment(index, certificate = false){
@@ -296,14 +327,14 @@ function openTx(type,row){ _editTxId=row?row._id:null; _txDoc=row?{url:row.docUr
   `,`<button class="btn btn-primary" onclick="saveTx()">บันทึก</button>`);
   updateTxTax();
 }
-function editTx(id){ const t=finTx.find(x=>String(x._id||x.id)===String(id)); if(!t)return; openTx(t.TxType||'expense',{quoteId:t.QuoteID||'',_id:t._id||t.id,date:(t.Date||'').slice(0,10),category:t.Category,amount:t.TaxVersion==='1'?+t.InputAmount:+t.Amount||0,taxMode:t.TaxMode,vatRate:t.VatRate,whtRate:t.WhtRate,taxDoc:t.TaxDoc,taxDate:t.TaxDate,vatEligible:t.VatEligible==='true',partyId:t.PartyID,partyTax:t.PartyTaxID,partyBranch:t.PartyBranch,bankName:t.BankName,bankAccountName:t.BankAccountName,bankAccountNumber:t.BankAccountNumber,party:t.Party,method:t.Method,note:t.Note,docUrl:t.DocURL,docName:t.DocName}); }
+function editTx(id){ const t=finTx.find(x=>String(x._id||x.id)===String(id)); if(!t)return; openTx(t.TxType||'expense',{quoteId:t.QuoteID||'',_id:t._id||t.id,date:(t.Date||'').slice(0,10),category:t.Category,amount:t.TaxVersion==='1'?+t.InputAmount:+t.Amount||0,taxMode:t.TaxMode,vatRate:t.VatRate,whtRate:t.WhtRate,whtBase:t.WhtBaseAmount,taxDoc:t.TaxDoc,taxDate:t.TaxDate,vatEligible:t.VatEligible==='true',partyId:t.PartyID,partyTax:t.PartyTaxID,partyBranch:t.PartyBranch,bankName:t.BankName,bankAccountName:t.BankAccountName,bankAccountNumber:t.BankAccountNumber,party:t.Party,method:t.Method,note:t.Note,docUrl:t.DocURL,docName:t.DocName}); }
 async function _txUpload(input){ const el=document.getElementById('tx-doc'); if(el)el.textContent='⏳...'; try{ _txDoc=await uploadDoc(input); if(el)el.innerHTML=_txDoc?docChip(_txDoc.url,_txDoc.name):''; }catch(e){ if(el)el.textContent='อัปโหลดไม่สำเร็จ'; } }
 async function saveTx(){
   const type=document.getElementById('tx-type').value;
   const amt=+document.getElementById('tx-amt').value||0; if(amt<=0){ toast('กรอกจำนวนเงิน','error'); return; }
   let tax;try{tax=readTxTax();}catch(e){toast(e.message,'error');return;}
   let bank;try{bank=BankDetails.validate({bankName:document.getElementById('tx-bank-name').value,bankAccountName:document.getElementById('tx-bank-account-name').value,bankAccountNumber:document.getElementById('tx-bank-account-number').value});}catch(e){toast(e.message,'error');return;}
-  const fields={ QuoteID:document.getElementById('tx-quote').value,BankName:bank.bankName,BankAccountName:bank.bankAccountName,BankAccountNumber:bank.bankAccountNumber,TaxVersion:'1', InputAmount:String(amt), TaxMode:document.getElementById('tx-tax-mode').value, VatRate:document.getElementById('tx-vat').value, WhtRate:document.getElementById('tx-wht').value, BaseAmount:String(tax.base), VatAmount:String(tax.vat), WhtAmount:String(tax.wht), GrossAmount:String(tax.gross), TaxDoc:document.getElementById('tx-tax-doc').value.trim(), TaxDate:document.getElementById('tx-tax-date').value, VatEligible:String(document.getElementById('tx-vat-eligible').checked), PartyID:document.getElementById('tx-party-id').value, PartyTaxID:document.getElementById('tx-party-tax').value.trim(), PartyBranch:document.getElementById('tx-party-branch').value.trim(), Date:document.getElementById('tx-date').value, TxType:type, Category:document.getElementById('tx-cat').value,
+  const fields={ QuoteID:document.getElementById('tx-quote').value,BankName:bank.bankName,BankAccountName:bank.bankAccountName,BankAccountNumber:bank.bankAccountNumber,TaxVersion:'1', InputAmount:String(amt), TaxMode:document.getElementById('tx-tax-mode').value, VatRate:document.getElementById('tx-vat').value, WhtRate:document.getElementById('tx-wht').value, BaseAmount:String(tax.base), VatAmount:String(tax.vat), WhtAmount:String(tax.wht), WhtBaseAmount:String(tax.whtBase??tax.base), GrossAmount:String(tax.gross), TaxDoc:document.getElementById('tx-tax-doc').value.trim(), TaxDate:document.getElementById('tx-tax-date').value, VatEligible:String(document.getElementById('tx-vat-eligible').checked), PartyID:document.getElementById('tx-party-id').value, PartyTaxID:document.getElementById('tx-party-tax').value.trim(), PartyBranch:document.getElementById('tx-party-branch').value.trim(), Date:document.getElementById('tx-date').value, TxType:type, Category:document.getElementById('tx-cat').value,
     Amount:String(tax.net), Method:document.getElementById('tx-method').value, Party:document.getElementById('tx-party').value,
     Note:document.getElementById('tx-note').value, DocURL:_txDoc?_txDoc.url:'', DocName:_txDoc?_txDoc.name:'', CreatedBy:currentUser.email };
   if(!fields.Date || !fields.TaxDate){toast('กรอกวันที่รับ/จ่ายและวันที่เอกสาร','error');return;}

@@ -23,7 +23,7 @@ function renderPayment() {
           <span>คงเหลือ: <span style="color:${rem>0?'var(--red)':'var(--green)'};font-family:var(--mono)">${fmt(rem)}</span></span>
           <div style="margin-left:auto">
             ${typeof Billing!=='undefined' ? Billing.buttonHtml(q) : ''}
-            ${rem > 0 ? `<button class="btn btn-sm btn-success" onclick="openPaymentModal('${q.id}')">+ บันทึกชำระ</button>` : '<span style="color:var(--green);font-size:12px">✓ ชำระครบแล้ว</span>'}
+            ${rem > 0 ? `<button class="btn btn-sm btn-success" onclick="openSaleTrackerModal('${q.id}');document.getElementById('st-tab-btn-payment').click()">+ บันทึกชำระ</button>` : '<span style="color:var(--green);font-size:12px">✓ ชำระครบแล้ว</span>'}
           </div>
         </div>
       </div>

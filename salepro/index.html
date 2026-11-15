@@ -1090,6 +1090,18 @@
           <div id="st-pay-due-display" style="margin-top:6px;font-size:11px;color:var(--muted)"></div>
         </div>
         <div id="st-pay-summary" style="margin-bottom:14px"></div>
+          <details style="margin-bottom:10px"><summary>ใบกำกับภาษีขาย</summary>
+            <div id="st-tax-invoices"></div>
+            <form class="form-grid" id="st-tax-invoice-form" onsubmit="event.preventDefault();saveSTTaxInvoice(this)">
+              <label>เลขที่ใบกำกับภาษี<input name="number" maxlength="100" required></label>
+              <label>วันที่ใบกำกับภาษี<input name="documentDate" type="date" required></label>
+              <label>วันที่เกิดภาษี<input name="taxDate" type="date" required></label>
+              <label>ยอดก่อน VAT (บาท)<input name="base" type="number" min="0.01" step="0.01" required></label>
+              <label>VAT ตามใบกำกับ (บาท)<input name="vat" type="number" min="0" step="0.01" required></label>
+              <label>แนบใบกำกับภาษี<input name="file" type="file" accept="image/*,.pdf"></label>
+              <button type="submit" class="btn btn-sm">บันทึกใบกำกับภาษี</button>
+            </form>
+          </details>
         <div id="st-pay-history" style="margin-bottom:14px"></div>
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px">
           <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:10px">+ บันทึกการชำระ</div>
@@ -1099,6 +1111,9 @@
             <div class="form-group"><label>วิธีชำระ</label><select id="st-pay-method" onchange="renderWHTHint()"><option>เงินสด</option><option>โอนเงิน</option><option>Cheque</option><option>ลดหนี้ (ปรับปรุงหนี้)</option></select></div>
             <div class="form-group"><label>เลขอ้างอิง</label><input id="st-pay-ref" placeholder="เลขโอน"></div>
             <div class="form-group"><label>ลูกค้าหัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:6px;align-items:center"><input id="st-pay-wht" type="number" min="0" max="100" step="0.5" placeholder="0" oninput="renderWHTHint()" style="max-width:80px"><button class="action-btn" onclick="document.getElementById('st-pay-wht').value=3;renderWHTHint()" title="ค่าบริการ 3%" style="font-size:11px;padding:3px 8px">3%</button></div></div>
+            <div class="form-group"><label for="st-pay-wht-base">ฐานหัก ณ ที่จ่าย (บาท)</label><input id="st-pay-wht-base" type="number" min="0" step="0.01" placeholder="ใช้ยอดก่อน VAT ถ้าเว้นว่าง" oninput="renderWHTHint()"></div>
+            <div class="form-group"><label for="st-pay-vat-rate">อัตรา VAT ของยอดรับชำระ</label><select id="st-pay-vat-rate" onchange="renderWHTHint()"><option value="7">7%</option><option value="0">ไม่มี VAT / 0%</option></select></div>
+            <div class="form-group"><label for="st-pay-tax-invoice">ใบกำกับภาษีที่ชำระ</label><select id="st-pay-tax-invoice" onchange="renderWHTHint()"><option value="">ยังไม่ระบุ</option></select></div>
             <div class="form-group"><label>ยอดหลังหัก (รับจริง)</label><div id="st-pay-wht-hint" style="font-size:12px;color:var(--muted);padding-top:8px">—</div></div>
             <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="st-pay-note" style="min-height:48px"></textarea></div>
             <div class="form-group">
@@ -1650,16 +1665,16 @@
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
 <script src="../shared/travel-cost.js?v=routepin20261108"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=customsite20261112"></script><script src="js/pages/quotes.js?v=crm20261112"></script>
 <script src="js/pages/approve.js?v=crm20261112"></script>
-<script src="js/pages/payment.js?v=whtcertificate20261115"></script>
+<script src="js/pages/payment.js?v=taxdocuments20261115"></script>
 <script src="js/pages/catalog.js?v=baseprice20261111"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
 <script src="js/pages/settings.js?v=monitor20261107"></script>
 <script src="js/pages/customers.js?v=partner20261115"></script>
 <script src="js/pages/signature.js?v=partner20261115"></script>
 <script src="js/pages/company.js?v=startup20261108"></script>
 <script src="js/pages/pdf.js?v=drafts20261108"></script>
-<script src="../shared/sale-payment-core.js?v=whtbase20261114"></script>
+<script src="../shared/sale-payment-core.js?v=taxdocuments20261115"></script>
 <script src="js/pages/purchase-expenses.js?v=whtcertificate20261115"></script>
-<script src="js/pages/saletracker.js?v=whtcertificate20261115"></script>
+<script src="js/pages/saletracker.js?v=taxdocuments20261115"></script>
 <script src="../shared/billing-core.js?v=billingbaskets20261108"></script>
 <script src="js/pages/billing.js?v=billingbaskets20261108"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>

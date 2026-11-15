@@ -795,6 +795,73 @@ function renderSTPaySummary(q) {
     </div></div>`;
 }
 
+let stSalesTaxInvoices=[];
+function renderSTTaxInvoices(){
+  const list=document.getElementById('st-tax-invoices');
+  const select=document.getElementById('st-pay-tax-invoice');
+  const previous=select.value;
+  list.replaceChildren();
+  select.replaceChildren(new Option('ยังไม่ระบุ',''));
+  for(const invoice of stSalesTaxInvoices){
+    const row=document.createElement('div');
+    row.textContent=invoice.Title+' · '+fmtDate(invoice.DocumentDate)+' · VAT '+fmt(invoice.VatAmount)+' ';
+    if(invoice.DocURL){
+      const link=document.createElement('a');
+      link.href=invoice.DocURL;link.target='_blank';link.rel='noopener';link.textContent='เปิดใบกำกับ';row.append(link);
+    }
+    list.append(row);
+    select.add(new Option(invoice.Title,invoice.id));
+  }
+  if(stSalesTaxInvoices.some(i=>i.id===previous))select.value=previous;
+  renderWHTHint();
+}
+async function loadSTTaxInvoices(quoteId){
+  const form=document.getElementById('st-tax-invoice-form');
+  if(!form?.reset||!document.getElementById('st-pay-tax-invoice')?.replaceChildren)return;
+  stSalesTaxInvoices=[];
+  form.reset();
+  renderSTTaxInvoices();
+  try{
+    const invoices=await getListItems('SalesTaxInvoices');
+    if(stQuoteId!==quoteId)return;
+    stSalesTaxInvoices=invoices.filter(i=>String(i.QuoteID)===String(quoteId));
+    renderSTTaxInvoices();
+    const quote=quotesData.find(q=>q.id===quoteId);if(quote)renderSTPayHistory(quote);
+  }catch(error){if(stQuoteId===quoteId)toast('โหลดใบกำกับภาษีไม่สำเร็จ: '+error.message,'error');}
+}
+async function saveSTTaxInvoice(form){
+  const quoteId=stQuoteId;
+  const quote=quotesData.find(q=>q.id===quoteId);
+  if(!quote||quote.Status==='Cancelled'||!canManageSaleActions(quote)||form.dataset.saving)return;
+  const {number,documentDate,taxDate,base,vat,file}=form.elements;
+  const title=number.value.trim();
+  if(title.startsWith('='))return toast('เลขที่ใบกำกับภาษีขึ้นต้นด้วย = ไม่ได้','error');
+  if(!title||!documentDate.value||!taxDate.value||!(base.valueAsNumber>0)||!(vat.valueAsNumber>=0))return toast('ตรวจเลขที่ วันที่ และยอดตามใบกำกับภาษี','error');
+  const fields={Title:title,QuoteID:quoteId,DocumentDate:documentDate.value,TaxDate:taxDate.value,BaseAmount:base.valueAsNumber,VatAmount:vat.valueAsNumber};
+  const attachment=file.files[0];
+  form.dataset.saving='1';
+  const submit=form.querySelector('button[type=submit]');submit.disabled=true;
+  try{
+    const invoices=await getListItems('SalesTaxInvoices');
+    if(invoices.some(i=>String(i.Title).trim().toLowerCase()===title.toLowerCase()))throw Error('เลขที่ใบกำกับภาษีนี้ถูกบันทึกแล้ว');
+    if(attachment){
+      if(attachment.size>5*1024*1024||!(/^image\//.test(attachment.type)||attachment.type==='application/pdf'||/\.pdf$/i.test(attachment.name)))throw Error('เลือกไฟล์รูปหรือ PDF ขนาดไม่เกิน 5 MB');
+      const upload=await _call({action:'uploadFile',folder:'SalesTaxInvoices',fileName:attachment.name,mimeType:attachment.type||'application/pdf',base64:(await fileToBase64(attachment)).split(',')[1],privateFile:true});
+      if(!upload.fileUrl)throw Error('อัปโหลดใบกำกับภาษีไม่สำเร็จ');
+      fields.DocURL=upload.fileUrl;
+    }
+    const saved=await createListItem('SalesTaxInvoices',fields);
+    if(stQuoteId===quoteId){stSalesTaxInvoices=stSalesTaxInvoices.filter(i=>i.id!==saved.id).concat(saved);renderSTTaxInvoices();document.getElementById('st-pay-tax-invoice').value=saved.id;renderWHTHint();form.reset();}
+    toast('บันทึกใบกำกับภาษีแล้ว','success');
+  }catch(error){toast(error.message,'error');}
+  finally{delete form.dataset.saving;submit.disabled=false;}
+}
+function calculateSTPayment(amount,rate,invoice){
+  const rateInput=document.getElementById('st-pay-vat-rate');
+  if(rateInput)rateInput.disabled=!!invoice;
+  const vatRate=invoice?Number(invoice.VatAmount)/Number(invoice.BaseAmount)*100:Number(rateInput?.value||7);
+  return SalePaymentCore.calculate(amount,rate,vatRate,document.getElementById('st-pay-wht-base')?.value);
+}
 async function renderSTPayHistory(q) {
   const el=document.getElementById('st-pay-history');
   if(!el) return;
@@ -804,11 +871,12 @@ async function renderSTPayHistory(q) {
     const pays=paymentsCache.filter(p=>String(p.QuoteID)===String(stQuoteId));
     if(!pays.length){el.innerHTML='<div style="font-size:12px;color:var(--muted);padding:4px 0 8px">ยังไม่มีประวัติการชำระ</div>';return;}
     el.innerHTML='<div style="font-size:11px;color:var(--muted);margin-bottom:6px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em">ประวัติการชำระ</div>'+
-      pays.map(p=>{ const _isCredit=/ลดหนี้/.test(p.PaymentMethod||''); return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:12px">
+      pays.map(p=>{ const _isCredit=/ลดหนี้/.test(p.PaymentMethod||''); const invoice=stSalesTaxInvoices.find(i=>String(i.id)===String(p.TaxInvoiceId)); return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:12px">
         <span style="color:${_isCredit?'var(--amber)':'var(--green)'};font-family:var(--mono)">${_isCredit?'▼ ':''}${fmt(p.AmountPaid||0)}</span>
         <span style="color:var(--muted)">${fmtDate(p.PaymentDate)}</span>
         <span class="badge badge-draft" style="font-size:10px${_isCredit?';background:rgba(251,191,36,0.15);color:var(--amber)':''}">${p.PaymentMethod||''}</span>
         ${(+p.WHTAmount>0)?`<span style="color:var(--green);font-size:11px">รับเงินจริง ${fmt(SalePaymentCore.cash(p))}</span><span style="color:var(--amber);font-size:11px" title="ลูกค้าหัก ณ ที่จ่าย ${p.WHTPercent||''}%">หัก ${fmt(p.WHTAmount)}</span>`:''}
+        ${invoice?`<span style="color:var(--muted);font-size:11px">ใบกำกับ ${escHtml(invoice.Title)}</span>`:''}
         ${p.Reference?`<span style="color:var(--muted);font-size:11px">${escHtml(p.Reference)}</span>`:''}
         ${(p.SlipURL || p.WHTCertificateURL) ? `<span style="margin-left:auto;display:inline-flex;flex-wrap:wrap;gap:6px">${p.SlipURL && /^https?:\/\//i.test(p.SlipURL) ? docThumb(p.SlipURL,'สลิปโอนเงิน',{small:true}) : ''}${p.WHTCertificateURL && /^https?:\/\//i.test(p.WHTCertificateURL) ? docThumb(p.WHTCertificateURL,'หนังสือรับรองหัก ณ ที่จ่าย',{small:true}) : ''}</span>` : ''}
       </div>`; }).join('');
@@ -843,7 +911,9 @@ async function saveSTPayment(){
   if(!amt||amt<=0){toast('กรุณาระบุจำนวนเงิน','error');return;}
   const q=quotesData.find(x=>x.id===stQuoteId);if(!q)return;
   if(q.Status==='Cancelled'){toast('ใบเสนอราคานี้ถูกยกเลิกแล้ว','error');return;}
-  let payment;try{payment=SalePaymentCore.calculate(amt,+document.getElementById('st-pay-wht')?.value||0);}catch(e){toast(e.message,'error');return;}
+  const taxInvoiceId=document.getElementById('st-pay-tax-invoice')?.value||'';
+  const invoice=taxInvoiceId?stSalesTaxInvoices.find(i=>i.id===taxInvoiceId):null;
+  let payment;try{payment=calculateSTPayment(amt,+document.getElementById('st-pay-wht')?.value||0,invoice);}catch(e){toast(e.message,'error');return;}
   const submit=document.getElementById('st-pay-submit-btn');
   if(submit?.disabled)return;
   if(submit)submit.disabled=true;
@@ -853,6 +923,7 @@ async function saveSTPayment(){
     const newPaid=Math.min((q.PaidAmount||0)+amt,q.TotalAmount||0);
     const fields={
       Title:payRef, QuoteID:q.id, ...payment.fields,
+      TaxInvoiceId:taxInvoiceId, TaxDocumentMode:'document',
       PaymentDate:document.getElementById('st-pay-date').value,
       PaymentMethod:document.getElementById('st-pay-method').value,
       Reference:document.getElementById('st-pay-ref').value,
@@ -879,7 +950,7 @@ async function saveSTPayment(){
     stDealData.notes.push({id:Date.now(),user:currentUser?.displayName||'User',text:`บันทึกชำระ ${fmt(amt)} (${fields.PaymentMethod})${isNowFullyPaid?' — ชำระครบแล้ว ✓ Closed':''}`,ts:new Date().toISOString(),type:'payment'});
     await saveSTDealData();
     clearSTSlip();
-    ['st-pay-amount','st-pay-ref','st-pay-note','st-pay-wht'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['st-pay-amount','st-pay-ref','st-pay-note','st-pay-wht','st-pay-wht-base'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     renderWHTHint();
     const qU=quotesData.find(x=>x.id===stQuoteId);
     if(qU){
@@ -1041,6 +1112,8 @@ function applyTrackerVisibility(q) {
   const isPaid = (q.PaidAmount||0) >= (q.TotalAmount||1) && (q.TotalAmount||0) > 0;
 
   const isCancelled = q.Status === 'Cancelled';
+  const taxForm=document.getElementById('st-tax-invoice-form');
+  if(taxForm)taxForm.hidden=!canManage||isCancelled;
   const isStatusClosed = q.Status === 'Closed';
 
   // Tab payment & procurement — ซ่อนถ้า Cancelled/Closed หรือปิดงานแล้ว
@@ -2299,7 +2372,7 @@ function openSaleTrackerModal(id) {
   if (av) av.textContent = (currentUser?.displayName || 'U')[0].toUpperCase();
 
   const _v = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
-  _v('st-pay-amount',''); _v('st-pay-date', new Date().toISOString().split('T')[0]); _v('st-pay-ref',''); _v('st-pay-note','');
+  _v('st-pay-vat-rate','7'); _v('st-pay-wht-base',''); _v('st-pay-amount',''); _v('st-pay-date', new Date().toISOString().split('T')[0]); _v('st-pay-ref',''); _v('st-pay-note','');
   clearSTSlip();
 
   // Apply visibility ก่อน switch tab
@@ -2310,6 +2383,7 @@ function openSaleTrackerModal(id) {
   renderSTDocs();
   renderSTPaySummary(q);
   renderSTPayHistory(q).catch(()=>{});
+  loadSTTaxInvoices(q.id);
   renderPOStatusBar(q);
   renderPayDueDateDisplay(q);
   renderReminderDisplay();
@@ -2413,8 +2487,10 @@ function renderWHTHint() {
   if (!el) return;
   const amt = +document.getElementById('st-pay-amount')?.value || 0;
   const pct = +document.getElementById('st-pay-wht')?.value || 0;
+  const invoice=stSalesTaxInvoices.find(i=>i.id===document.getElementById('st-pay-tax-invoice')?.value);
+  const rateInput=document.getElementById('st-pay-vat-rate');if(rateInput)rateInput.disabled=!!invoice;
   if (amt <= 0) { el.innerHTML = '—'; return; }
-  let payment;try{payment=SalePaymentCore.calculate(amt,pct);}catch(e){el.textContent=e.message;return;}
+  let payment;try{payment=calculateSTPayment(amt,pct,invoice);}catch(e){el.textContent=e.message;return;}
   const wht=payment.wht,net=payment.cash;
   el.innerHTML = pct > 0
     ? `ฐานก่อน VAT ${fmt(payment.base)} · VAT ${fmt(payment.vat)}<br>หัก ณ ที่จ่าย ${fmt(wht)} · <b style="color:var(--green)">รับจริง ${fmt(net)}</b>`

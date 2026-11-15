@@ -184,3 +184,6 @@ a{color:var(--accent2)}
 @media (prefers-reduced-motion: reduce) {
   .finance-progress progress { animation: none; }
 }
+
+.ledger-table .tbl{min-width:1070px}
+.ledger-table th:nth-child(n+5):nth-child(-n+9){text-align:right;white-space:nowrap}

@@ -1,12 +1,14 @@
 // Tax values are explicit transaction snapshots; never infer VAT from cash amounts.
-function calcFinanceTax(amount,mode,vatRate,whtRate){
+function calcFinanceTax(amount,mode,vatRate,whtRate,withholdingBase){
   const round=n=>Math.round((n+Number.EPSILON)*100)/100;
   amount=Number(amount); vatRate=Number(vatRate); whtRate=Number(whtRate);
   if(!Number.isFinite(amount)||amount<=0||!['exclusive','inclusive'].includes(mode)||![0,7].includes(vatRate)||![0,1,3,5].includes(whtRate))throw Error('กรุณาตรวจจำนวนเงินและอัตราภาษี');
   const base=mode==='inclusive'?round(amount/(1+vatRate/100)):round(amount);
   const vat=vatRate?(mode==='inclusive'?round(amount-base):round(base*vatRate/100)):0;
-  const wht=round(base*whtRate/100),gross=round(base+vat);
-  return {base,vat,wht,gross,net:round(gross-wht)};
+  const whtBase=withholdingBase==null||withholdingBase===''?base:Number(withholdingBase);
+  if(!Number.isFinite(whtBase)||whtBase<0||whtBase>base)throw Error('ฐานหัก ณ ที่จ่ายเกินยอดก่อน VAT');
+  const wht=round(whtBase*whtRate/100),gross=round(base+vat);
+  return {base,vat,wht,gross,net:round(gross-wht),...(withholdingBase==null||withholdingBase===''?{}:{whtBase})};
 }
 let finParties=[];
 function txTaxForm(r,type){
@@ -14,12 +16,13 @@ function txTaxForm(r,type){
   return `<div class="fg"><label>จำนวนเงินที่กรอก</label><select id="tx-tax-mode" onchange="updateTxTax()">${opts([['exclusive','ก่อน VAT'],['inclusive','รวม VAT แล้ว']],r.taxMode||'exclusive')}</select></div>
   <div class="fg"><label>${type==='income'?'ภาษีขาย':'ภาษีซื้อ'}</label><select id="tx-vat" onchange="updateTxTax()">${opts([[0,'ไม่ระบุ VAT / ไม่มี VAT'],[7,'VAT 7%']],r.vatRate||0)}</select></div>
   <div class="fg"><label>${type==='income'?'ลูกค้าหัก ณ ที่จ่ายเรา':'เราหัก ณ ที่จ่ายผู้รับ/ผู้ขาย'}</label><select id="tx-wht" onchange="updateTxTax()">${opts([[0,'ไม่หัก'],[1,'1%'],[3,'3%'],[5,'5%']],r.whtRate||0)}</select></div>
+  <div class="fg"><label for="tx-wht-base">ฐานหัก ณ ที่จ่าย (บาท)</label><input id="tx-wht-base" type="number" min="0" step="0.01" placeholder="ใช้ยอดก่อน VAT ถ้าเว้นว่าง" value="${esc(r.whtBase??'')}" oninput="updateTxTax()"></div>
   <div class="fg"><label>เลขที่ใบกำกับภาษี / เอกสาร</label><input id="tx-tax-doc" value="${esc(r.taxDoc||'')}"></div>
   <div class="fg"><label>วันที่ใบกำกับภาษี (ใช้ในรายงาน VAT)</label><input type="date" id="tx-tax-date" value="${esc(r.taxDate||r.date||_today())}"></div>
   <div class="fg"><label><input type="checkbox" id="tx-vat-eligible" ${type==='income'?'checked disabled':(r.vatEligible===true?'checked':'')}> ${type==='expense'?'ภาษีซื้อมีสิทธิใช้เครดิต (ตรวจใบกำกับภาษีแล้ว)':'รวมภาษีขายในรายงาน'}</label></div>
   <div id="tx-tax-summary" class="card" style="padding:10px"></div>`;
 }
-function readTxTax(){return calcFinanceTax(document.getElementById('tx-amt').value,document.getElementById('tx-tax-mode').value,document.getElementById('tx-vat').value,document.getElementById('tx-wht').value);}
+function readTxTax(){return calcFinanceTax(document.getElementById('tx-amt').value,document.getElementById('tx-tax-mode').value,document.getElementById('tx-vat').value,document.getElementById('tx-wht').value,document.getElementById('tx-wht-base')?.value);}
 function updateTxTax(){try{const t=readTxTax();document.getElementById('tx-tax-summary').textContent=`ฐาน ${fmt(t.base)} + VAT ${fmt(t.vat)} − หัก ณ ที่จ่าย ${fmt(t.wht)} = รับ/จ่ายสุทธิ ${fmt(t.net)}`;}catch(e){document.getElementById('tx-tax-summary').textContent='กรอกจำนวนเงินเพื่อคำนวณ';}}
 function partyOptions(){return finParties.map((p,i)=>`<option value="${i}">${esc(p.Name)}${p.TaxID?' · '+esc(p.TaxID):''}</option>`).join('');}
 function pickTxParty(index){const p=finParties[Number(index)];if(index===''||!p)return;document.getElementById('tx-party').value=p.Name||'';document.getElementById('tx-party-tax').value=p.TaxID||'';document.getElementById('tx-party-branch').value=p.Branch||'';document.getElementById('tx-party-id').value=String(p.id||p._id);const bank=BankDetails.read(p);document.getElementById('tx-bank-name').value=bank.bankName;document.getElementById('tx-bank-account-name').value=bank.bankAccountName;document.getElementById('tx-bank-account-number').value=bank.bankAccountNumber;}
@@ -35,7 +38,7 @@ function financeTaxInPeriod(date){
 }
 function financeTaxRows(){
   const imported=typeof impTax==='undefined'?[]:impTax;
-  return finTx.filter(t=>t.TaxVersion==='1').map(t=>({...t,_source:'Finance',_vatKnown:true})).concat(imported).map(t=>({...t,_vatInPeriod:financeTaxInPeriod(t.TaxDate||t.Date)&&t._vatKnown!==false,_whtInPeriod:financeTaxInPeriod(t.Date)}));
+  return finTx.filter(t=>t.TaxVersion==='1').map(t=>({...t,_source:'Finance',_vatKnown:true})).concat(imported).map(t=>({...t,_vatInPeriod:financeTaxInPeriod(String(t.TaxDate||'').slice(0,10))&&t._vatKnown!==false,_whtInPeriod:financeTaxInPeriod(t.Date)}));
 }
 function financeTaxDetail(rows,kind){
   const active=rows.filter(r=>kind==='vat'?r._vatInPeriod:r._whtInPeriod&&Number(r.WhtAmount)>0);
@@ -48,11 +51,11 @@ function renderFinanceTaxReport(){
   const t=financeTaxTotals(rows),unknown=allEntries().filter(inPeriod).filter(e=>!e.taxKnown).length;
   const cell=(label,value)=>`<tr><td>${label}</td><td style="text-align:right">${fmt(value)}</td></tr>`;
   const byRate=[...new Set([1,3,5,...rows.filter(r=>r._whtInPeriod&&Number(r.WhtAmount)>0).map(r=>Number(r.WhtRate))])].sort((a,b)=>a-b).map(rate=>{const list=rows.filter(r=>r._whtInPeriod&&Number(r.WhtRate)===rate);return cell('เราหักผู้ขาย '+rate+'%',list.filter(r=>r.TxType==='expense').reduce((s,r)=>s+Number(r.WhtAmount||0),0))+cell('ลูกค้าหักเรา '+rate+'%',list.filter(r=>r.TxType==='income').reduce((s,r)=>s+Number(r.WhtAmount||0),0));}).join('');
-  return `<div class="grid2" style="margin-top:14px"><div class="card"><div class="card-h">สรุป VAT · ตามข้อมูลภาษีที่บันทึก</div><table class="tbl"><tbody>${cell('ภาษีขาย',t.sales)}${cell('ภาษีซื้อที่ใช้เครดิต',t.purchase)}${cell('ภาษีซื้อไม่ใช้เครดิต',t.excluded)}${cell('ภาษีขาย − ภาษีซื้อที่ใช้เครดิต',t.sales-t.purchase)}</tbody></table><small>ผลต่างก่อนเครดิตยกมาและรายการปรับปรุง</small>${financeTaxDetail(rows,'vat')}</div><div class="card"><div class="card-h">สรุปหัก ณ ที่จ่าย · ตามวันที่รับ/จ่าย</div><table class="tbl"><tbody>${cell('เราหักผู้ขาย (เตรียมนำส่ง)',t.withheld)}${cell('ลูกค้าหักเรา (เครดิตภาษี)',t.credit)}${byRate}</tbody></table>${financeTaxDetail(rows,'wht')}</div></div><div class="card" style="margin-top:12px;padding:12px">${unknown} รายการรับจ่ายยังมีรายละเอียดภาษีไม่ครบ · แสดงยอด VAT เฉพาะที่บันทึกไว้ ไม่คำนวณ VAT ซื้อจากยอดโอนเอง · รายการที่ไม่มีวันที่ใบกำกับใช้วันที่รับจ่ายเพื่อการตรวจสอบเบื้องต้น ยังไม่ใช่แบบยื่นภาษี <button class="btn btn-sm" onclick="exportFinanceTaxCSV()">ส่งออก CSV ภาษี</button></div>`;
+  return `<div class="grid2" style="margin-top:14px"><div class="card"><div class="card-h">สรุป VAT · ตามข้อมูลภาษีที่บันทึก</div><table class="tbl"><tbody>${cell('ภาษีขาย',t.sales)}${cell('ภาษีซื้อที่ใช้เครดิต',t.purchase)}${cell('ภาษีซื้อไม่ใช้เครดิต',t.excluded)}${cell('ภาษีขาย − ภาษีซื้อที่ใช้เครดิต',t.sales-t.purchase)}</tbody></table><small>ผลต่างก่อนเครดิตยกมาและรายการปรับปรุง</small>${financeTaxDetail(rows,'vat')}</div><div class="card"><div class="card-h">สรุปหัก ณ ที่จ่าย · ตามวันที่รับ/จ่าย</div><table class="tbl"><tbody>${cell('เราหักผู้ขาย (เตรียมนำส่ง)',t.withheld)}${cell('ลูกค้าหักเรา (เครดิตภาษี)',t.credit)}${byRate}</tbody></table>${financeTaxDetail(rows,'wht')}</div></div><div class="card" style="margin-top:12px;padding:12px">${unknown} รายการรับจ่ายยังมีรายละเอียดภาษีไม่ครบ · แสดงยอด VAT เฉพาะที่บันทึกไว้ ไม่คำนวณ VAT ซื้อจากยอดโอนเอง · รายการที่ยังไม่ยืนยันวันที่ภาษีไม่รวมในยอด VAT · ใช้ตรวจสอบก่อนจัดทำแบบยื่นภาษี <button class="btn btn-sm" onclick="exportFinanceTaxCSV()">ส่งออก CSV ภาษี</button></div>`;
 }
 function exportFinanceTaxCSV(){
   const header=['วันที่รับจ่าย','วันที่ใบกำกับภาษี','เลขที่เอกสาร','ประเภท','คู่ค้า','เลขผู้เสียภาษี','สาขา','ฐานก่อน VAT','VAT','สิทธิภาษีซื้อ','อัตราหัก ณ ที่จ่าย','ยอดหัก ณ ที่จ่าย','รับจ่ายสุทธิ','VAT อยู่ในช่วง','หัก ณ ที่จ่ายอยู่ในช่วง'];
-  const rows=financeTaxRows().filter(r=>r._vatInPeriod||r._whtInPeriod).map(r=>[r.Date,r.TaxDate,r.TaxDoc,r.TxType==='income'?'รายรับ':'รายจ่าย',r.Party,r.PartyTaxID,r.PartyBranch,r.BaseAmount,r.VatAmount,r.VatEligible,r.WhtRate,r.WhtAmount,r.Amount,financeTaxInPeriod(r.TaxDate||r.Date),financeTaxInPeriod(r.Date)]);
+  const rows=financeTaxRows().filter(r=>r._vatInPeriod||r._whtInPeriod).map(r=>[r.Date,r.TaxDate,r.TaxDoc,r.TxType==='income'?'รายรับ':'รายจ่าย',r.Party,r.PartyTaxID,r.PartyBranch,r.BaseAmount,r.VatAmount,r.VatEligible,r.WhtRate,r.WhtAmount,r.Amount,r._vatInPeriod,r._whtInPeriod]);
   const csv='\ufeff'+[header,...rows].map(row=>row.map(v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='finance-tax-'+_period+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }

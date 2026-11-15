@@ -82,6 +82,13 @@ function createRow(name, fields) {
   try {
     var sh = _sheet(name);
     if(name==='Quotations'&&fields&&fields.LocalDraftId){var priorDraft=listRows(name).filter(function(q){return q.LocalDraftId===fields.LocalDraftId;})[0];if(priorDraft){priorDraft._localDraftReused=true;return priorDraft;}}
+    if(name==='SalesTaxInvoices'){
+      var title=String(fields&&fields.Title||'').trim();
+      if(!title||title.length>100||title.charAt(0)==='='||!fields.QuoteID||!/^\d{4}-\d{2}-\d{2}$/.test(fields.TaxDate)||!/^\d{4}-\d{2}-\d{2}$/.test(fields.DocumentDate)||typeof fields.BaseAmount!=='number'||!(fields.BaseAmount>0)||typeof fields.VatAmount!=='number'||!(fields.VatAmount>=0))throw Error('ข้อมูลใบกำกับภาษีไม่ครบ');
+      var duplicate=listRows(name).find(function(row){return String(row.Title||'').trim().toLowerCase()===title.toLowerCase();});
+      if(duplicate)throw Error('เลขที่ใบกำกับภาษีนี้ถูกบันทึกแล้ว');
+      fields.Title=title;
+    }
     fields = prepareQuotationNumberFields(name,prepareContractNumberFields(name,fields||{},null),null);
     validatePurchaseDecision(name,fields,null,null);
     var keys = Object.keys(fields);
@@ -150,7 +157,7 @@ function updateRow(name, id, fields, actor) {
     var rowIdx = _findRowIndex(sh, id);
     if (rowIdx < 0) throw new Error('ไม่พบรายการ id=' + id + ' ใน ' + name);
     if(name==='Quotations'){var previousQuote=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];fields=prepareQuotationNumberFields(name,fields,previousQuote);}
-    if(name==='Procurement'||name==='Settings'){var oldPurchase=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];validatePurchaseDecision(name,fields,oldPurchase,actor);}
+    if(name==='Procurement'||name==='Settings'){var oldPurchase=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];validatePurchaseDecision(name,fields,oldPurchase,actor);if(name==='Settings')keepTechExpenseTaxReviews(fields,oldPurchase);}
     var hdr = _ensureCols(sh, Object.keys(fields));
     if(name==='Contracts'){var oldRow=listRows(name).filter(function(r){return String(r.id)===String(id);})[0];fields=prepareContractNumberFields(name,fields,oldRow);}
     var rng = sh.getRange(rowIdx, 1, 1, hdr.length);
@@ -330,9 +337,54 @@ function replaceFinanceAttachment(req, certificate) {
   }finally{lock.releaseLock();}
 }
 
+function keepTechExpenseTaxReviews(fields, previous) {
+  if(!previous||!String(previous.Title||'').startsWith('DealStatus_')||typeof fields.Value!=='string')return;
+  var saved=JSON.parse(previous.Value||'{}'), next=JSON.parse(fields.Value||'{}');
+  var jobs=new Map((saved.techJobs||[]).map(function(job){return [String(job.id),job];}));
+  (next.techJobs||[]).forEach(function(job){
+    var oldJob=jobs.get(String(job.id));
+    if(!oldJob)return;
+    var expenses=new Map((oldJob.expenses||[]).map(function(expense){return [String(expense.id),expense];}));
+    (job.expenses||[]).forEach(function(expense){
+      var old=expenses.get(String(expense.id));
+      if(expense.taxDocumentType!=='invoice')return;
+      var unchanged=old&&old.vatReviewedBy&&['taxDoc','taxDate','vatAmount','receiptUrl','amount'].every(function(key){return old[key]===expense[key];});
+      expense.vatStatus=unchanged?old.vatStatus:'pending';
+      expense.vatReviewedBy=unchanged?old.vatReviewedBy:'';
+      expense.vatReviewedAt=unchanged?old.vatReviewedAt:'';
+    });
+  });
+  fields.Value=JSON.stringify(next);
+}
+function reviewTechExpenseTax(req) {
+  var email=String(req._actor && req._actor.email || '').toLowerCase();
+  var target=req.target||{}, status=String(req.status||'');
+  if(!email||target.source!=='TechPro'||!['pending','credit','excluded'].includes(status)) throw Error('ข้อมูลตรวจภาษีไม่ถูกต้อง');
+  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  try {
+    var settings=listRows('Settings');
+    var role=settings.find(function(row){return row.Title==='Role_'+email||row.Title==='Role_'+email.split('@')[0];});
+    if(email!=='admin@dongroups.com'&&String(role&&role.Value||'').trim().toLowerCase()!=='admin')throw Error('เฉพาะ Admin ที่ยืนยันภาษีซื้อได้');
+    var row=settings.find(function(r){return r.Title==='DealStatus_'+String(target.quoteId||'');});
+    var deal=row?JSON.parse(row.Value||'{}'):{};
+    var job=(deal.techJobs||[]).find(function(j){return j.id!=null&&String(j.id)===String(target.jobId);});
+    var expense=(job&&job.expenses||[]).find(function(e){return e.id!=null&&String(e.id)===String(target.id);});
+    if(!expense||expense.taxDocumentType!=='invoice'||!expense.receiptUrl||expense.taxDoc!==req.taxDoc||expense.taxDate!==req.taxDate||expense.vatAmount!==req.vat)throw Error('ใบกำกับถูกแก้หรือไม่ครบ กรุณาโหลดข้อมูลใหม่');
+    if(expense.vatStatus===status)return {ok:true};
+    if(expense.vatStatus!==req.previousStatus)throw Error('ผลตรวจถูกแก้แล้ว กรุณาโหลดข้อมูลใหม่');
+    expense.vatStatus=status;
+    expense.vatReviewedBy=email;
+    expense.vatReviewedAt=new Date().toISOString();
+    var sheet=_sheet('Settings'),index=_findRowIndex(sheet,row.id),column=_headers(sheet).indexOf('Value')+1;
+    if(index<1||column<1)throw Error('ไม่พบรายการต้นทาง');
+    sheet.getRange(index,column).setValue(JSON.stringify(deal));
+    return {ok:true};
+  }finally{lock.releaseLock();}
+}
 function handle(req) {
   var a = req.action;
   if(a==='replaceFinanceAttachment')return replaceFinanceAttachment(req);
+  if(a==='reviewTechExpenseTax')return reviewTechExpenseTax(req);
   if(a==='attachFinanceWhtCertificate')return replaceFinanceAttachment(req,true);
   if(a==='correctClosedPurchasePayment')return correctClosedPurchasePayment(req);
   if(a==='serviceReport')return serviceReport(req);

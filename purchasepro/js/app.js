@@ -616,8 +616,8 @@ function openPaymentCorrection(){
     return new Option(vendors[id].invNo?name+' · '+vendors[id].invNo:name,id);
   }));
   const updateNet=()=>{
-    const withheld=Number((Number(amount.value)*Number(rate.value)/100).toFixed(2));
-    document.getElementById('correction-net').textContent='ยอดจ่ายสุทธิ '+fmt(Number(amount.value)-withheld);
+    const tax=SalePaymentCore.purchase({...vendors[vendor.value],amount:amount.value,whtPct:rate.value});
+    document.getElementById('correction-net').textContent='ยอดจ่ายสุทธิ '+(tax.wht==null?'รอตรวจ':fmt(tax.net));
   };
   vendor.onchange=()=>{
     const payment=vendors[vendor.value];
@@ -645,6 +645,8 @@ function openPaymentCorrection(){
     e.preventDefault();
     if(saving)return;
     const payment=vendors[vendor.value];
+    const tax=SalePaymentCore.purchase({...payment,amount:amount.value,whtPct:rate.value});
+    if(tax.wht==null||tax.base<0){status.textContent='ตรวจยอด VAT และฐานหัก ณ ที่จ่าย';return;}
     const request={action:'correctClosedPurchasePayment',purchaseId:purchase.id,vendorId:vendor.value,
       amount:amount.valueAsNumber,whtPct:rate.valueAsNumber,reason:reason.value,
       previousAmount:Number(payment.amount||0),previousWhtPct:Number(payment.whtPct||0)};
@@ -768,6 +770,7 @@ async function moveStage(d){
 }
 async function closePurchase(){
   if(!canClosePurchase()){ toast('ต้องกรอกขั้น 6-7-8 ให้ครบทุก Vendor ก่อน','error'); return; }
+  try{validatePurchaseTaxes();}catch(error){toast(error.message,'error');return;}
   editingPO.closed=true; editingPO.stage=8;
   await savePurchase();
   closeModal('po-modal');
@@ -973,7 +976,7 @@ function pbSetStep(vid,n){ vid=String(vid); n=Math.max(1,Math.min(6,+n||1)); con
   // ล็อก "ออก PO" (ขั้น 3+) จนกว่า SalePro จะรับ PO ลูกค้า (เว้นงานซื้อใช้เอง)
   if(n>=3 && _projPOLocked()){ toast('🔒 ออก PO ไม่ได้ — ต้องรับ PO ลูกค้า หรืออนุมัติคำขอข้าม PO ก่อน','error'); return; }
   d.vStep[vid]=n; d.vMax[vid]=Math.max(+(d.vMax[vid]||1), n); if(n<6)d.vClosed[vid]=false; renderStageBody(); savePurchase(); }
-function pbCloseVendor(vid){ vid=String(vid); const d=_pb(); d.vStep[vid]=6; d.vMax[vid]=6; d.vClosed[vid]=true; renderStageBody(); savePurchase(); if(typeof renderFooter==='function')renderFooter(); if(_pbAllDone())toast('✓ ทุก Vendor เสร็จครบแล้ว — ปิดโครงการได้','success'); else toast('ปิดงาน Vendor นี้แล้ว','success'); }
+function pbCloseVendor(vid){ vid=String(vid); try{validatePurchaseTaxes([payFor(vid)]);}catch(error){toast(error.message,'error');return;} const d=_pb(); d.vStep[vid]=6; d.vMax[vid]=6; d.vClosed[vid]=true; renderStageBody(); savePurchase(); if(typeof renderFooter==='function')renderFooter(); if(_pbAllDone())toast('✓ ทุก Vendor เสร็จครบแล้ว — ปิดโครงการได้','success'); else toast('ปิดงาน Vendor นี้แล้ว','success'); }
 function pbReopenVendor(vid){ const d=_pb(); d.vClosed[String(vid)]=false; renderStageBody(); savePurchase(); if(typeof renderFooter==='function')renderFooter(); }
 function _pbAllDone(){ const d=_pb(); return d.projVendors.length>0 && d.projVendors.every(vid=>d.vClosed[String(vid)]); }
 function vDoneSet(vid,f,v){ const d=_pb(); vid=String(vid); d.vDone[vid]=d.vDone[vid]||{}; d.vDone[vid][f]=v; }
@@ -1165,7 +1168,6 @@ function _payVendorCard(vid, opt){ opt=opt||{}; const v=getVendorById(vid), p=pa
         <input type="file" onchange="attachPayDocFile('${vid}','${dc.id}',this)">
         ${dc.url?docThumb(dc.url,dc.name||'ไฟล์',{small:true}):''}
         <button class="btn btn-sm" onclick="removePayDoc('${vid}','${dc.id}')" style="color:var(--red)">✕</button></div>`).join('');
-    const amt=+p.amount||0, whtPct=+p.whtPct||0, whtAmt=+(amt*whtPct/100).toFixed(2), net=+(amt-whtAmt).toFixed(2);
     const due=payDueDate(p);
     const head = opt.noHead ? '' : `<div class="card-head">🏢 ${esc(v?v.name:'?')}</div>`;
     const wrapOpen = opt.noHead ? '<div>' : '<div class="card" style="margin-bottom:14px">';
@@ -1176,9 +1178,10 @@ function _payVendorCard(vid, opt){ opt=opt||{}; const v=getVendorById(vid), p=pa
           <div class="form-group"><label>วันรับวางบิล (เริ่มนับเครดิต)</label><input type="date" value="${p.termStart||''}" oninput="payTermChange('${vid}','termStart',this.value)"></div>
           <div class="form-group"><label>เทอมเครดิต (วัน)</label><input type="number" min="0" value="${p.termDays||''}" placeholder="เช่น 30" oninput="payTermChange('${vid}','termDays',this.value)"></div>
           <div class="form-group"><label>ครบกำหนดจ่าย</label><input value="${due?fmtDate(due):'—'}" readonly style="opacity:0.8;background:var(--surface)"></div>
-          <div class="form-group"><label>จำนวนเงิน (ก่อนหัก)</label><input type="number" value="${p.amount||''}" oninput="payInput('${vid}','amount',this.value)"></div>
-          <div class="form-group"><label>หัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><input type="number" min="0" max="100" step="0.5" value="${p.whtPct??''}" placeholder="0" oninput="payWithholdingInput(this,'${vid}')" style="max-width:70px"><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',1);renderStageBody()" title="ค่าขนส่ง/เช่า 1%">1%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',3);renderStageBody()" title="ค่าบริการ 3%">3%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',7);renderStageBody()" title="7%">7%</button><label style="display:inline-flex;align-items:center;gap:5px;margin:0"><input type="checkbox" data-no-wht style="width:auto;margin:0" ${p.whtPct!=null&&p.whtPct!==''&&Number(p.whtPct)===0?'checked':''} onchange="setNoPayWithholding(this,'${vid}')"> ไม่หัก ณ ที่จ่าย</label></div></div>
-          <div class="form-group" style="grid-column:1/-1"><div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:12px;display:flex;gap:18px;flex-wrap:wrap"><span>หัก ณ ที่จ่าย: <b style="font-family:var(--mono)">${fmt(whtAmt)}</b></span><span>ยอดจ่ายสุทธิ: <b style="font-family:var(--mono);color:var(--accent2)">${fmt(net)}</b></span></div></div>
+          ${purchaseTaxFields(vid,p)}
+          <div class="form-group"><label>ยอดรวม VAT ก่อนหัก</label><input type="number" value="${p.amount||''}" oninput="payInput('${vid}','amount',this.value)"></div>
+          <div class="form-group"><label>หัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><input type="number" min="0" max="100" step="0.5" value="${p.whtPct??''}" placeholder="0" oninput="payWithholdingInput(this,'${vid}')" style="max-width:70px"><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',1);renderStageBody()" title="อัตรา 1%">1%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',3);renderStageBody()" title="ค่าบริการ 3%">3%</button><label style="display:inline-flex;align-items:center;gap:5px;margin:0"><input type="checkbox" data-no-wht style="width:auto;margin:0" ${p.whtPct!=null&&p.whtPct!==''&&Number(p.whtPct)===0?'checked':''} onchange="setNoPayWithholding(this,'${vid}')"> ไม่หัก ณ ที่จ่าย</label></div></div>
+          <div class="form-group" style="grid-column:1/-1"><div data-pay-tax-summary="${esc(vid)}" style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:12px">${esc(purchaseTaxSummary(p))}</div></div>
           <div class="form-group"><label>วันที่จ่ายจริง</label><input type="date" value="${p.date||''}" oninput="payInput('${vid}','date',this.value)"></div>
           <div class="form-group"><label>วิธีจ่าย</label><select onchange="payInput('${vid}','method',this.value)">${['เงินโอน','เงินสด','เช็ค','เครดิต'].map(m=>`<option ${p.method===m?'selected':''}>${m}</option>`).join('')}</select></div>
           <div class="form-group"><label>หลักฐานการจ่าย (สลิป)</label><div style="display:flex;gap:6px;align-items:center"><input type="file" onchange="attachPaySlip('${vid}',this)">${p.slipUrl?docThumb(p.slipUrl,p.slipName||'สลิป',{small:true}):''}</div></div>
@@ -2501,7 +2504,6 @@ function renderPayStage(){
         <input type="file" onchange="attachPayDocFile('${vid}','${dc.id}',this)">
         ${dc.url?docThumb(dc.url,dc.name||'ไฟล์',{small:true}):''}
         <button class="btn btn-sm" onclick="removePayDoc('${vid}','${dc.id}')" style="color:var(--red)">✕</button></div>`).join('');
-    const amt=+p.amount||0, whtPct=+p.whtPct||0, whtAmt=+(amt*whtPct/100).toFixed(2), net=+(amt-whtAmt).toFixed(2);
     const due=payDueDate(p);
     return `<div class="card" style="margin-bottom:14px"><div class="card-head">🏢 ${esc(v?v.name:'?')}</div>
       <div style="padding:12px 14px">
@@ -2511,9 +2513,10 @@ function renderPayStage(){
           <div class="form-group"><label>วันรับวางบิล (เริ่มนับเครดิต)</label><input type="date" value="${p.termStart||''}" oninput="payTermChange('${vid}','termStart',this.value)"></div>
           <div class="form-group"><label>เทอมเครดิต (วัน)</label><input type="number" min="0" value="${p.termDays||''}" placeholder="เช่น 30" oninput="payTermChange('${vid}','termDays',this.value)"></div>
           <div class="form-group"><label>ครบกำหนดจ่าย</label><input value="${due?fmtDate(due):'—'}" readonly style="opacity:0.8;background:var(--surface)"></div>
-          <div class="form-group"><label>จำนวนเงิน (ก่อนหัก)</label><input type="number" value="${p.amount||''}" oninput="payInput('${vid}','amount',this.value)"></div>
-          <div class="form-group"><label>หัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><input type="number" min="0" max="100" step="0.5" value="${p.whtPct??''}" placeholder="0" oninput="payWithholdingInput(this,'${vid}')" style="max-width:70px"><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',1);renderStageBody()" title="ค่าขนส่ง/เช่า 1%">1%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',3);renderStageBody()" title="ค่าบริการ 3%">3%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',7);renderStageBody()" title="7%">7%</button><label style="display:inline-flex;align-items:center;gap:5px;margin:0"><input type="checkbox" data-no-wht style="width:auto;margin:0" ${p.whtPct!=null&&p.whtPct!==''&&Number(p.whtPct)===0?'checked':''} onchange="setNoPayWithholding(this,'${vid}')"> ไม่หัก ณ ที่จ่าย</label></div></div>
-          <div class="form-group" style="grid-column:1/-1"><div style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:12px;display:flex;gap:18px;flex-wrap:wrap"><span>หัก ณ ที่จ่าย: <b style="font-family:var(--mono)">${fmt(whtAmt)}</b></span><span>ยอดจ่ายสุทธิ: <b style="font-family:var(--mono);color:var(--accent2)">${fmt(net)}</b></span></div></div>
+          ${purchaseTaxFields(vid,p)}
+          <div class="form-group"><label>ยอดรวม VAT ก่อนหัก</label><input type="number" value="${p.amount||''}" oninput="payInput('${vid}','amount',this.value)"></div>
+          <div class="form-group"><label>หัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><input type="number" min="0" max="100" step="0.5" value="${p.whtPct??''}" placeholder="0" oninput="payWithholdingInput(this,'${vid}')" style="max-width:70px"><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',1);renderStageBody()" title="อัตรา 1%">1%</button><button class="btn btn-sm" onclick="payInput('${vid}','whtPct',3);renderStageBody()" title="ค่าบริการ 3%">3%</button><label style="display:inline-flex;align-items:center;gap:5px;margin:0"><input type="checkbox" data-no-wht style="width:auto;margin:0" ${p.whtPct!=null&&p.whtPct!==''&&Number(p.whtPct)===0?'checked':''} onchange="setNoPayWithholding(this,'${vid}')"> ไม่หัก ณ ที่จ่าย</label></div></div>
+          <div class="form-group" style="grid-column:1/-1"><div data-pay-tax-summary="${esc(vid)}" style="background:var(--surface2);border-radius:8px;padding:8px 12px;font-size:12px">${esc(purchaseTaxSummary(p))}</div></div>
           <div class="form-group"><label>วันที่จ่ายจริง</label><input type="date" value="${p.date||''}" oninput="payInput('${vid}','date',this.value)"></div>
           <div class="form-group"><label>วิธีจ่าย</label><select onchange="payInput('${vid}','method',this.value)">${['เงินโอน','เงินสด','เช็ค','เครดิต'].map(m=>`<option ${p.method===m?'selected':''}>${m}</option>`).join('')}</select></div>
           <div class="form-group"><label>หลักฐานการจ่าย (สลิป)</label><div style="display:flex;gap:6px;align-items:center"><input type="file" onchange="attachPaySlip('${vid}',this)">${p.slipUrl?docThumb(p.slipUrl,p.slipName||'สลิป',{small:true}):''}</div></div>
@@ -2523,6 +2526,34 @@ function renderPayStage(){
         <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px"><div style="font-size:11px;color:var(--muted);margin-bottom:6px">เอกสารอื่น (เพิ่มได้ไม่จำกัด)</div>${docs||''}<button class="btn btn-sm" onclick="addPayDoc('${vid}')">+ เพิ่มเอกสาร</button></div>
       </div></div>`;
   }).join('');
+}
+function validatePurchaseTaxes(payments=Object.values(sd().payment?.vendors||{})){
+  for(const payment of payments){
+    if(!(Number(payment.amount)>0)||payment.taxCapture!=='1')continue;
+    const tax=SalePaymentCore.purchase(payment);
+    if(tax.wht==null||tax.base<0||tax.vat<0)throw Error('ตรวจยอด VAT และฐานหัก ณ ที่จ่าย หรือเลือกไม่หัก');
+    if(['credit','excluded'].includes(tax.status)&&(!payment.taxDoc?.trim()||!payment.taxDate||tax.vat==null))throw Error('กรอกเลขที่ วันที่ และ VAT ตามใบกำกับภาษี');
+  }
+}
+function purchaseTaxSummary(payment){
+  const tax=SalePaymentCore.purchase(payment);
+  return 'ยอดก่อน VAT '+(tax.base==null?'รอตรวจ':fmt(tax.base))+' · VAT '+(tax.vat==null?'รอตรวจ':fmt(tax.vat))+' · หัก ณ ที่จ่าย '+(tax.wht==null?'รอตรวจ':fmt(tax.wht))+' · ยอดจ่ายสุทธิ '+(tax.wht==null?'รอตรวจ':fmt(tax.net));
+}
+function purchaseTaxFields(vid,p){
+  const status=[['pending','รอใบกำกับ / รอตรวจ'],['credit','ใช้เครดิตได้'],['excluded','ใช้เครดิตไม่ได้'],['none','ไม่มี VAT']];
+  return `<div class="form-group"><label>สถานะ VAT ซื้อ</label><select onchange="payInput('${vid}','vatStatus',this.value)">${status.map(([value,label])=>'<option value="'+value+'" '+((p.vatStatus||'pending')===value?'selected':'')+'>'+label+'</option>').join('')}</select></div>
+    <div class="form-group"><label>เลขที่ใบกำกับภาษี</label><input value="${esc(p.taxDoc||'')}" oninput="payInput('${vid}','taxDoc',this.value)"></div>
+    <div class="form-group"><label>วันที่ใบกำกับภาษี</label><input type="date" value="${esc(p.taxDate||'')}" onchange="payInput('${vid}','taxDate',this.value)"></div>
+    <div class="form-group"><label>แนบใบกำกับภาษี</label><input type="file" accept="image/*,.pdf" onchange="attachPurchaseTaxInvoice('${vid}',this)">${p.taxDocUrl?docThumb(p.taxDocUrl,'ใบกำกับภาษี',{small:true}):''}</div>
+    <div class="form-group"><label>VAT ตามใบกำกับ (บาท)</label><input type="number" min="0" step="0.01" value="${p.vatAmount??''}" oninput="payInput('${vid}','vatAmount',this.value)"></div>
+    <div class="form-group"><label>ฐานหัก ณ ที่จ่าย (บาท)</label><input type="number" min="0" step="0.01" value="${p.whtBaseAmount??''}" placeholder="ใช้ยอดก่อน VAT ถ้าเว้นว่าง" oninput="payInput('${vid}','whtBaseAmount',this.value)"></div>`;
+}
+async function attachPurchaseTaxInvoice(vid,input){
+  const payment=payFor(vid);
+  try{
+    const result=await uploadFile(input,'PurchaseDocs','tax-invoice');
+    if(result){payment.taxDocUrl=result.fileUrl;renderStageBody();}
+  }catch(error){toast('อัปโหลดใบกำกับไม่สำเร็จ: '+error.message,'error');}
 }
 function payWithholdingInput(input, vendorId){
   payInput(vendorId,'whtPct',input.value);
@@ -2534,7 +2565,13 @@ function setNoPayWithholding(checkbox, vendorId){
   payWithholdingInput(input,vendorId);
   renderStageBody();
 }
-function payInput(vid,f,val){ const p=payFor(vid); p[f]=((f==='amount'||f==='whtPct')?(val===''?'':+val):val); }
+function payInput(vid,f,val){
+  const p=payFor(vid);
+  if(['vatStatus','vatAmount','whtBaseAmount','whtPct'].includes(f)||f==='amount'&&!p.amount)p.taxCapture='1';
+  p[f]=['amount','whtPct','vatAmount','whtBaseAmount'].includes(f)&&val!==''?Number(val):val;
+  const summary=[...document.querySelectorAll('[data-pay-tax-summary]')].find(el=>el.dataset.payTaxSummary===String(vid));
+  if(summary)summary.textContent=purchaseTaxSummary(p);
+}
 function _addDays(ds,n){ if(!ds)return''; const d=new Date(ds+'T00:00:00'); if(isNaN(d))return''; d.setDate(d.getDate()+(+n||0)); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function payDueDate(p){ if(!p||!p.termStart||!(+p.termDays))return''; return _addDays(p.termStart,+p.termDays); }
 function payTermChange(vid,f,val){ const p=payFor(vid); p[f]=(f==='termDays'?(val===''?'':+val):val); const due=payDueDate(p); if(due) p.remindDate=due; renderStageBody(); }

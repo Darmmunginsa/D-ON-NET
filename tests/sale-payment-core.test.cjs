@@ -4,3 +4,13 @@ test('partial payments allocate VAT and WHT on their base, without withholding t
 test('zero WHT keeps full receipt and zero VAT uses gross as base',()=>{assert.equal(core.calculate(9095,0).cash,9095);assert.equal(core.calculate(8500,3,0).cash,8245);});
 test('historical records preserve stored WHT rather than silently rewriting old certificates',()=>{assert.equal(core.cash({AmountPaid:9095,WHTAmount:272.85}),8822.15);assert.equal(core.cash({AmountPaid:9095}),9095);assert.equal(core.cash({AmountPaid:-100}),-100);});
 test('invalid input rejected',()=>{for(const args of [[0,3],[-10,3],[9095,-1],[9095,101],[NaN,3]])assert.throws(()=>core.calculate(...args));});
+
+test('purchase withholding uses the documented base for new payments and preserves legacy cash', () => {
+  const payment = { amount: 5681.7, vatAmount: 371.7, vatStatus: 'credit', whtPct: 3 };
+  assert.equal(core.purchase({ ...payment, taxCapture: '1' }).wht, 159.3);
+  assert.equal(core.purchase({ ...payment, taxCapture: '1' }).net, 5522.4);
+  assert.equal(core.purchase(payment).net, 5511.25);
+  assert.equal(core.purchase({ amount: 1000, whtPct: 3, taxCapture: '1' }).wht, null);
+  assert.equal(core.purchase({ amount: 1000, whtPct: 0, taxCapture: '1' }).net, 1000);
+  assert.equal(core.calculate(9095, 3, 7, 2000).cash, 9035);
+});
