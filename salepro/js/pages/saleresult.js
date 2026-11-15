@@ -1,7 +1,7 @@
 // ============================================================
 // SALE RESULT — ผลการขาย Win / Lose (สำหรับนำเสนอผู้บริหาร)
 // Win  = ปิดการขายจริงเท่านั้น (DealStatus.closed) หรือ Status Closed
-// Lose = Status Cancelled หรืออยู่ตะกร้า "ยกเลิก" (ยกเว้นสายที่ Revise แล้วชนะ)
+// Lose = Status Cancelled หรืออยู่ตะกร้า "ยกเลิก" (ยกเว้นใบที่ถูกแทนด้วยฉบับแก้ไขหรือยกเลิกเพื่อออกใหม่)
 // else = กำลังดำเนินการ (รวม "PO Received" ที่ยังไม่ปิดการขาย)
 // ============================================================
 
@@ -14,11 +14,26 @@ function _srClassify(q) {
     if (q.Status === 'Closed' || ds.closed === true) return 'win';
     const cancelled = q.Status === 'Cancelled' || (typeof isQuoteInCancelBasket === 'function' && isQuoteInCancelBasket(q.id));
     if (cancelled) {
-      if (typeof familyHasClosed === 'function' && familyHasClosed(q)) return 'skip'; // revise แล้วชนะ → ไม่นับแพ้
+      const reason = _srLoseReason(q);
+      if (reason === 'ออกใบผิด/ทำซ้ำ (ไม่ใช่การแพ้)' || reason === 'ยกเลิกเพื่อออกใบใหม่') return 'skip';
+      if (_srHasReplacement(q)) return 'skip';
       return 'lose';
     }
   } catch(e) {}
   return 'progress';
+}
+function _srHasReplacement(quote) {
+  const title = String(quote.Title || '');
+  const revision = /-RV(\d+)$/.exec(title);
+  const base = revision ? title.slice(0, revision.index) : title;
+  const currentNumber = revision ? Number(revision[1]) : 0;
+  return (quotesData || []).some(candidate => {
+    if (String(candidate.id) === String(quote.id)) return false;
+    if (candidate.RevisionSourceId) return String(candidate.RevisionSourceId) === String(quote.id);
+    const candidateTitle = String(candidate.Title || '');
+    const next = /-RV(\d+)$/.exec(candidateTitle);
+    return Boolean(base && next && candidateTitle.slice(0, next.index) === base && Number(next[1]) > currentNumber);
+  });
 }
 function _srDate(q) {
   try { const ds = parseDealStatus(q.DealStatus); if (ds.closedAt) return ds.closedAt.slice(0,10); } catch(e) {}
@@ -28,7 +43,7 @@ function _srNum(n) { return (Number(n)||0).toLocaleString('th-TH'); }
 function _srMoney(n) { const v = Number(n)||0; if (v>=1e6) return (v/1e6).toFixed(2)+' ล้าน'; return v.toLocaleString('th-TH'); }
 
 // หมวดเหตุผลที่แพ้ (ตรงกับ dropdown ในหน้ายกเลิกใบเสนอราคา)
-const SR_LOSE_REASONS = ['ราคาสูงกว่าคู่แข่ง','งบไม่พอ / ไม่อนุมัติงบ','ลูกค้าเลื่อน/ยกเลิกโครงการ','เลือกผู้ขายรายอื่น','สเปก/สินค้าไม่ตรงความต้องการ','ส่งมอบ/ระยะเวลาไม่ทัน','เงื่อนไขการชำระเงิน','ติดต่อลูกค้าไม่ได้/ไม่ตอบกลับ','ออกใบผิด/ทำซ้ำ (ไม่ใช่การแพ้)','อื่นๆ'];
+const SR_LOSE_REASONS = ['ราคาสูงกว่าคู่แข่ง','งบไม่พอ / ไม่อนุมัติงบ','ลูกค้าเลื่อน/ยกเลิกโครงการ','เลือกผู้ขายรายอื่น','สเปก/สินค้าไม่ตรงความต้องการ','ส่งมอบ/ระยะเวลาไม่ทัน','เงื่อนไขการชำระเงิน','ติดต่อลูกค้าไม่ได้/ไม่ตอบกลับ','ออกใบผิด/ทำซ้ำ (ไม่ใช่การแพ้)','ยกเลิกเพื่อออกใบใหม่','อื่นๆ'];
 const SR_REASON_ICON = {'ราคาสูงกว่าคู่แข่ง':'💸','งบไม่พอ / ไม่อนุมัติงบ':'📉','ลูกค้าเลื่อน/ยกเลิกโครงการ':'⏸','เลือกผู้ขายรายอื่น':'🤝','สเปก/สินค้าไม่ตรงความต้องการ':'🧩','ส่งมอบ/ระยะเวลาไม่ทัน':'⏱','เงื่อนไขการชำระเงิน':'💳','ติดต่อลูกค้าไม่ได้/ไม่ตอบกลับ':'📵','ออกใบผิด/ทำซ้ำ (ไม่ใช่การแพ้)':'♻️','อื่นๆ':'…','ไม่ระบุ':'❔'};
 
 // หาเหตุผลที่แพ้ของใบนี้ → คืนชื่อหมวด (จาก LoseReason_<id> ก่อน ไม่งั้น parse จาก CancelReason_<id>)
