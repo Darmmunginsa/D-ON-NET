@@ -259,7 +259,7 @@ function correctClosedPurchasePayment(req) {
   } finally {lock.releaseLock();}
 }
 
-function replaceFinanceAttachment(req) {
+function replaceFinanceAttachment(req, certificate) {
   var email=String(req._actor && req._actor.email || '').toLowerCase();
   if(!email) throw Error('กรุณาเข้าสู่ระบบ');
   var url=String(req.url||''), filename=String(req.filename||'').trim();
@@ -272,10 +272,13 @@ function replaceFinanceAttachment(req) {
     if(email!=='admin@dongroups.com'&&String(role&&role.Value||'').trim().toLowerCase()!=='admin')
       throw Error('เฉพาะ Admin ที่เปลี่ยนไฟล์แนบได้');
     var target=req.target||{}, sheetName, row, data, attachment, urlKey, nameKey;
+    if(certificate&&target.source!=='SalePro')throw Error('เลือกเฉพาะรายการรับชำระจาก SalePro');
     if(target.source==='SalePro'){
       sheetName='Payments';
       row=listRows(sheetName).find(function(item){return String(item.id)===String(target.id);});
-      attachment=row;urlKey='SlipURL';nameKey='SlipName';
+      attachment=row;
+      urlKey=certificate?'WHTCertificateURL':'SlipURL';
+      nameKey=certificate?'WHTCertificateName':'SlipName';
     }else if(target.source==='PurchasePro'){
       var purchaseTitle='Purchase_'+String(target.id||'');
       sheetName='Procurement';
@@ -330,6 +333,7 @@ function replaceFinanceAttachment(req) {
 function handle(req) {
   var a = req.action;
   if(a==='replaceFinanceAttachment')return replaceFinanceAttachment(req);
+  if(a==='attachFinanceWhtCertificate')return replaceFinanceAttachment(req,true);
   if(a==='correctClosedPurchasePayment')return correctClosedPurchasePayment(req);
   if(a==='serviceReport')return serviceReport(req);
   srProtectGeneric(req);

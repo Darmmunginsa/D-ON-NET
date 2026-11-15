@@ -31,9 +31,12 @@ function openDocPreview(encUrl,encName){ const url=decodeURIComponent(encUrl), n
 }
 
 // ── upload helper ──
-async function uploadDoc(input){ const f=input.files&&input.files[0]; if(!f) return null;
+async function uploadDoc(input, certificate = false){ const f=input.files&&input.files[0]; if(!f) return null;
   const b64=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(f); });
-  const d=await apiPost('uploadFile','_',null,{folder:'FinanceDocs',fileName:Date.now()+'_'+f.name,mimeType:f.type||'application/octet-stream',base64Data:b64});
+  const fileName=Date.now()+'_'+f.name;
+  const d=certificate
+    ?await _call({action:'uploadFile',folder:'PaymentCertificates',fileName,mimeType:f.type,base64:b64,privateFile:true})
+    :await apiPost('uploadFile','_',null,{folder:'FinanceDocs',fileName,mimeType:f.type||'application/octet-stream',base64Data:b64});
   return { url:(d&&d.fileUrl)||'', name:f.name };
 }
 
@@ -201,7 +204,7 @@ function renderLedger(){
     <td style="text-align:right;font-family:var(--mono);color:${e.type==='income'?'var(--green)':'var(--red)'}">${e.type==='income'?'+':'-'}${fmt0(e.amount)}</td>
     <td>${e.quoteId?'<div style="font-size:12px;color:var(--accent2)">'+esc(e.quoteTitle||e.quoteId)+'</div><div style="font-size:10px;color:var(--muted)">'+esc(e.quoteCustomer)+'</div>':'<span style="color:var(--muted)">ไม่ผูกใบเสนอราคา</span>'}${e.purchaseId?'<div style="font-size:10px;color:var(--muted)">งานจัดซื้อ '+esc(e.purchaseId)+'</div>':''}</td>
     <td>${srcBadge(e.source)}</td>
-    <td>${docChip(e.docUrl,e.docName)} ${docChip(e.whtCertificateUrl,'หนังสือรับรองหัก ณ ที่จ่าย')} ${e.attachmentTarget&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+')">แก้ไฟล์แนบ</button>':''}</td>
+    <td>${docChip(e.docUrl,e.docName)} ${docChip(e.whtCertificateUrl,'หนังสือรับรองหัก ณ ที่จ่าย')} ${e.attachmentTarget&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+')">'+(e.source==='SalePro'?'แก้สลิป':'แก้ไฟล์แนบ')+'</button>':''} ${e.attachmentTarget?.source==='SalePro'&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+',true)">'+(e.whtCertificateUrl?'เปลี่ยนหนังสือรับรอง':'แนบหนังสือรับรองหัก ณ ที่จ่าย')+'</button>':''}</td>
     <td style="text-align:right">${e.editable?`<button class="ic" onclick="editTx('${e._id}')" title="แก้ไข">✏️</button><button class="ic" onclick="delTx('${e._id}')" title="ลบ" style="color:var(--red)">✕</button>`:''}</td>
   </tr>`).join(''):'<tr><td colspan="9" class="empty">ไม่มีรายการ</td></tr>';
   const srcOpts=['all','Manual','SalePro','PurchasePro','TechPro','SaleExpense','เบิกจ่าย'].map(s=>`<option value="${s}" ${f.source===s?'selected':''}>${s==='all'?'ทุกแหล่ง':s}</option>`).join('');
@@ -217,9 +220,11 @@ function renderLedger(){
     <div class="ledger-workspace"><div class="card ledger-table"><table class="tbl"><thead><tr><th>วันที่</th><th>ประเภท</th><th>หมวดหมู่</th><th>รายละเอียด</th><th style="text-align:right">จำนวนเงิน</th><th>ใบเสนอราคา / งานที่เกี่ยวข้อง</th><th>แหล่ง</th><th>เอกสาร</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${summary}</div>`;
 }
 
-function editLedgerAttachment(index){
+function editLedgerAttachment(index, certificate = false){
   const row=ledgerAttachmentRows[index];
-  if(!isAdminUser()||!row?.attachmentTarget)return;
+  if(!isAdminUser()||!row?.attachmentTarget||(certificate&&row.source!=='SalePro'))return;
+  const currentUrl=certificate?row.whtCertificateUrl:row.docUrl;
+  const name=certificate?'หนังสือรับรองหัก ณ ที่จ่าย':row.docName;
   const dialog=document.getElementById('finance-attachment');
   const form=dialog.querySelector('form');
   const fileInput=form.elements.namedItem('attachment');
@@ -229,7 +234,8 @@ function editLedgerAttachment(index){
   form.reset();
   status.textContent='';
   dialog.querySelector('[data-entry]').textContent=[row.source,row.quoteTitle,row.party].filter(Boolean).join(' · ');
-  dialog.querySelector('[data-current]').textContent=row.docUrl?'ไฟล์ปัจจุบัน: '+row.docName:'ยังไม่มีไฟล์แนบ';
+  dialog.querySelector('h3').textContent=certificate?'แนบหนังสือรับรองหัก ณ ที่จ่าย':'แก้ไฟล์แนบ';
+  dialog.querySelector('[data-current]').textContent=currentUrl?'ไฟล์ปัจจุบัน: '+name:'ยังไม่มีไฟล์แนบ';
   let saving=false, uploadedFile=null, uploaded=null;
   cancel.onclick=()=>dialog.close();
   dialog.oncancel=event=>{if(saving)event.preventDefault();};
@@ -239,22 +245,23 @@ function editLedgerAttachment(index){
     const file=fileInput.files[0];
     if(!file)return;
     if(!/^(image\/|application\/pdf$)/.test(file.type)){status.textContent='เลือกไฟล์รูปภาพหรือ PDF';return;}
+    if(certificate&&file.size>5*1024*1024){status.textContent='ไฟล์ต้องมีขนาดไม่เกิน 5 MB';return;}
     saving=true;
     fileInput.disabled=submit.disabled=cancel.disabled=true;
     try{
       if(uploadedFile!==file){
         status.textContent='กำลังอัปโหลดไฟล์…';
-        uploaded=await uploadDoc(fileInput);
+        uploaded=await uploadDoc(fileInput,certificate);
         if(!uploaded?.url)throw Error('ระบบยังไม่ส่งลิงก์ไฟล์กลับมา');
         uploadedFile=file;
       }
       status.textContent='กำลังบันทึกกลับไปยังรายการต้นทาง…';
-      await _call({action:'replaceFinanceAttachment',target:row.attachmentTarget,previousUrl:row.docUrl,url:uploaded.url,filename:uploaded.name});
-      row.docUrl=uploaded.url;
-      row.docName=uploaded.name;
+      await _call({action:certificate?'attachFinanceWhtCertificate':'replaceFinanceAttachment',target:row.attachmentTarget,previousUrl:currentUrl,url:uploaded.url,filename:uploaded.name});
+      if(certificate)row.whtCertificateUrl=uploaded.url;
+      else {row.docUrl=uploaded.url;row.docName=uploaded.name;}
       dialog.close();
       if(_view==='ledger')go('ledger');
-      toast('เปลี่ยนไฟล์แนบแล้ว','success');
+      toast(certificate?'บันทึกหนังสือรับรองแล้ว':'เปลี่ยนไฟล์แนบแล้ว','success');
     }catch(error){status.textContent=error.message;}
     finally{
       saving=false;
