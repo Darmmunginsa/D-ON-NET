@@ -691,7 +691,7 @@ function jobPhotoGroups(item) {
           <button type="button" class="btn btn-outline btn-sm" onclick="deleteSelectedJobPhotos(this.form)">ลบรูปที่เลือก</button>
         </div>
       </form>` : grid;
-    return `<details class="job-photo-group" ${photos.length || !serial ? 'open' : ''}>
+    return `<details class="job-photo-group" data-photo-job="${DonnetReport.esc(job.id)}" ${photos.length || !serial ? 'open' : ''}>
       <summary>${serial ? 'Serial ' + DonnetReport.esc(serial) : 'รูปทั่วไป'} · ${photos.length} รูป</summary>
       ${photoContent}
       <label class="upload-box" style="display:block;margin-top:8px">📷 แนบรูปในกลุ่มนี้
@@ -723,24 +723,48 @@ async function moveGeneralPhotos(form) {
     return;
   }
 
+  await moveJobPhotos(item, urls, serial, [...form.elements]);
+}
+
+async function moveJobPhotos(item, urls, serial, controls) {
+  const quoteId = String(item.q.id);
+  if (photoUploads.has(quoteId)) {
+    toast('กรุณารอให้การจัดการรูปก่อนหน้าเสร็จ', 'info');
+    return false;
+  }
+  const available = new Set(jobPhotoUrls(item.job));
+  const selected = new Set(urls.filter(url => available.has(url)));
+  const targets = [...(item.ds.expiries || []), ...(item.job.completionPhotoGroups || [])];
+  if (!selected.size || !serial || !targets.some(entry => DonnetReport.serial(entry.serial) === serial)) return false;
   const originalGroups = item.job.completionPhotoGroups;
-  const controls = [...form.elements];
   photoUploads.add(quoteId);
   controls.forEach(control => { control.disabled = true; });
   try {
-    const groups = (originalGroups || []).filter(entry => !selected.has(entry.url) || !available.has(entry.url));
-    item.job.completionPhotoGroups = [...groups, ...urls.map(url => ({url, serial}))];
+    const groups = (originalGroups || []).filter(entry => !selected.has(entry.url));
+    item.job.completionPhotoGroups = [...groups, ...[...selected].map(url => ({url, serial}))];
     await saveDealStatus(item);
   } catch (error) {
     item.job.completionPhotoGroups = originalGroups;
     toast('ย้ายรูปไม่สำเร็จ: ' + error.message, 'error');
-    return;
+    return false;
   } finally {
     photoUploads.delete(quoteId);
     controls.forEach(control => { control.disabled = false; });
   }
-  toast('ย้าย ' + urls.length + ' รูปเข้า Serial ' + serial + ' แล้ว', 'success');
+  toast('ย้าย ' + selected.size + ' รูปเข้า Serial ' + serial + ' แล้ว', 'success');
   renderJobList();
+  return true;
+}
+function jobPhotoPreviewOptions(jobId) {
+  const item = allJobs.find(entry => String(entry.job.id) === jobId);
+  if (!item) return null;
+  const targets = [...new Set([...(item.ds.expiries || []), ...(item.job.completionPhotoGroups || [])]
+    .map(entry => DonnetReport.serial(entry.serial)).filter(Boolean))];
+  return {
+    destinations: url => targets.filter(serial => !jobPhotosForSerial(item.job, serial).includes(url)),
+    remove: (url, controls) => removeJobPhotos(item, [url], controls),
+    move: (url, serial, controls) => moveJobPhotos(item, [url], serial, controls)
+  };
 }
 async function deleteSelectedJobPhotos(form) {
   const item = allJobs.find(entry => String(entry.job.id) === form.dataset.jobId);
@@ -935,7 +959,7 @@ function toast(msg, type='info') {
   setTimeout(() => el.remove(), 3500);
 }
 </script>
-<script src="../shared/donnet-report.js?v=strings44_20261115"></script><script src="../salepro/js/pages/datetime-picker.js?v=dtpall20261107"></script><script src="reports.js?v=photomanagement20261115"></script>
-<script src="../shared/tech-document-preview.js?v=preview20261114"></script>
+<script src="../shared/donnet-report.js?v=strings44_20261115"></script><script src="../salepro/js/pages/datetime-picker.js?v=dtpall20261107"></script><script src="reports.js?v=gallery20261115"></script>
+<script src="../shared/tech-document-preview.js?v=gallery20261115"></script>
 <script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/tech-route.js?v=20261103"></script><script src="route.js?v=aiplan20261103"></script></body>
 </html>

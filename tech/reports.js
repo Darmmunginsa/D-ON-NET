@@ -26,6 +26,17 @@ const TechReports=(()=>{
     const photos=report ? jobPhotosForSerial(item.job,report.fields.serial) : jobPhotoUrls(item.job);
     drawer.innerHTML='<header><b>ข้อมูลอ้างอิงหน้างาน</b><button type="button" onclick="TechReports.toggleReference()">✕ ปิด</button></header><p>'+E(item.quoteTitle)+'<br>'+E(item.customer)+'</p><h3>Serial / รายละเอียดจาก SalePro</h3>'+entries.map(e=>'<article><b>'+E(e.name)+'</b><p>S/N: '+E(e.serial||'—')+'</p><div class="sr-reference-detail">'+E(e.sourceDetail||e.note||'ไม่มีรายละเอียดเพิ่มเติม')+'</div></article>').join('')+'<h3>รายการในใบเสนอราคา</h3><div id="sr-reference-items"><label>กำลังโหลดรายละเอียด...<progress aria-label="กำลังโหลดรายละเอียดรายการ"></progress></label></div><h3>รูปหน้างาน ('+photos.length+')</h3><p>กดรูปเพื่อเปิดดูขนาดใหญ่</p><div class="sr-reference-photos">'+photos.map((u,i)=>'<a href="'+E(u)+'" target="_blank" rel="noopener" data-tech-preview="image" data-preview-name="รูปหน้างาน '+(i+1)+'"><img loading="lazy" src="'+E(_driveThumb(u))+'" alt="รูปหน้างาน '+(i+1)+'"><span>รูป '+(i+1)+'</span></a>').join('')+'</div>';
     const photoGrid=drawer.querySelector('.sr-reference-photos');
+    photoGrid.dataset.photoJob=String(current.job.id);
+    photoGrid.addEventListener('tech-photo-change', event=>{
+      if(item!==current)return;
+      if(event.detail.removed&&report&&meta?.status!=='signed'&&report.photos.includes(event.detail.url)){
+        report.photos=report.photos.filter(url=>url!==event.detail.url);
+        markDirty();
+      }
+      renderReportPhotos();
+      document.getElementById('sr-reference')?.remove();
+      toggleReference();
+    });
     if(photos.length){
       [...photoGrid.children].forEach((link,index)=>{
         const row=document.createElement('div');
