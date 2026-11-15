@@ -98,6 +98,15 @@ a{color:var(--accent2)}
 .fg{margin-bottom:12px}
 .fg label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
 .fg input,.fg select,.fg textarea{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;font-family:var(--font)}
+.tax-correction-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.tax-correction-form > *{min-width:0;overflow-wrap:anywhere}
+.tax-correction-form label{display:block;font-size:12px;color:var(--muted)}
+.tax-correction-form input,.tax-correction-form select{display:block;box-sizing:border-box;width:100%;min-width:0;max-width:100%;margin-top:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 9px;font:inherit}
+.tax-correction-form input[type="file"]{overflow:hidden;text-overflow:ellipsis}
+.tax-correction-form input[type="date"]{color-scheme:dark}
+.tax-correction-wide{grid-column:1/-1}
+.tax-correction-form [role="status"]{margin:0}
+@media(max-width:360px){.tax-correction-form{grid-template-columns:minmax(0,1fr)}}
 .rv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
 .rv span{color:var(--muted)}
 

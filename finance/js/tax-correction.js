@@ -10,21 +10,21 @@ function openFinanceTaxCorrection(index){
   const status=states.map(([key,label])=>'<option value="'+key+'" '+((row.vatStatus||'pending')===key?'selected':'')+'>'+label+'</option>').join('');
   modal('แก้ข้อมูลภาษี',`
     <p>${esc(row.quoteTitle||row.party)} · ${esc(source)} · ${work?'จ่ายจริง':'ยอดรวมก่อนหัก'} ${fmt(row.gross)}</p>
-    <form id="finance-tax-correction-form" class="grid2">
+    <form id="finance-tax-correction-form" class="tax-correction-form">
       ${money('vat',sale?'VAT ของยอดรับชำระงวดนี้':'VAT ตามเอกสาร',row.vat,sale)}
       ${sale?'':'<label>สถานะ VAT ซื้อ<select name="vatStatus">'+status+'</select></label>'}
       ${work?'':money('whtRate','อัตราหัก ณ ที่จ่าย (%)',row.taxCorrection.whtRate,true)+money('whtBase','ฐานหัก ณ ที่จ่าย (บาท)',row.taxCorrection.whtBase)}
       <label>เลขที่ใบกำกับภาษี<input name="taxDoc" maxlength="100" value="${esc(row.taxDoc||'')}"></label>
       <label>วันที่ใบกำกับภาษี<input name="documentDate" type="date" value="${esc(row.taxCorrection.documentDate||'')}"></label>
-      <label>แนบหรือเปลี่ยนไฟล์ใบกำกับภาษี<input name="invoiceFile" type="file" accept="image/*,.pdf"></label>
-      ${sale?`<label>หนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ)<input name="certificateFile" type="file" accept="image/*,.pdf">
-        ${row.whtCertificateUrl?'<small>มีไฟล์แนบแล้ว · เลือกไฟล์ใหม่เพื่อเปลี่ยน</small>':''}</label>`:''}
       ${sale?`<label>วันที่เกิดภาษี<input name="taxDate" type="date" value="${esc(row.taxCorrection.taxDate||'')}"></label>
       ${money('invoiceBase','ยอดก่อน VAT ทั้งใบกำกับ',invoice?.BaseAmount)}
       ${money('invoiceVat','VAT ทั้งใบกำกับ',invoice?.VatAmount)}
-      <small style="grid-column:1/-1">การแก้ใบกำกับมีผลกับทุกงวดที่อ้างถึงใบเดียวกัน ยอดชำระก่อนหักของงวดนี้คงเดิม</small>`:''}
-      <label style="grid-column:1/-1">เหตุผลที่แก้ไข<input name="reason" maxlength="500" required></label>
-      <p style="grid-column:1/-1" role="status"></p>
+      <small class="tax-correction-wide">การแก้ใบกำกับมีผลกับทุกงวดที่อ้างถึงใบเดียวกัน ยอดชำระก่อนหักของงวดนี้คงเดิม</small>`:''}
+      <label class="tax-correction-wide">แนบหรือเปลี่ยนไฟล์ใบกำกับภาษี<input name="invoiceFile" type="file" accept="image/*,.pdf"></label>
+      ${sale?`<label class="tax-correction-wide">หนังสือรับรองหัก ณ ที่จ่าย (50 ทวิ)<input name="certificateFile" type="file" accept="image/*,.pdf">
+        ${row.whtCertificateUrl?'<small>มีไฟล์แนบแล้ว · เลือกไฟล์ใหม่เพื่อเปลี่ยน</small>':''}</label>`:''}
+      <label class="tax-correction-wide">เหตุผลที่แก้ไข<input name="reason" maxlength="500" required></label>
+      <p class="tax-correction-wide" role="status"></p>
     </form>`, '<button type="submit" form="finance-tax-correction-form" class="btn btn-primary">บันทึกการแก้ไข</button>');
   const form=document.getElementById('finance-tax-correction-form');
   const submit=document.querySelector('[form="finance-tax-correction-form"]');
