@@ -445,6 +445,7 @@ function renderJobBody(item) {
       <span class="expense-cat">${e.category||'-'}</span>
       <span class="expense-desc">${e.desc||''}</span>
       <span class="expense-receipt">${e.receiptUrl ? '<a href="'+e.receiptUrl+'" target="_blank" rel="noopener" data-tech-preview="document" data-preview-name="ใบเสร็จค่าใช้จ่ายงานช่าง">ใบเสร็จ</a>' : ''}</span>
+      ${e.taxDoc?`<small>${DonnetReport.esc(e.taxDoc)} · VAT ${e.vatAmount==null?'รอตรวจ':fmtMoney(e.vatAmount)} ${e.taxDocUrl?`<a href="${DonnetReport.esc(e.taxDocUrl)}" target="_blank" rel="noopener" data-tech-preview="document">ใบกำกับภาษี</a>`:''}${e.vatStatus==='credit'?' · ใช้เครดิตได้':e.vatStatus==='excluded'?' · ใช้เครดิตไม่ได้':' · รอตรวจ'}</small>`:''}
       <span class="expense-amount">${fmtMoney(e.amount||0)}</span>
     </div>`).join('');
 

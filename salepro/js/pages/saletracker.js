@@ -516,7 +516,7 @@ function renderExpenseTab() {
   (stDealData.techJobs || []).forEach(j => {
     (j.expenses || []).forEach(e => {
       techExps.push({ id:e.id, cat:(e.category||'อื่นๆ'), detail:(e.desc||e.description||''), amount:+e.amount||0,
-        date:String(e.date||e.ts||j.scheduledAt||'').split('T')[0], by:'ช่าง '+(j.techName||''), receiptUrl:e.receiptUrl||'', _src:'tech' });
+        date:String(e.date||e.addedAt||e.ts||j.scheduledAt||'').split('T')[0], taxDoc:e.taxDoc,vatAmount:e.vatAmount,taxDocUrl:e.taxDocUrl, by:'ช่าง '+(j.techName||''), receiptUrl:e.receiptUrl||'', _src:'tech' });
     });
   });
   const purchaseExps=(purchases?.rows||[]).filter(r=>r.ordered).map(r=>({id:'purchase-'+r.id,cat:'จัดซื้อ',detail:r.title+' · '+r.vendor+' · '+r.items,amount:r.amount,date:r.date,_src:'purchase'}));

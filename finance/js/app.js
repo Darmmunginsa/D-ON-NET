@@ -31,11 +31,11 @@ function openDocPreview(encUrl,encName){ const url=decodeURIComponent(encUrl), n
 }
 
 // ── upload helper ──
-async function uploadDoc(input, certificate = false){ const f=input.files&&input.files[0]; if(!f) return null;
+async function uploadDoc(input, certificate = false, privateFolder = 'PaymentCertificates'){ const f=input.files&&input.files[0]; if(!f) return null;
   const b64=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(f); });
   const fileName=Date.now()+'_'+f.name;
   const d=certificate
-    ?await _call({action:'uploadFile',folder:'PaymentCertificates',fileName,mimeType:f.type,base64:b64,privateFile:true})
+    ?await _call({action:'uploadFile',folder:privateFolder,fileName,mimeType:f.type||'application/pdf',base64:b64,privateFile:true})
     :await apiPost('uploadFile','_',null,{folder:'FinanceDocs',fileName,mimeType:f.type||'application/octet-stream',base64Data:b64});
   return { url:(d&&d.fileUrl)||'', name:f.name };
 }
@@ -84,7 +84,7 @@ async function loadAll(){
       return {
         ...relation,date:(p.PaymentDate||'').slice(0,10), type:'income', category:'รายรับจากการขาย',
         amount:SalePaymentCore.cash(p),whtAmount:wht,settledAmount:+p.AmountPaid||0,base,vat,gross:Number(p.AmountPaid),vatStatus:invoice||taxDate?'':'pending',taxKnown:!!(invoice||taxDate)&&wht!=null,taxDoc:invoice?.Title||p.TaxDoc,taxDocUrl:invoice?.DocURL,party, method:p.PaymentMethod||'',
-        note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:p.SlipName||'สลิป', whtCertificateUrl:p.WHTCertificateURL||'', source:'SalePro', attachmentTarget:p.id?{source:'SalePro',id:p.id}:null
+        note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:p.SlipName||'สลิป', whtCertificateUrl:p.WHTCertificateURL||'', source:'SalePro', taxCorrection:{invoice,revision:p.TaxRevision,whtRate:p.WHTPercent,whtBase:p.WHTBaseAmount,taxDate:invoice?.TaxDate||p.TaxDate,documentDate:invoice?.DocumentDate||p.TaxDate}, attachmentTarget:p.id?{source:'SalePro',id:p.id}:null
       };
     });
     // รายจ่ายจาก PurchasePro (Procurement → Purchase_<id> JSON → payment.vendors)
@@ -92,7 +92,7 @@ async function loadAll(){
     try{
       const legacy=await getListItems(CONFIG.lists.settings);
       impWorkExpense=FinanceRelationships.workExpenses(legacy,financeQuotes);
-      impWorkExpense.filter(e=>e.source==='TechPro'&&e.taxDoc).forEach(e=>impTax.push(workExpenseTaxRow(e)));
+      impWorkExpense.filter(e=>e.taxDoc).forEach(e=>impTax.push(workExpenseTaxRow(e)));
       const current=await getListItems(CONFIG.lists.procurement);
       const proc=[...new Map([...legacy,...current].map(r=>[r.Title,r])).values()];
       const jobRow=proc.find(r=>r.Title==='Procurements');
@@ -111,7 +111,7 @@ async function loadAll(){
           impTax.push({TaxVersion:'1',Date:String(p.date||'').slice(0,10),TaxDate:p.taxDate||'',TaxDoc:p.taxDoc||'',TxType:'expense',...relation,Party:vName(vid),BaseAmount:base,VatAmount:vat,VatEligible:String(status==='credit'),WhtRate:p.whtPct,WhtAmount:wht,Amount:net,_source:'PurchasePro',_vatKnown:vatReviewed&&status!=='none'});
           impExpense.push({ ...relation,...BankDetails.read(vendors.find(v=>String(v.id)===String(vid))), bankFromDirectory:true,date:(p.date||'').slice(0,10), type:'expense', category:'ค่าซื้อสินค้า/วัตถุดิบ',
             amount:net,base,vat,gross,whtAmount:wht,taxKnown:vatReviewed&&wht!=null,taxDoc:p.taxDoc,taxDocUrl:p.taxDocUrl,vatStatus:status,whtCertificateUrl:p.whtUrl,party:vName(vid), method:p.method||'', note:(p.invNo?'INV '+p.invNo:'')+(ext.quoteTitle?' · '+ext.quoteTitle:''),
-            docUrl:p.slipUrl||p.invUrl||'', docName:(p.slipUrl?p.slipName:p.invName)||'หลักฐานจ่าย', source:'PurchasePro', attachmentTarget:{source:'PurchasePro',id:purchaseId,vendorId:vid} });
+            docUrl:p.slipUrl||p.invUrl||'', docName:(p.slipUrl?p.slipName:p.invName)||'หลักฐานจ่าย', source:'PurchasePro', taxCorrection:{revision:p.taxRevision,whtRate:p.whtPct,whtBase:p.whtBaseAmount,documentDate:p.taxDate}, attachmentTarget:{source:'PurchasePro',id:purchaseId,vendorId:vid} });
         });
       });
     }catch(e){ console.warn('load purchasepro expense',e.message); }
@@ -203,7 +203,7 @@ let ledgerAttachmentRows=[];
 function workExpenseTaxRow(entry){
   return {TaxVersion:'1',TxType:'expense',Date:entry.date,TaxDate:entry.taxDate,TaxDoc:entry.taxDoc,
     quoteTitle:entry.quoteTitle,Party:entry.party,BaseAmount:entry.base,VatAmount:entry.vat,
-    VatEligible:String(entry.vatStatus==='credit'),Amount:entry.amount,_source:'TechPro',
+    VatEligible:String(entry.vatStatus==='credit'),Amount:entry.amount,_source:entry.source,
     _vatKnown:entry.vatStatus==='credit'||entry.vatStatus==='excluded'};
 }
 async function reviewTechExpenseTax(index,status){
@@ -236,7 +236,7 @@ function renderLedger(){
     <td>${e.quoteId?'<div style="font-size:12px;color:var(--accent2)">'+esc(e.quoteTitle||e.quoteId)+'</div><div style="font-size:10px;color:var(--muted)">'+esc(e.quoteCustomer)+'</div>':'<span style="color:var(--muted)">ไม่ผูกใบเสนอราคา</span>'}${e.purchaseId?'<div style="font-size:10px;color:var(--muted)">งานจัดซื้อ '+esc(e.purchaseId)+'</div>':''}</td>
     <td>${srcBadge(e.source)}</td>
     <td>${docChip(e.docUrl,e.docName)} ${docChip(e.whtCertificateUrl,'หนังสือรับรองหัก ณ ที่จ่าย')} ${docChip(e.taxDocUrl,e.taxDoc?'ใบกำกับ '+e.taxDoc:'ใบกำกับภาษี')} ${e.taxDoc&&!e.taxDocUrl?'<small>'+esc(e.taxDoc)+'</small>':''} ${e.source==='TechPro'&&e.taxDoc&&e.attachmentTarget&&isAdminUser()?'<select class="btn btn-sm" aria-label="ผลตรวจภาษีซื้อ" onchange="reviewTechExpenseTax('+index+',this.value)"><option value="pending" '+(e.vatStatus==='pending'?'selected':'')+'>รอตรวจ</option><option value="credit" '+(e.vatStatus==='credit'?'selected':'')+'>ใช้เครดิตได้</option><option value="excluded" '+(e.vatStatus==='excluded'?'selected':'')+'>ใช้เครดิตไม่ได้</option></select>':''} ${e.attachmentTarget&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+')">'+(e.source==='SalePro'?'แก้สลิป':'แก้ไฟล์แนบ')+'</button>':''} ${e.attachmentTarget?.source==='SalePro'&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+',true)">'+(e.whtCertificateUrl?'เปลี่ยนหนังสือรับรอง':'แนบหนังสือรับรองหัก ณ ที่จ่าย')+'</button>':''}</td>
-    <td style="text-align:right">${e.editable?`<button class="ic" onclick="editTx('${e._id}')" title="แก้ไข">✏️</button><button class="ic" onclick="delTx('${e._id}')" title="ลบ" style="color:var(--red)">✕</button>`:''}</td>
+    <td style="text-align:right">${e.attachmentTarget&&e.taxCorrection&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="openFinanceTaxCorrection('+index+')">แก้ภาษี</button>':''}${e.editable?`<button class="ic" onclick="editTx('${e._id}')" title="แก้ไข">✏️</button><button class="ic" onclick="delTx('${e._id}')" title="ลบ" style="color:var(--red)">✕</button>`:''}</td>
   </tr>`).join(''):'<tr><td colspan="13" class="empty">ไม่มีรายการ</td></tr>';
   const srcOpts=['all','Manual','SalePro','PurchasePro','TechPro','SaleExpense','เบิกจ่าย'].map(s=>`<option value="${s}" ${f.source===s?'selected':''}>${s==='all'?'ทุกแหล่ง':s}</option>`).join('');
   const income=ents.filter(e=>e.type==='income').reduce((n,e)=>n+(+e.amount||0),0),expense=ents.filter(e=>e.type==='expense').reduce((n,e)=>n+(+e.amount||0),0),withheld=ents.reduce((n,e)=>n+(+e.whtAmount||0),0);
