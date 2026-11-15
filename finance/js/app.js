@@ -123,17 +123,11 @@ function catNames(kind){ const fromSheet=finCat.filter(c=>(c.Kind||'')===kind).m
 
 // รวมทุกแหล่งเป็น ledger เดียว
 function allEntries(){
-  const manual = finTx.map(t=>({ ...FinanceRelationships.resolve(t,financeQuotes),_id:t._id||t.id, date:(t.Date||'').slice(0,10), type:t.TxType||'expense', category:t.Category||'', amount:+t.Amount||0, party:t.Party||'', method:t.Method||'', note:t.Note||'', docUrl:t.DocURL||'', docName:t.DocName||'', ...BankDetails.read(t),source:'Manual',base:SalePaymentCore.optional(t.BaseAmount),vat:SalePaymentCore.optional(t.VatAmount),gross:SalePaymentCore.optional(t.GrossAmount),whtAmount:SalePaymentCore.optional(t.WhtAmount),taxDoc:t.TaxDoc,taxKnown:t.TaxVersion==='1', editable:true }));
+  const manual = finTx.map(t=>({ ...FinanceRelationships.resolve(t,financeQuotes),_id:t._id||t.id, date:(t.Date||'').slice(0,10), type:t.TxType||'expense', category:t.Category||'', amount:+t.Amount||0, party:t.Party||'', method:t.Method||'', note:t.Note||'', docUrl:t.DocURL||'', docName:t.DocName||'', ...BankDetails.read(t),source:'Manual',base:SalePaymentCore.optional(t.BaseAmount),vat:SalePaymentCore.optional(t.VatAmount),gross:SalePaymentCore.optional(t.GrossAmount),whtAmount:SalePaymentCore.optional(t.WhtAmount),taxDoc:t.TaxDoc,taxKnown:t.TaxVersion==='1'&&(!(Number(t.VatAmount)>0)||!!(t.TaxDoc&&t.TaxDate)), editable:true }));
   const reqPaid = finReq.filter(r=>r.Status==='Paid').map(r=>({ ...FinanceRelationships.resolve(r,financeQuotes),date:(r.PaidDate||r.ApprovedAt||r.Date||'').slice(0,10), type:'expense', category:r.Category||'เบิกจ่าย', amount:+r.Amount||0, party:r.Requester||'', method:r.PaidMethod||'', note:'ใบเบิก '+(r.ReqNo||'')+(r.Reason?' · '+r.Reason:''), docUrl:r.DocURL||'', docName:r.DocName||'', source:'เบิกจ่าย' }));
   return manual.concat(reqPaid, impIncome, impExpense,impWorkExpense).filter(e=>e.date);
 }
-function periodRange(){
-  const now=new Date(); let start=null;
-  if(_period==='month') start=new Date(now.getFullYear(),now.getMonth(),1);
-  else if(_period==='year') start=new Date(now.getFullYear(),0,1);
-  return start?start.toISOString().slice(0,10):null;
-}
-function inPeriod(e){ const s=periodRange(); return !s || e.date>=s; }
+function inPeriod(entry){return financeTaxInPeriod(entry.date);}
 
 // ── nav ──
 function go(v){ _view=v;
@@ -181,8 +175,8 @@ function drawCharts(){
       let acc=0; const R=52,C=66,sw=22; const circ=2*Math.PI*R;
       const segs=pairs.map((p,i)=>{ const frac=p[1]/total; const dash=frac*circ; const off=circ-acc*circ; acc+=frac;
         return `<circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${colors[i%colors.length]}" stroke-width="${sw}" stroke-dasharray="${dash} ${circ-dash}" stroke-dashoffset="${off}" transform="rotate(-90 ${C} ${C})"/>`; }).join('');
-      const legend=pairs.map((p,i)=>`<div class="lg"><span class="dot" style="background:${colors[i%colors.length]}"></span><span class="lg-n">${esc(p[0])}</span><span class="lg-v">${fmt0(p[1])} (${Math.round(p[1]/total*100)}%)</span></div>`).join('');
-      dEl.innerHTML=`<div class="donut-wrap"><svg width="132" height="132" viewBox="0 0 132 132">${segs}<text x="66" y="62" text-anchor="middle" font-size="11" fill="var(--muted)">รวม</text><text x="66" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text)">${fmt0(total)}</text></svg><div class="legend">${legend}</div></div>`;
+      const legend=pairs.map((p,i)=>`<div class="lg"><span class="dot" style="background:${colors[i%colors.length]}"></span><span class="lg-n">${esc(p[0])}</span><span class="lg-v">${fmt(p[1])} (${Math.round(p[1]/total*100)}%)</span></div>`).join('');
+      dEl.innerHTML=`<div class="donut-wrap"><svg width="132" height="132" viewBox="0 0 132 132">${segs}<text x="66" y="62" text-anchor="middle" font-size="11" fill="var(--muted)">รวม</text><text x="66" y="78" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text)">${fmt(total)}</text></svg><div class="legend">${legend}</div></div>`;
     }
   }
   // bars: monthly income vs expense (last 6 buckets within data)
@@ -230,6 +224,19 @@ async function reviewTechExpenseTax(index,status){
   }
 }
 function ledgerTaxAmount(amount){return amount==null?'<span style="color:var(--muted)">รอตรวจ</span>':fmt(amount);}
+function summarizeLedger(entries){
+  const totals={income:0,expense:0,customerWithheld:0,vendorWithheld:0};
+  for(const entry of entries){
+    if(entry.type==='income'){
+      totals.income+=Number(entry.amount)||0;
+      totals.customerWithheld+=Number(entry.whtAmount)||0;
+    }else if(entry.type==='expense'){
+      totals.expense+=Number(entry.amount)||0;
+      totals.vendorWithheld+=Number(entry.whtAmount)||0;
+    }
+  }
+  return totals;
+}
 function renderLedger(){
   let ents=allEntries().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const f=_ledgerFilter;
@@ -254,8 +261,8 @@ function renderLedger(){
     <td style="text-align:right">${e.attachmentTarget&&e.taxCorrection&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="openFinanceTaxCorrection('+index+')">แก้ภาษี</button>':''}${e.editable?`<button class="ic" onclick="editTx('${e._id}')" title="แก้ไข">✏️</button><button class="ic" onclick="delTx('${e._id}')" title="ลบ" style="color:var(--red)">✕</button>`:''}</td>
   </tr>`).join(''):'<tr><td colspan="13" class="empty">ไม่มีรายการ</td></tr>';
   const srcOpts=['all','Manual','SalePro','PurchasePro','TechPro','SaleExpense','เบิกจ่าย'].map(s=>`<option value="${s}" ${f.source===s?'selected':''}>${s==='all'?'ทุกแหล่ง':s}</option>`).join('');
-  const income=ents.filter(e=>e.type==='income').reduce((n,e)=>n+(+e.amount||0),0),expense=ents.filter(e=>e.type==='expense').reduce((n,e)=>n+(+e.amount||0),0),withheld=ents.reduce((n,e)=>n+(+e.whtAmount||0),0);
-  const summary=`<aside class="ledger-summary card"><h3>สรุปรายการที่แสดง</h3><p>${ents.length} รายการ · ตามตัวกรองปัจจุบัน</p><div>รับเงินจริง <b style="color:var(--green)">${fmt(income)}</b></div><div>รายจ่าย <b style="color:var(--red)">${fmt(expense)}</b></div><div>คงเหลือสุทธิ <b>${fmt(income-expense)}</b></div><div>ลูกค้าหัก ณ ที่จ่าย <b>${fmt(withheld)}</b></div><small>ยอดหัก ณ ที่จ่ายแสดงประกอบ ไม่บวกซ้ำในเงินรับจริง · ค่าใช้จ่าย Sale/ช่างอิงยอดที่บันทึกไว้</small></aside>`;
+  const {income,expense,customerWithheld,vendorWithheld}=summarizeLedger(ents);
+  const summary=`<aside class="ledger-summary card"><h3>สรุปรายการที่แสดง</h3><p>${ents.length} รายการ · ตามตัวกรองปัจจุบัน</p><div>รับเงินจริง <b style="color:var(--green)">${fmt(income)}</b></div><div>รายจ่าย <b style="color:var(--red)">${fmt(expense)}</b></div><div>คงเหลือสุทธิ <b>${fmt(income-expense)}</b></div><div>ลูกค้าหักเรา <b>${fmt(customerWithheld)}</b></div><div>เราหักผู้ขาย <b>${fmt(vendorWithheld)}</b></div><small>ยอดหัก ณ ที่จ่ายแสดงประกอบยอดเงินสด · ค่าใช้จ่าย Sale/ช่างอิงยอดที่บันทึกไว้</small></aside>`;
   return `<div class="page-head"><h2>รายการรับ-จ่าย</h2>
     <div style="display:flex;gap:8px"><button class="btn btn-sm" onclick="openTx('income')" style="border-color:var(--green);color:var(--green)">+ รายรับ</button><button class="btn btn-primary btn-sm" onclick="openTx('expense')">+ รายจ่าย</button></div></div>
     <div class="toolbar">
@@ -458,7 +465,7 @@ function renderReport(){
   const ents=allEntries().filter(inPeriod);
   const sum=(type)=>{ const by={}; ents.filter(e=>e.type===type).forEach(e=>{ by[e.category||'อื่น ๆ']=(by[e.category||'อื่น ๆ']||0)+e.amount; }); return Object.entries(by).sort((a,b)=>b[1]-a[1]); };
   const inc=sum('income'), exp=sum('expense'); const ti=inc.reduce((s,p)=>s+p[1],0), te=exp.reduce((s,p)=>s+p[1],0);
-  const tbl=(pairs,tot,color)=>pairs.length?pairs.map(p=>`<tr><td>${esc(p[0])}</td><td style="text-align:right;font-family:var(--mono)">${fmt0(p[1])}</td><td style="text-align:right;color:var(--muted)">${tot?Math.round(p[1]/tot*100):0}%</td></tr>`).join(''):'<tr><td colspan="3" class="empty">—</td></tr>';
+  const tbl=(pairs,tot,color)=>pairs.length?pairs.map(p=>`<tr><td>${esc(p[0])}</td><td style="text-align:right;font-family:var(--mono)">${fmt(p[1])}</td><td style="text-align:right;color:var(--muted)">${tot?Math.round(p[1]/tot*100):0}%</td></tr>`).join(''):'<tr><td colspan="3" class="empty">—</td></tr>';
   const periodBtns=['month','year','all'].map(p=>`<button class="chip ${_period===p?'active':''}" onclick="setPeriodR('${p}')">${p==='month'?'เดือนนี้':p==='year'?'ปีนี้':'ทั้งหมด'}</button>`).join('');
   return `<div class="page-head"><h2>รายงานรับ–จ่ายและภาษี <span style="font-size:13px;color:var(--muted);font-weight:400">· ${periodLabel()}</span></h2>
     <div style="display:flex;gap:8px;align-items:center"><div class="chips">${periodBtns}</div><button class="btn btn-sm" onclick="exportCSV()">⬇ CSV</button></div></div>

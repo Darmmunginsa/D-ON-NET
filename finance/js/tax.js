@@ -32,26 +32,36 @@ function openFinanceParty(index){_financePartyEdit=index===undefined?null:index;
 async function saveFinanceParty(){const fields={};for(const k of ['Name','TaxID','Branch','Address','Phone','Email','BankName','BankAccountName','BankAccountNumber'])fields[k]=document.getElementById('party-'+k).value.trim();if(!fields.Name)return toast('กรอกชื่อคู่ค้า','error');if(fields.TaxID&&!/^\d{13}$/.test(fields.TaxID))return toast('เลขผู้เสียภาษีต้องเป็นตัวเลข 13 หลัก','error');try{BankDetails.validate(fields);if(_financePartyEdit===null){const p=await createListItem('FinanceParty',fields);finParties.push(Object.assign({},p,fields));}else{const p=finParties[_financePartyEdit];await updateListItem('FinanceParty',p.id||p._id,fields);Object.assign(p,fields);}closeModal();go('parties');toast('บันทึกคู่ค้าแล้ว','success');}catch(e){toast('บันทึกไม่สำเร็จ: '+e.message,'error');}}
 function financeTaxTotals(rows){const t={purchase:0,sales:0,excluded:0,withheld:0,credit:0};for(const r of rows){if(r.TaxVersion!=='1')continue;const expense=r.TxType==='expense';const vat=Number(r.VatAmount)||0,wht=Number(r.WhtAmount)||0;if(r._vatInPeriod!==false){if(expense){if(r.VatEligible==='false')t.excluded+=vat;else t.purchase+=vat;}else t.sales+=vat;}if(r._whtInPeriod!==false){if(expense)t.withheld+=wht;else t.credit+=wht;}}return t;}
 function financeTaxInPeriod(date){
+  date=String(date||'').slice(0,10);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))return false;
   const now=new Date(),year=String(now.getFullYear()),month=year+'-'+String(now.getMonth()+1).padStart(2,'0');
   return _period==='all'||(_period==='year'?date.slice(0,4)===year:date.slice(0,7)===month);
 }
 function financeTaxRows(){
   const imported=typeof impTax==='undefined'?[]:impTax;
-  return finTx.filter(t=>t.TaxVersion==='1').map(t=>({...t,_source:'Finance',_vatKnown:true})).concat(imported).map(t=>({...t,_vatInPeriod:financeTaxInPeriod(String(t.TaxDate||'').slice(0,10))&&t._vatKnown!==false,_whtInPeriod:financeTaxInPeriod(t.Date)}));
+  return finTx.filter(t=>t.TaxVersion==='1').map(t=>({...t,_source:'Finance',_vatKnown: !(Number(t.VatAmount)>0)||!!(t.TaxDoc&&t.TaxDate)})).concat(imported).map(t=>({...t,_vatInPeriod:financeTaxInPeriod(String(t.TaxDate||'').slice(0,10))&&t._vatKnown!==false,_whtInPeriod:financeTaxInPeriod(t.Date)}));
 }
 function financeTaxDetail(rows,kind){
-  const active=rows.filter(r=>kind==='vat'?r._vatInPeriod:r._whtInPeriod&&Number(r.WhtAmount)>0);
-  const lines=active.map(r=>'<tr><td>'+esc(kind==='vat'?(r.TaxDate||r.Date):r.Date)+'</td><td>'+esc(r.quoteTitle||r.TaxDoc||'—')+'<div style="font-size:10px">'+esc(r._source||'Finance')+' · '+esc(r.Party||'')+'</div></td><td>'+ (r.TxType==='income'?'ขาย / ลูกค้าหักเรา':'ซื้อ / เราหักผู้ขาย')+'</td><td style="text-align:right">'+fmt(kind==='vat'?r.VatAmount:r.WhtAmount)+'</td></tr>').join('');
-  return '<div style="overflow:auto"><table class="tbl"><thead><tr><th>วันที่</th><th>เอกสาร / งาน / แหล่ง</th><th>ประเภท</th><th>ยอดภาษี</th></tr></thead><tbody>'+ (lines||'<tr><td colspan="4">ยังไม่มีรายการภาษีในช่วงนี้</td></tr>')+'</tbody></table></div>';
+  const vat=kind==='vat';
+  const active=rows.filter(r=>vat?r._vatInPeriod&&(Number(r.VatAmount)!==0||r.TaxDoc):r._whtInPeriod&&Number(r.WhtAmount)>0);
+  const lines=active.map(r=>{
+    const reference=[r.TaxDoc?'ใบกำกับ '+r.TaxDoc:'',r.quoteTitle].filter(Boolean).join(' · ');
+    const type=vat?(r.TxType==='income'?'ภาษีขาย':r.VatEligible==='false'?'ภาษีซื้อ · ใช้เครดิตไม่ได้':'ภาษีซื้อ · ใช้เครดิตได้'):(r.TxType==='income'?'ลูกค้าหักเรา':'เราหักผู้ขาย');
+    return '<tr><td>'+esc(vat?r.TaxDate:r.Date)+'</td><td>'+esc(reference||'—')+'<div style="font-size:10px">'+esc(r._source||'Finance')+' · '+esc(r.Party||'')+'</div></td><td>'+type+'</td><td style="text-align:right">'+fmt(vat?r.VatAmount:r.WhtAmount)+'</td></tr>';
+  }).join('');
+  return '<div style="overflow:auto"><table class="tbl"><thead><tr><th>วันที่</th><th>เอกสาร / งาน / แหล่ง</th><th>ประเภท</th><th>ยอดภาษี</th></tr></thead><tbody>'+(lines||'<tr><td colspan="4">ยังไม่มีรายการภาษีในช่วงนี้</td></tr>')+'</tbody></table></div>';
+}
+function financeTaxPendingDetail(entries){
+  if(!entries.length)return '';
+  const lines=entries.map(e=>'<tr><td>'+esc(e.date)+'</td><td>'+esc([e.quoteTitle,e.party,e.source].filter(Boolean).join(' · '))+'</td><td>'+esc(e.taxDoc||'—')+'</td><td>รอตรวจ</td></tr>').join('');
+  return '<details style="margin-top:8px"><summary>ดูรายการรอตรวจ</summary><div style="overflow:auto"><table class="tbl"><thead><tr><th>วันรับ/จ่าย</th><th>งาน / คู่ค้า / แหล่ง</th><th>เลขใบกำกับ</th><th>สถานะ</th></tr></thead><tbody>'+lines+'</tbody></table></div></details>';
 }
 function renderFinanceTaxReport(){
-  const inRange=financeTaxInPeriod;
   const rows=financeTaxRows();
-  const t=financeTaxTotals(rows),unknown=allEntries().filter(inPeriod).filter(e=>!e.taxKnown).length;
+  const t=financeTaxTotals(rows),pending=allEntries().filter(e=>financeTaxInPeriod(e.date)&&!e.taxKnown);
   const cell=(label,value)=>`<tr><td>${label}</td><td style="text-align:right">${fmt(value)}</td></tr>`;
   const byRate=[...new Set([1,3,5,...rows.filter(r=>r._whtInPeriod&&Number(r.WhtAmount)>0).map(r=>Number(r.WhtRate))])].sort((a,b)=>a-b).map(rate=>{const list=rows.filter(r=>r._whtInPeriod&&Number(r.WhtRate)===rate);return cell('เราหักผู้ขาย '+rate+'%',list.filter(r=>r.TxType==='expense').reduce((s,r)=>s+Number(r.WhtAmount||0),0))+cell('ลูกค้าหักเรา '+rate+'%',list.filter(r=>r.TxType==='income').reduce((s,r)=>s+Number(r.WhtAmount||0),0));}).join('');
-  return `<div class="grid2" style="margin-top:14px"><div class="card"><div class="card-h">สรุป VAT · ตามข้อมูลภาษีที่บันทึก</div><table class="tbl"><tbody>${cell('ภาษีขาย',t.sales)}${cell('ภาษีซื้อที่ใช้เครดิต',t.purchase)}${cell('ภาษีซื้อไม่ใช้เครดิต',t.excluded)}${cell('ภาษีขาย − ภาษีซื้อที่ใช้เครดิต',t.sales-t.purchase)}</tbody></table><small>ผลต่างก่อนเครดิตยกมาและรายการปรับปรุง</small>${financeTaxDetail(rows,'vat')}</div><div class="card"><div class="card-h">สรุปหัก ณ ที่จ่าย · ตามวันที่รับ/จ่าย</div><table class="tbl"><tbody>${cell('เราหักผู้ขาย (เตรียมนำส่ง)',t.withheld)}${cell('ลูกค้าหักเรา (เครดิตภาษี)',t.credit)}${byRate}</tbody></table>${financeTaxDetail(rows,'wht')}</div></div><div class="card" style="margin-top:12px;padding:12px">${unknown} รายการรับจ่ายยังมีรายละเอียดภาษีไม่ครบ · แสดงยอด VAT เฉพาะที่บันทึกไว้ ไม่คำนวณ VAT ซื้อจากยอดโอนเอง · รายการที่ยังไม่ยืนยันวันที่ภาษีไม่รวมในยอด VAT · ใช้ตรวจสอบก่อนจัดทำแบบยื่นภาษี <button class="btn btn-sm" onclick="exportFinanceTaxCSV()">ส่งออก CSV ภาษี</button></div>`;
+  return `<div class="grid2" style="margin-top:14px"><div class="card"><div class="card-h">สรุป VAT · ตามข้อมูลภาษีที่บันทึก</div><table class="tbl"><tbody>${cell('ภาษีขาย',t.sales)}${cell('ภาษีซื้อที่ใช้เครดิต',t.purchase)}${cell('ภาษีซื้อไม่ใช้เครดิต',t.excluded)}${cell('ภาษีขาย − ภาษีซื้อที่ใช้เครดิต',t.sales-t.purchase)}</tbody></table><small>ผลต่างก่อนเครดิตยกมาและรายการปรับปรุง</small>${financeTaxDetail(rows,'vat')}</div><div class="card"><div class="card-h">สรุปหัก ณ ที่จ่าย · ตามวันที่รับ/จ่าย</div><table class="tbl"><tbody>${cell('เราหักผู้ขาย (เตรียมนำส่ง)',t.withheld)}${cell('ลูกค้าหักเรา (เครดิตภาษี)',t.credit)}${byRate}</tbody></table>${financeTaxDetail(rows,'wht')}</div></div><div class="card" style="margin-top:12px;padding:12px">รายการรอตรวจ ${pending.length} รายการ ตามวันรับ/จ่าย · ยอด VAT รวมเฉพาะรายการที่ยืนยันข้อมูลภาษีแล้ว${financeTaxPendingDetail(pending)} <button class="btn btn-sm" onclick="exportFinanceTaxCSV()">ส่งออก CSV ภาษี</button></div>`;
 }
 function exportFinanceTaxCSV(){
   const header=['วันที่รับจ่าย','วันที่ใบกำกับภาษี','เลขที่เอกสาร','ประเภท','คู่ค้า','เลขผู้เสียภาษี','สาขา','ฐานก่อน VAT','VAT','สิทธิภาษีซื้อ','อัตราหัก ณ ที่จ่าย','ยอดหัก ณ ที่จ่าย','รับจ่ายสุทธิ','VAT อยู่ในช่วง','หัก ณ ที่จ่ายอยู่ในช่วง'];
