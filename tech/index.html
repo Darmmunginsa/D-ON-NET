@@ -676,20 +676,19 @@ function jobPhotoGroups(item) {
        <img class="photo-thumb" src="${DonnetReport.esc(_driveThumb(u))}" onerror="this.style.display='none';this.parentElement.classList.add('no-thumb')"/>
        <span class="photo-chip-label">🖼️ รูป ${i+1}</span>
      </a>`;
-      return canMove
-        ? `<div class="job-photo-select">${thumbnail}<label><input type="checkbox" name="photo" value="${DonnetReport.esc(u)}"> เลือกรูป ${i+1}</label></div>`
-        : thumbnail;
+      return `<div class="job-photo-select">${thumbnail}<label><input type="checkbox" name="photo" value="${DonnetReport.esc(u)}"> เลือกรูป ${i+1}</label></div>`;
     }).join('');
     const grid = '<div class="photo-grid">'+photosHtml+'</div>';
-    const photoContent = canMove ? `
-      <form data-job-id="${DonnetReport.esc(job.id)}" onsubmit="event.preventDefault();moveGeneralPhotos(this)">
+    const photoContent = photos.length ? `
+      <form data-job-id="${DonnetReport.esc(job.id)}" data-serial="${DonnetReport.esc(serial)}" onsubmit="event.preventDefault();if(this.elements.namedItem('serial'))moveGeneralPhotos(this)">
         ${grid}
         <div class="job-photo-move">
-          <label>Serial ปลายทาง <select class="form-control" name="serial" required>
+          ${canMove ? `<label>Serial ปลายทาง <select class="form-control" name="serial" required>
             <option value="">เลือก Serial</option>
             ${[...serials].map(value => '<option>'+DonnetReport.esc(value)+'</option>').join('')}
           </select></label>
-          <button type="submit" class="btn btn-primary btn-sm">ย้ายรูปที่เลือก</button>
+          <button type="submit" class="btn btn-primary btn-sm">ย้ายรูปที่เลือก</button>` : ''}
+          <button type="button" class="btn btn-outline btn-sm" onclick="deleteSelectedJobPhotos(this.form)">ลบรูปที่เลือก</button>
         </div>
       </form>` : grid;
     return `<details class="job-photo-group" ${photos.length || !serial ? 'open' : ''}>
@@ -741,6 +740,52 @@ async function moveGeneralPhotos(form) {
     controls.forEach(control => { control.disabled = false; });
   }
   toast('ย้าย ' + urls.length + ' รูปเข้า Serial ' + serial + ' แล้ว', 'success');
+  renderJobList();
+}
+async function deleteSelectedJobPhotos(form) {
+  const item = allJobs.find(entry => String(entry.job.id) === form.dataset.jobId);
+  if (!item) return;
+  const quoteId = String(item.q.id);
+  if (photoUploads.has(quoteId)) {
+    toast('กรุณารอให้การจัดการรูปก่อนหน้าเสร็จ', 'info');
+    return;
+  }
+
+  const groupPhotos = new Set(jobPhotosForSerial(item.job, form.dataset.serial));
+  const selected = new Set(
+    [...form.querySelectorAll('input[name="photo"]:checked')]
+      .map(input => input.value)
+      .filter(url => groupPhotos.has(url))
+  );
+  if (!selected.size) {
+    toast('กรุณาเลือกรูปที่ต้องการลบ', 'error');
+    return;
+  }
+  if (!confirm('นำรูปที่เลือก ' + selected.size + ' รูปออกจากงาน Tech? ไฟล์ต้นฉบับยังอยู่ใน Drive')) return;
+
+  const job = item.job;
+  const originalPhotos = job.completionPhotos;
+  const originalGroups = job.completionPhotoGroups;
+  const originalLegacyPhoto = job.completionPhotoUrl;
+  const controls = [...form.elements];
+  photoUploads.add(quoteId);
+  controls.forEach(control => { control.disabled = true; });
+  try {
+    job.completionPhotos = (originalPhotos || [originalLegacyPhoto].filter(Boolean)).filter(url => !selected.has(url));
+    job.completionPhotoGroups = (originalGroups || []).filter(entry => !selected.has(entry.url));
+    if (selected.has(originalLegacyPhoto)) delete job.completionPhotoUrl;
+    await saveDealStatus(item);
+  } catch (error) {
+    job.completionPhotos = originalPhotos;
+    job.completionPhotoGroups = originalGroups;
+    job.completionPhotoUrl = originalLegacyPhoto;
+    toast('ลบรูปไม่สำเร็จ: ' + error.message, 'error');
+    return;
+  } finally {
+    photoUploads.delete(quoteId);
+    controls.forEach(control => { control.disabled = false; });
+  }
+  toast('นำรูปออกจากงานแล้ว ' + selected.size + ' รูป', 'success');
   renderJobList();
 }
 async function uploadPhotos(input) {
