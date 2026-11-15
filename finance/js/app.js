@@ -71,7 +71,7 @@ async function loadAll(){
       return {
         ...relation,date:(p.PaymentDate||'').slice(0,10), type:'income', category:'รายรับจากการขาย',
         amount:SalePaymentCore.cash(p),whtAmount:+p.WHTAmount||0,settledAmount:+p.AmountPaid||0, party, method:p.PaymentMethod||'',
-        note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:p.SlipName||'สลิป', source:'SalePro', attachmentTarget:p.id?{source:'SalePro',id:p.id}:null
+        note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:p.SlipName||'สลิป', whtCertificateUrl:p.WHTCertificateURL||'', source:'SalePro', attachmentTarget:p.id?{source:'SalePro',id:p.id}:null
       };
     });
     // รายจ่ายจาก PurchasePro (Procurement → Purchase_<id> JSON → payment.vendors)
@@ -201,7 +201,7 @@ function renderLedger(){
     <td style="text-align:right;font-family:var(--mono);color:${e.type==='income'?'var(--green)':'var(--red)'}">${e.type==='income'?'+':'-'}${fmt0(e.amount)}</td>
     <td>${e.quoteId?'<div style="font-size:12px;color:var(--accent2)">'+esc(e.quoteTitle||e.quoteId)+'</div><div style="font-size:10px;color:var(--muted)">'+esc(e.quoteCustomer)+'</div>':'<span style="color:var(--muted)">ไม่ผูกใบเสนอราคา</span>'}${e.purchaseId?'<div style="font-size:10px;color:var(--muted)">งานจัดซื้อ '+esc(e.purchaseId)+'</div>':''}</td>
     <td>${srcBadge(e.source)}</td>
-    <td>${docChip(e.docUrl,e.docName)} ${e.attachmentTarget&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+')">แก้ไฟล์แนบ</button>':''}</td>
+    <td>${docChip(e.docUrl,e.docName)} ${docChip(e.whtCertificateUrl,'หนังสือรับรองหัก ณ ที่จ่าย')} ${e.attachmentTarget&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+')">แก้ไฟล์แนบ</button>':''}</td>
     <td style="text-align:right">${e.editable?`<button class="ic" onclick="editTx('${e._id}')" title="แก้ไข">✏️</button><button class="ic" onclick="delTx('${e._id}')" title="ลบ" style="color:var(--red)">✕</button>`:''}</td>
   </tr>`).join(''):'<tr><td colspan="9" class="empty">ไม่มีรายการ</td></tr>';
   const srcOpts=['all','Manual','SalePro','PurchasePro','TechPro','SaleExpense','เบิกจ่าย'].map(s=>`<option value="${s}" ${f.source===s?'selected':''}>${s==='all'?'ทุกแหล่ง':s}</option>`).join('');

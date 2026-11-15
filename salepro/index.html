@@ -1101,13 +1101,18 @@
             <div class="form-group"><label>ลูกค้าหัก ณ ที่จ่าย (%)</label><div style="display:flex;gap:6px;align-items:center"><input id="st-pay-wht" type="number" min="0" max="100" step="0.5" placeholder="0" oninput="renderWHTHint()" style="max-width:80px"><button class="action-btn" onclick="document.getElementById('st-pay-wht').value=3;renderWHTHint()" title="ค่าบริการ 3%" style="font-size:11px;padding:3px 8px">3%</button></div></div>
             <div class="form-group"><label>ยอดหลังหัก (รับจริง)</label><div id="st-pay-wht-hint" style="font-size:12px;color:var(--muted);padding-top:8px">—</div></div>
             <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="st-pay-note" style="min-height:48px"></textarea></div>
-            <div class="form-group" style="grid-column:1/-1">
+            <div class="form-group">
               <label>สลิปการโอน</label>
               <div id="st-slip-drop" onclick="document.getElementById('st-slip-file').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--border2)'" ondrop="handleSTSlipDrop(event)" style="border:1.5px dashed var(--border2);border-radius:7px;padding:12px;text-align:center;cursor:pointer">
                 <div id="st-slip-label" style="font-size:12px;color:var(--muted)">คลิกหรือลากสลิปมาวาง</div>
               </div>
               <input type="file" id="st-slip-file" accept="image/*,.pdf" style="display:none" onchange="handleSTSlipSelect(this)">
               <div id="st-slip-preview" style="display:none;margin-top:8px"></div>
+            </div>
+            <div class="form-group" style="min-width:0">
+              <label for="st-pay-wht-file">หนังสือรับรองหัก ณ ที่จ่าย</label>
+              <input type="file" id="st-pay-wht-file" accept="image/*,.pdf" style="width:100%">
+              <button type="button" class="btn btn-sm" style="align-self:flex-start" onclick="document.getElementById('st-pay-wht-file').value=''">ล้างไฟล์ที่เลือก</button>
             </div>
           </div>
           <div style="display:flex;justify-content:flex-end;margin-top:4px">
@@ -1380,7 +1385,7 @@
         </div>
         <div class="form-group"><label>เลขอ้างอิง</label><input id="pay-ref" placeholder="เลขโอน / เลข Cheque"></div>
         <div class="form-group" style="grid-column:1/-1"><label>หมายเหตุ</label><textarea id="pay-note"></textarea></div>
-        <div class="form-group" style="grid-column:1/-1">
+        <div class="form-group">
           <label>สลิปการโอน / หลักฐานการชำระ</label>
           <div id="slip-drop-zone" onclick="document.getElementById('slip-file').click()" style="border:1.5px dashed var(--border2);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:all 0.15s;background:var(--surface2)"
             ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
@@ -1393,11 +1398,16 @@
           <input type="file" id="slip-file" accept="image/*,.pdf" style="display:none" onchange="handleSlipSelect(this)">
           <div id="slip-preview" style="display:none;margin-top:10px"></div>
         </div>
+        <div class="form-group" style="min-width:0">
+          <label for="pay-wht-file">หนังสือรับรองหัก ณ ที่จ่าย</label>
+          <input type="file" id="pay-wht-file" accept="image/*,.pdf" style="width:100%">
+          <button type="button" class="btn btn-sm" style="align-self:flex-start" onclick="document.getElementById('pay-wht-file').value=''">ล้างไฟล์ที่เลือก</button>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('payment-modal')">ยกเลิก</button>
-      <button class="btn btn-success" onclick="savePayment()">บันทึกการชำระ</button>
+      <button id="pay-submit-btn" class="btn btn-success" onclick="savePayment()">บันทึกการชำระ</button>
     </div>
   </div>
 </div>
@@ -1640,7 +1650,7 @@
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
 <script src="../shared/travel-cost.js?v=routepin20261108"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=customsite20261112"></script><script src="js/pages/quotes.js?v=crm20261112"></script>
 <script src="js/pages/approve.js?v=crm20261112"></script>
-<script src="js/pages/payment.js?v=workflowstatus20261108"></script>
+<script src="js/pages/payment.js?v=whtcertificate20261115"></script>
 <script src="js/pages/catalog.js?v=baseprice20261111"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
 <script src="js/pages/settings.js?v=monitor20261107"></script>
 <script src="js/pages/customers.js?v=partner20261115"></script>
@@ -1648,8 +1658,8 @@
 <script src="js/pages/company.js?v=startup20261108"></script>
 <script src="js/pages/pdf.js?v=drafts20261108"></script>
 <script src="../shared/sale-payment-core.js?v=whtbase20261114"></script>
-<script src="js/pages/purchase-expenses.js?v=workledger20261114"></script>
-<script src="js/pages/saletracker.js?v=workledger20261114"></script>
+<script src="js/pages/purchase-expenses.js?v=whtcertificate20261115"></script>
+<script src="js/pages/saletracker.js?v=whtcertificate20261115"></script>
 <script src="../shared/billing-core.js?v=billingbaskets20261108"></script>
 <script src="js/pages/billing.js?v=billingbaskets20261108"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>

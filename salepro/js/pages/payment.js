@@ -4,7 +4,7 @@
 function renderPayment() {
   const payable = quotesData.filter(q => q.Status === 'PO Received');
   if(currentPaymentQuoteId&&quotesData.some(q=>q.id===currentPaymentQuoteId&&q.Status==='Cancelled')){
-    closeModal('payment-modal');currentPaymentQuoteId=null;clearSlip();
+    closeModal('payment-modal');currentPaymentQuoteId=null;clearSlip(true);
   }
   document.getElementById('payment-list').innerHTML = payable.map(q => {
     const pct = Math.min(100, Math.round(((q.PaidAmount||0)/(q.TotalAmount||1))*100));
@@ -40,7 +40,7 @@ function openPaymentModal(id) {
   document.getElementById('pay-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('pay-ref').value = '';
   document.getElementById('pay-note').value = '';
-  clearSlip();
+  clearSlip(true);
   openModal('payment-modal');
 }
 
@@ -89,9 +89,11 @@ function setSlipFile(file) {
   }
 }
 
-function clearSlip() {
+function clearSlip(resetCertificate = false) {
   slipFile = null;
   document.getElementById('slip-file').value = '';
+  const certificateInput = document.getElementById('pay-wht-file');
+  if (resetCertificate && certificateInput) certificateInput.value = '';
   const label = document.getElementById('slip-label');
   const preview = document.getElementById('slip-preview');
   const dropZone = document.getElementById('slip-drop-zone');
@@ -100,14 +102,37 @@ function clearSlip() {
   if (dropZone) dropZone.style.borderColor = 'var(--border2)';
 }
 
-async function uploadSlipToSharePoint(file, paymentRef) {
-  const b64 = await fileToBase64(file);
-  const res = await apiPost('uploadFile', 'Payments', null, {
-    fileName: 'SLIP_' + paymentRef + '_' + file.name,
-    mimeType: file.type || 'image/jpeg',
-    base64Data: b64,
-  });
-  return res.fileUrl || '';
+async function uploadPaymentAttachments(paymentRef, slip, certificate) {
+  const attachments = [
+    { file: slip, field: 'SlipURL', prefix: 'SLIP', label: 'หลักฐานการชำระ' },
+    { file: certificate, field: 'WHTCertificateURL', prefix: 'WHT', label: 'หนังสือรับรองหัก ณ ที่จ่าย' },
+  ];
+  const fields = { SlipURL: '', WHTCertificateURL: '' };
+  for (const attachment of attachments) {
+    const { file, label } = attachment;
+    if (!file) continue;
+    if (file.size > 5 * 1024 * 1024) throw new Error(label + 'ต้องมีขนาดไม่เกิน 5 MB');
+    if (!file.type?.startsWith('image/') && file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+      throw new Error(label + 'ต้องเป็นรูปภาพหรือ PDF');
+    }
+  }
+  for (const { file, field, prefix, label } of attachments) {
+    if (!file) continue;
+    toast('กำลังอัปโหลด ' + label + '...', 'info');
+    try {
+      const fileName = prefix + '_' + paymentRef + '_' + file.name;
+      const mimeType = /\.pdf$/i.test(file.name) ? 'application/pdf' : file.type;
+      const base64Data = (await fileToBase64(file)).split(',')[1];
+      const res = field === 'WHTCertificateURL'
+        ? await _call({ action: 'uploadFile', folder: 'PaymentCertificates', fileName, mimeType, base64: base64Data, privateFile: true })
+        : await apiPost('uploadFile', 'Payments', null, { fileName, mimeType, base64Data });
+      if (!res?.fileUrl) throw new Error(res?.error || 'ระบบไม่ได้ส่งลิงก์ไฟล์กลับมา');
+      fields[field] = res.fileUrl;
+    } catch (error) {
+      throw new Error('อัปโหลด ' + label + ' ไม่สำเร็จ: ' + error.message);
+    }
+  }
+  return fields;
 }
 
 async function savePayment() {
@@ -116,48 +141,39 @@ async function savePayment() {
   const q = quotesData.find(x => x.id === currentPaymentQuoteId);
   if (!q) return;
   if(q.Status==='Cancelled'){toast('ใบเสนอราคานี้ถูกยกเลิกแล้ว ไม่สามารถบันทึกชำระเงินได้','error');return;}
+  const submit = document.getElementById('pay-submit-btn');
+  if (submit?.disabled) return;
+  if (submit) submit.disabled = true;
   try {
     toast('กำลังบันทึก...', 'info');
     const payRef = 'PAY-' + Date.now();
     const newPaid = Math.min((q.PaidAmount||0) + amt, q.TotalAmount||0);
 
-    // Upload slip if attached
-    let slipUrl = '';
-    if (slipFile) {
-      try {
-        toast('กำลังอัปโหลดสลิป...', 'info');
-        const slipReader2 = new FileReader();
-        const slipB64_2 = await new Promise((res,rej)=>{slipReader2.onload=e=>res(e.target.result.split(',')[1]);slipReader2.onerror=rej;slipReader2.readAsDataURL(slipFile);});
-        const slipRes2 = await apiPost('uploadFile','Payments',null,{fileName:'SLIP_'+payRef+'_'+slipFile.name,mimeType:slipFile.type||'image/jpeg',base64Data:slipB64_2});
-        slipUrl = slipRes2.fileUrl || '';
-      } catch(e2) {
-        toast('อัปโหลดสลิปไม่สำเร็จ: ' + e2.message, 'error');
-      }
-    }
-
-    await createListItem(CONFIG.lists.payments, {
+    const fields = {
       Title: payRef,
-      QuoteID: currentPaymentQuoteId,
+      QuoteID: q.id,
       AmountPaid: amt,
       PaymentDate: document.getElementById('pay-date').value,
       PaymentMethod: document.getElementById('pay-method').value,
       Reference: document.getElementById('pay-ref').value,
       Note: document.getElementById('pay-note').value,
-      SlipURL: slipUrl
-    });
+    };
+    Object.assign(fields, await uploadPaymentAttachments(payRef, slipFile, document.getElementById('pay-wht-file')?.files?.[0]));
+    const saved = await createListItem(CONFIG.lists.payments, fields);
     // RecordedBy is Person column - skip to avoid errors
     const isFullyPaid = newPaid >= (q.TotalAmount||0) && (q.TotalAmount||0) > 0;
     const updateFields = isFullyPaid ? { PaidAmount: newPaid, Status: 'Closed' } : { PaidAmount: newPaid };
-    await updateListItem(CONFIG.lists.quotations, currentPaymentQuoteId, updateFields);
+    await updateListItem(CONFIG.lists.quotations, q.id, updateFields);
     // อัปเดต local cache แทน syncAll
-    const qPay = quotesData.find(x => x.id === currentPaymentQuoteId);
+    const qPay = quotesData.find(x => x.id === q.id);
     if (qPay) { qPay.PaidAmount = newPaid; if (isFullyPaid) qPay.Status = 'Closed'; }
-    if (paymentsCache) paymentsCache.push({QuoteID:currentPaymentQuoteId,AmountPaid:amt,PaymentDate:document.getElementById('pay-date').value,PaymentMethod:document.getElementById('pay-method').value,Reference:document.getElementById('pay-ref').value,Note:document.getElementById('pay-note').value,SlipURL:slipUrl,Title:payRef});
+    if (paymentsCache) paymentsCache.push({ ...fields, ...saved });
     if (isFullyPaid && qPay) sendPaymentCompleteEmail(qPay, newPaid).catch(function(e) { console.warn('Payment email failed:', e.message); });
     renderDash(); renderQuotes(); renderPayment(); updateBadge();
-    clearSlip();
+    clearSlip(true);
     closeModal('payment-modal');
-    toast(`บันทึกการชำระสำเร็จ${isFullyPaid?' — ชำระครบแล้ว ✓ Closed':''}${slipUrl?' (พร้อมสลิป)':''}`, 'success');
+    toast(`บันทึกการชำระสำเร็จ${isFullyPaid?' — ชำระครบแล้ว ✓ Closed':''}${fields.SlipURL?' (พร้อมสลิป)':''}`, 'success');
   } catch(e) { toast('ไม่สำเร็จ: ' + e.message, 'error'); }
+  finally { if (submit) submit.disabled = false; }
 }
 

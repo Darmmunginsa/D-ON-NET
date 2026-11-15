@@ -520,7 +520,7 @@ function renderExpenseTab() {
     });
   });
   const purchaseExps=(purchases?.rows||[]).filter(r=>r.ordered).map(r=>({id:'purchase-'+r.id,cat:'จัดซื้อ',detail:r.title+' · '+r.vendor+' · '+r.items,amount:r.amount,date:r.date,_src:'purchase'}));
-  const incomeRows=(purchases?.receipts||[]).map(r=>({id:'receipt-'+r.id,cat:'รับชำระจากลูกค้า',detail:r.reference+(r.wht?' · หัก ณ ที่จ่าย '+fmt(r.wht):''),amount:r.cash,date:r.date,receiptUrl:r.docUrl,_src:'income'}));
+  const incomeRows=(purchases?.receipts||[]).map(r=>({id:'receipt-'+r.id,cat:'รับชำระจากลูกค้า',detail:r.reference+(r.wht?' · หัก ณ ที่จ่าย '+fmt(r.wht):''),amount:r.cash,date:r.date,receiptUrl:r.docUrl,whtCertificateUrl:r.whtCertificateUrl,_src:'income'}));
   const financeIncome=(purchases?.finance||[]).filter(e=>e.type==='income').map(e=>({...e,_src:'income'}));
   const pendingRows=(purchases?.rows||[]).filter(r=>!r.ordered).map(r=>({id:'pending-'+r.id,cat:'จัดซื้อ (รอดำเนินการ)',detail:r.title+' · '+r.items+' — ยังไม่รวมค่าใช้จ่าย',amount:r.amount,date:r.date,_src:'pending'}));
   const all = incomeRows.concat(financeIncome,saleExps,techExps,purchaseExps,pendingRows);
@@ -566,7 +566,7 @@ function renderExpenseTab() {
       <tr>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);white-space:nowrap">${fmtDate(e.date)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border)"><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;background:${(EXP_CAT_COLORS[e.cat]||'#9ca3b5')}22;color:${EXP_CAT_COLORS[e.cat]||'#9ca3b5'}">${escHtml(e.cat||'อื่นๆ')}</span>${e._src==='tech'?'<div style="font-size:9px;color:var(--amber);margin-top:2px">จากงานช่าง</div>':e._src==='purchase'?'<div style="font-size:9px;color:var(--accent2);margin-top:2px">จาก PurchasePro · อ่านอย่างเดียว</div>':''}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text)">${escHtml(e.detail||'-')}${e.by?`<div style="font-size:10px;color:var(--muted)">โดย ${escHtml(e.by)}</div>`:''}${e.receiptUrl?`<div style="margin-top:3px">${docThumb(e.receiptUrl,'ใบเสร็จ',{small:true})}</div>`:(e._src==='sale'?(e.receiptError?`<div style="margin-top:3px;font-size:10px;color:var(--red)">⚠ แนบรูปไม่สำเร็จ: ${escHtml(e.receiptError)}</div>`:`<div style="margin-top:3px;font-size:10px;color:var(--amber)">⚠ ไม่มีรูปแนบ</div>`):'')}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--text)">${escHtml(e.detail||'-')}${e.by?`<div style="font-size:10px;color:var(--muted)">โดย ${escHtml(e.by)}</div>`:''}${e.receiptUrl?`<div style="margin-top:3px">${docThumb(e.receiptUrl,e._src==='income'?'สลิปโอนเงิน':'ใบเสร็จ',{small:true})}</div>`:(e._src==='sale'?(e.receiptError?`<div style="margin-top:3px;font-size:10px;color:var(--red)">⚠ แนบรูปไม่สำเร็จ: ${escHtml(e.receiptError)}</div>`:`<div style="margin-top:3px;font-size:10px;color:var(--amber)">⚠ ไม่มีรูปแนบ</div>`):'')}${e.whtCertificateUrl?`<div style="margin-top:3px">${docThumb(e.whtCertificateUrl,'หนังสือรับรองหัก ณ ที่จ่าย',{small:true})}</div>`:''}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono);color:${e._src==='income'?'var(--green)':'var(--red)'}">${e._src==='income'?'+':e._src==='pending'?'ประมาณ ':'-'}${fmt(e.amount)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:center">${e._src==='tech'?'<span style="font-size:9px;color:var(--muted)" title="บันทึกโดยช่าง — แก้ไขในแท็บช่าง">🔧</span>':'<span style="font-size:11px;color:var(--muted)" title="ค่าใช้จ่ายถูกบันทึกเป็นหลักฐาน ลบไม่ได้">🔒</span>'}</td>
       </tr>`).join('')}
@@ -810,7 +810,7 @@ async function renderSTPayHistory(q) {
         <span class="badge badge-draft" style="font-size:10px${_isCredit?';background:rgba(251,191,36,0.15);color:var(--amber)':''}">${p.PaymentMethod||''}</span>
         ${(+p.WHTAmount>0)?`<span style="color:var(--green);font-size:11px">รับเงินจริง ${fmt(SalePaymentCore.cash(p))}</span><span style="color:var(--amber);font-size:11px" title="ลูกค้าหัก ณ ที่จ่าย ${p.WHTPercent||''}%">หัก ${fmt(p.WHTAmount)}</span>`:''}
         ${p.Reference?`<span style="color:var(--muted);font-size:11px">${escHtml(p.Reference)}</span>`:''}
-        ${p.SlipURL && p.SlipURL.startsWith('http')?`<span style="margin-left:auto">${docThumb(p.SlipURL,'สลิปโอนเงิน',{small:true})}</span>`:''}
+        ${(p.SlipURL || p.WHTCertificateURL) ? `<span style="margin-left:auto;display:inline-flex;flex-wrap:wrap;gap:6px">${p.SlipURL && /^https?:\/\//i.test(p.SlipURL) ? docThumb(p.SlipURL,'สลิปโอนเงิน',{small:true}) : ''}${p.WHTCertificateURL && /^https?:\/\//i.test(p.WHTCertificateURL) ? docThumb(p.WHTCertificateURL,'หนังสือรับรองหัก ณ ที่จ่าย',{small:true}) : ''}</span>` : ''}
       </div>`; }).join('');
   } catch(e){el.innerHTML='';}
 }
@@ -835,6 +835,7 @@ function clearSTSlip(){
   if(prev){prev.style.display='none';prev.innerHTML='';}
   if(drop)drop.style.borderColor='var(--border2)';
   const fi=document.getElementById('st-slip-file');if(fi)fi.value='';
+  const certificateInput=document.getElementById('st-pay-wht-file');if(certificateInput)certificateInput.value='';
 }
 
 async function saveSTPayment(){
@@ -843,39 +844,40 @@ async function saveSTPayment(){
   const q=quotesData.find(x=>x.id===stQuoteId);if(!q)return;
   if(q.Status==='Cancelled'){toast('ใบเสนอราคานี้ถูกยกเลิกแล้ว','error');return;}
   let payment;try{payment=SalePaymentCore.calculate(amt,+document.getElementById('st-pay-wht')?.value||0);}catch(e){toast(e.message,'error');return;}
+  const submit=document.getElementById('st-pay-submit-btn');
+  if(submit?.disabled)return;
+  if(submit)submit.disabled=true;
   try{
     toast('กำลังบันทึก...','info');
     const payRef='PAY-'+Date.now();
     const newPaid=Math.min((q.PaidAmount||0)+amt,q.TotalAmount||0);
-    let slipUrl='';
-    if(stCurrentSlipFile){
-      try{
-        toast('กำลังอัปโหลดสลิป...','info');
-        const slipReader=new FileReader();
-        const slipB64=await new Promise((res,rej)=>{slipReader.onload=e=>res(e.target.result.split(',')[1]);slipReader.onerror=rej;slipReader.readAsDataURL(stCurrentSlipFile);});
-        const slipRes=await apiPost('uploadFile','Payments',null,{fileName:'SLIP_'+payRef+'_'+stCurrentSlipFile.name,mimeType:stCurrentSlipFile.type||'image/jpeg',base64Data:slipB64});
-        slipUrl=slipRes.fileUrl||'';
-      }catch(e2){toast('อัปโหลดสลิปไม่สำเร็จ: '+e2.message,'error');}
+    const fields={
+      Title:payRef, QuoteID:q.id, ...payment.fields,
+      PaymentDate:document.getElementById('st-pay-date').value,
+      PaymentMethod:document.getElementById('st-pay-method').value,
+      Reference:document.getElementById('st-pay-ref').value,
+      Note:document.getElementById('st-pay-note').value,
+    };
+    const certificate=document.getElementById('st-pay-wht-file')?.files?.[0];
+    if(stCurrentSlipFile || certificate){
+      Object.assign(fields,await uploadPaymentAttachments(payRef,stCurrentSlipFile,certificate));
     }
-
-    await createListItem(CONFIG.lists.payments,{Title:payRef,QuoteID:stQuoteId,...payment.fields,PaymentDate:document.getElementById('st-pay-date').value,PaymentMethod:document.getElementById('st-pay-method').value,Reference:document.getElementById('st-pay-ref').value,Note:document.getElementById('st-pay-note').value,SlipURL:slipUrl});
+    const saved=await createListItem(CONFIG.lists.payments,fields);
     const isNowFullyPaid = newPaid >= (q.TotalAmount||0) && (q.TotalAmount||0) > 0;
     const statusUpdate = isNowFullyPaid ? { PaidAmount: newPaid, Status: 'Closed' } : { PaidAmount: newPaid };
-    await updateListItem(CONFIG.lists.quotations,stQuoteId,statusUpdate);
+    await updateListItem(CONFIG.lists.quotations,q.id,statusUpdate);
     if (isNowFullyPaid) {
       q.Status = 'Closed';
       renderQuotes();
       // แจ้ง Approver ว่าชำระเงินครบแล้ว
       sendPaymentCompleteEmail(q, newPaid).catch(function(e) { console.warn('Payment email failed:', e.message); });
     }
+    if (paymentsCache) paymentsCache.push({...fields,...saved});
+    q.PaidAmount=newPaid;
+    if (stQuoteId!==q.id) return;
     stDealData.notes=stDealData.notes||[];
-    stDealData.notes.push({id:Date.now(),user:currentUser?.displayName||'User',text:`บันทึกชำระ ${fmt(amt)} (${document.getElementById('st-pay-method').value})${isNowFullyPaid?' — ชำระครบแล้ว ✓ Closed':''}`,ts:new Date().toISOString(),type:'payment'});
+    stDealData.notes.push({id:Date.now(),user:currentUser?.displayName||'User',text:`บันทึกชำระ ${fmt(amt)} (${fields.PaymentMethod})${isNowFullyPaid?' — ชำระครบแล้ว ✓ Closed':''}`,ts:new Date().toISOString(),type:'payment'});
     await saveSTDealData();
-    // อัปเดต paymentsCache ใน memory แทนการ syncAll ทั้งก้อน
-    if (paymentsCache) paymentsCache.push({QuoteID:stQuoteId,...payment.fields,PaymentDate:document.getElementById('st-pay-date').value,PaymentMethod:document.getElementById('st-pay-method').value,Reference:document.getElementById('st-pay-ref').value,Note:document.getElementById('st-pay-note').value,SlipURL:slipUrl,Title:payRef});
-    // อัปเดต quotesData ใน memory
-    const qLocal=quotesData.find(x=>x.id===stQuoteId);
-    if(qLocal){qLocal.PaidAmount=newPaid;if(isNowFullyPaid)qLocal.Status='Closed';}
     clearSTSlip();
     ['st-pay-amount','st-pay-ref','st-pay-note','st-pay-wht'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     renderWHTHint();
@@ -895,6 +897,7 @@ async function saveSTPayment(){
     renderSTTimeline();
     toast('บันทึกการชำระสำเร็จ','success');
   }catch(e){toast('ไม่สำเร็จ: '+e.message,'error');}
+  finally{if(submit)submit.disabled=false;}
 }
 
 // ---- PROCUREMENT ----
