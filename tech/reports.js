@@ -25,6 +25,37 @@ const TechReports=(()=>{
     const entries=(item.ds.expiries||[]).filter(e=>!selected||String(e.id)===String(selected));
     const photos=report ? jobPhotosForSerial(item.job,report.fields.serial) : jobPhotoUrls(item.job);
     drawer.innerHTML='<header><b>ข้อมูลอ้างอิงหน้างาน</b><button type="button" onclick="TechReports.toggleReference()">✕ ปิด</button></header><p>'+E(item.quoteTitle)+'<br>'+E(item.customer)+'</p><h3>Serial / รายละเอียดจาก SalePro</h3>'+entries.map(e=>'<article><b>'+E(e.name)+'</b><p>S/N: '+E(e.serial||'—')+'</p><div class="sr-reference-detail">'+E(e.sourceDetail||e.note||'ไม่มีรายละเอียดเพิ่มเติม')+'</div></article>').join('')+'<h3>รายการในใบเสนอราคา</h3><div id="sr-reference-items"><label>กำลังโหลดรายละเอียด...<progress aria-label="กำลังโหลดรายละเอียดรายการ"></progress></label></div><h3>รูปหน้างาน ('+photos.length+')</h3><p>กดรูปเพื่อเปิดดูขนาดใหญ่</p><div class="sr-reference-photos">'+photos.map((u,i)=>'<a href="'+E(u)+'" target="_blank" rel="noopener" data-tech-preview="image" data-preview-name="รูปหน้างาน '+(i+1)+'"><img loading="lazy" src="'+E(_driveThumb(u))+'" alt="รูปหน้างาน '+(i+1)+'"><span>รูป '+(i+1)+'</span></a>').join('')+'</div>';
+    const photoGrid=drawer.querySelector('.sr-reference-photos');
+    if(photos.length){
+      [...photoGrid.children].forEach((link,index)=>{
+        const row=document.createElement('div');
+        link.replaceWith(row);
+        row.append(link);
+        const label=document.createElement('label');
+        label.innerHTML='<input type="checkbox" data-photo-index="'+index+'"> เลือกรูป '+(index+1);
+        row.append(label);
+      });
+      const remove=document.createElement('button');
+      remove.type='button';
+      remove.textContent='ลบรูปที่เลือกออกจากงาน';
+      photoGrid.after(remove);
+      remove.onclick=async()=>{
+        if(busy)return;
+        const checked=[...photoGrid.querySelectorAll('input:checked')];
+        const urls=checked.map(input=>photos[Number(input.dataset.photoIndex)]);
+        busy=true;
+        try{
+          if(!await removeJobPhotos(current,urls,[remove,...photoGrid.querySelectorAll('input')]))return;
+          if(report&&meta?.status!=='signed'){
+            const remaining=report.photos.filter(url=>!urls.includes(url));
+            if(remaining.length!==report.photos.length){report.photos=remaining;markDirty();}
+            renderReportPhotos();
+          }
+          drawer.remove();
+          toggleReference();
+        }finally{busy=false;}
+      };
+    }
     try{const rows=await _getQuoteItems(current.q.id);if(item!==current||!drawer.isConnected)return;drawer.querySelector('#sr-reference-items').innerHTML=rows.filter(r=>!String(r.Title||'').startsWith('__')).map(r=>'<article><b>'+E(r.Title||'รายการ')+'</b><small>จำนวน '+E(r.Quantity||'—')+' '+E(r.Unit||'')+'</small><div class="sr-reference-detail">'+E(r.Description||'ไม่มีรายละเอียดเพิ่มเติม')+'</div></article>').join('')||'<p>ไม่มีรายการ</p>';}catch(e){if(drawer.isConnected)drawer.querySelector('#sr-reference-items').textContent='โหลดรายการไม่ได้ กรุณาปิดแล้วเปิด Report ใหม่';}
   }
   async function open(jobId){if(busy)return;item=allJobs.find(j=>String(j.job.id)===String(jobId));if(!item)return;report=null;meta=null;dirty=false;mount();notice('กำลังโหลดรายงาน...');busy=true;try{const data=await Promise.all([api('list'),api('configGet'),api('profilesGet')]);reports=data[0].reports||[];equipment=data[0].equipment||[];config=data[1].config||{};profiles=data[2].profiles||[];notice('');render();}catch(e){notice('ยังเปิดระบบ Report ไม่ได้: '+e.message+' · กรุณาอัปเดต Apps Script ชุด Report');}finally{busy=false;}}
@@ -72,11 +103,12 @@ const TechReports=(()=>{
     if(!area||!report)return;
     const locked=meta?.status==='signed';
     const serial=DonnetReport.serial(report.fields.serial);
-    const photos=locked?report.photos:jobPhotosForSerial(item.job,serial);
+    const photos=locked?report.photos:[...new Set([...jobPhotosForSerial(item.job,serial),...report.photos])];
     area.innerHTML='<p>'+E(serial?'Serial '+serial:'รูปทั่วไป')+'</p><div class="sr-grid">'+photos.map((url,index)=>
       '<label><input type="checkbox" data-report-photo="'+index+'" '+(report.photos.includes(url)?'checked':'')+'> รูป '+(index+1)+'</label>'
     ).join('')+'</div>'+(!photos.length?'<p>ยังไม่มีรูปในกลุ่มนี้</p>':'');
-    if(!locked&&report.photos.some(url=>!photos.includes(url)))area.insertAdjacentHTML('beforeend','<p>ฉบับนี้มีรูปที่เคยแนบไว้จากกลุ่มอื่น ดูได้ใน Preview รูปเหล่านี้จะถูกเอาออกเมื่อเปลี่ยน Serial</p>');
+    if(locked&&photos.length)area.insertAdjacentHTML('beforeend','<p>หากต้องการเอารูปออกจากฉบับที่เซ็นแล้ว ให้กดสร้างฉบับแก้ไข</p>');
+    if(!locked&&photos.length)area.insertAdjacentHTML('beforeend','<p>เอาเครื่องหมายออกเพื่อนำรูปออกจาก Draft แล้วกดบันทึก</p>');
     area.querySelectorAll('[data-report-photo]').forEach(input=>{
       input.disabled=locked;
       input.onchange=()=>{
