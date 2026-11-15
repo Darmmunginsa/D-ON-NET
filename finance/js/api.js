@@ -34,6 +34,7 @@ async function _call(payload) {
     update: 'กำลังบันทึกการเปลี่ยนแปลง…',
     delete: 'กำลังลบรายการ…',
     deleteWhere: 'กำลังลบรายการ…',
+    replaceFinanceAttachment: 'กำลังบันทึกไฟล์แนบ…',
     uploadFile: 'กำลังอัปโหลดเอกสาร…',
     sendEmail: 'กำลังส่งอีเมล…'
   };

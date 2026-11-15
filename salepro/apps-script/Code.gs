@@ -259,8 +259,77 @@ function correctClosedPurchasePayment(req) {
   } finally {lock.releaseLock();}
 }
 
+function replaceFinanceAttachment(req) {
+  var email=String(req._actor && req._actor.email || '').toLowerCase();
+  if(!email) throw Error('กรุณาเข้าสู่ระบบ');
+  var url=String(req.url||''), filename=String(req.filename||'').trim();
+  if(!/^https:\/\/drive\.google\.com\//.test(url)||!filename||filename.length>255) throw Error('ไฟล์แนบไม่ถูกต้อง');
+  var lock=LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var settings=listRows('Settings');
+    var role=settings.find(function(row){return row.Title==='Role_'+email||row.Title==='Role_'+email.split('@')[0];});
+    if(email!=='admin@dongroups.com'&&String(role&&role.Value||'').trim().toLowerCase()!=='admin')
+      throw Error('เฉพาะ Admin ที่เปลี่ยนไฟล์แนบได้');
+    var target=req.target||{}, sheetName, row, data, attachment, urlKey, nameKey;
+    if(target.source==='SalePro'){
+      sheetName='Payments';
+      row=listRows(sheetName).find(function(item){return String(item.id)===String(target.id);});
+      attachment=row;urlKey='SlipURL';nameKey='SlipName';
+    }else if(target.source==='PurchasePro'){
+      var purchaseTitle='Purchase_'+String(target.id||'');
+      sheetName='Procurement';
+      row=listRows(sheetName).find(function(item){return item.Title===purchaseTitle;});
+      if(!row){sheetName='Settings';row=settings.find(function(item){return item.Title===purchaseTitle;});}
+      if(row){
+        data=JSON.parse(row.Value||'{}');
+        var vendors=data.stageData?.payment?.vendors;
+        if(vendors&&Object.prototype.hasOwnProperty.call(vendors,target.vendorId))attachment=vendors[target.vendorId];
+      }
+      var useInvoice=attachment&&!attachment.slipUrl&&attachment.invUrl;
+      urlKey=useInvoice?'invUrl':'slipUrl';nameKey=useInvoice?'invName':'slipName';
+    }else if(target.source==='TechPro'||target.source==='SaleExpense'){
+      sheetName='Settings';
+      row=settings.find(function(item){return item.Title==='DealStatus_'+String(target.quoteId||'');});
+      if(row){
+        data=JSON.parse(row.Value||'{}');
+        var expenses=data.expenses;
+        if(target.source==='TechPro'){
+          var job=(data.techJobs||[]).find(function(item){return item.id!=null&&String(item.id)===String(target.jobId);});
+          expenses=job&&job.expenses;
+        }
+        attachment=(expenses||[]).find(function(item){return item.id!=null&&String(item.id)===String(target.id);});
+      }
+      urlKey='receiptUrl';nameKey='receiptName';
+    }
+    if(!row||!attachment)throw Error('ไม่พบรายการต้นทาง');
+    var previous=String(attachment[urlKey]||'');
+    if(previous===url&&attachment[nameKey]===filename)return {ok:true};
+    if(previous!==String(req.previousUrl||''))throw Error('ไฟล์แนบถูกแก้แล้ว กรุณาโหลดข้อมูลใหม่');
+    attachment[urlKey]=url;
+    attachment[nameKey]=filename;
+    var sheet=_sheet(sheetName), rowIndex=_findRowIndex(sheet,row.id);
+    if(rowIndex<1)throw Error('ไม่พบแถวข้อมูลต้นทาง');
+    if(data){
+      var valueColumn=_headers(sheet).indexOf('Value')+1;
+      if(!valueColumn)throw Error('ไม่พบช่องข้อมูลต้นทาง');
+      sheet.getRange(rowIndex,valueColumn).setValue(JSON.stringify(data));
+    }else{
+      var headers=_ensureCols(sheet,[urlKey,nameKey]);
+      var range=sheet.getRange(rowIndex,1,1,headers.length);
+      var formulas=range.getFormulas()[0];
+      var values=range.getValues()[0].map(function(value,index){return formulas[index]||value;});
+      values[headers.indexOf(urlKey)]=url;
+      values[headers.indexOf(nameKey)]=filename.charAt(0)==='='?String.fromCharCode(39)+filename:filename;
+      range.setValues([values]);
+    }
+    return {ok:true};
+  }finally{lock.releaseLock();}
+}
+
 function handle(req) {
   var a = req.action;
+  if(a==='replaceFinanceAttachment')return replaceFinanceAttachment(req);
   if(a==='correctClosedPurchasePayment')return correctClosedPurchasePayment(req);
   if(a==='serviceReport')return serviceReport(req);
   srProtectGeneric(req);

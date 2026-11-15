@@ -53,16 +53,27 @@
   <span id="finance-progress-label"></span>
   <progress aria-labelledby="finance-progress-label"></progress>
 </div>
+<dialog id="finance-attachment" style="margin:auto;width:min(460px,92vw);background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:20px">
+  <form>
+    <h3>แก้ไฟล์แนบ</h3>
+    <p data-entry></p>
+    <p data-current></p>
+    <div class="fg"><label for="finance-replacement-file">ไฟล์ใหม่ (รูปภาพหรือ PDF)</label><input id="finance-replacement-file" type="file" name="attachment" accept="image/*,application/pdf" required></div>
+    <p role="status"></p>
+    <button type="button" class="btn" data-cancel>ยกเลิก</button>
+    <button type="submit" class="btn btn-primary">บันทึกไฟล์ใหม่</button>
+  </form>
+</dialog>
 <div id="toasts"></div>
 
 <script src="../shared/gateway-client.js?v=idle4h20261112"></script>
 <script src="../shared/sale-payment-core.js?v=whtbase20261114"></script>
 <script src="../shared/bank-details.js?v=bank1"></script>
 <script src="js/config.js?v=admin1"></script>
-<script src="js/api.js?v=progress20261115"></script>
+<script src="js/api.js?v=attachment20261115"></script>
 <script src="js/auth.js?v=idle60-20261104"></script>
 <script src="js/tax.js?v=taxsources20261114"></script>
-<script src="js/relationships.js?v=workledger20261114"></script>
-<script src="js/app.js?v=paymentlabel20261115"></script>
+<script src="js/relationships.js?v=attachment20261115"></script>
+<script src="js/app.js?v=attachment20261115"></script>
 <script src="../shared/workspace-appearance.js?v=20261103"></script></body>
 </html>

@@ -20,7 +20,8 @@ let _reqFilter = 'all';
 function _driveId(u){ const s=String(u||''); const m=s.match(/\/d\/([-\w]{10,})/)||s.match(/[?&]id=([-\w]{10,})/); return m?m[1]:''; }
 function _driveThumb(u){ const id=_driveId(u); return id?('https://drive.google.com/thumbnail?id='+id+'&sz=w200'):u; }
 function docChip(url,name){ if(!url) return ''; const label=esc(name||'เอกสาร');
-  return `<span onclick="openDocPreview('${encodeURIComponent(url)}','${encodeURIComponent(name||'')}')" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:var(--accent2);border:1px solid var(--border);border-radius:6px;padding:2px 8px">📎 ${label}</span>`; }
+  const encodeArg=value=>encodeURIComponent(value).replace(/'/g,'%27');
+  return `<span onclick="openDocPreview('${encodeArg(url)}','${encodeArg(name||'')}')" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:var(--accent2);border:1px solid var(--border);border-radius:6px;padding:2px 8px">📎 ${label}</span>`; }
 function openDocPreview(encUrl,encName){ const url=decodeURIComponent(encUrl), name=decodeURIComponent(encName||''); const did=_driveId(url);
   let o=document.getElementById('doc-ov'); if(!o){ o=document.createElement('div'); o.id='doc-ov'; o.onclick=e=>{ if(e.target===o)o.remove(); }; document.body.appendChild(o); }
   o.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:28px';
@@ -70,7 +71,7 @@ async function loadAll(){
       return {
         ...relation,date:(p.PaymentDate||'').slice(0,10), type:'income', category:'รายรับจากการขาย',
         amount:SalePaymentCore.cash(p),whtAmount:+p.WHTAmount||0,settledAmount:+p.AmountPaid||0, party, method:p.PaymentMethod||'',
-        note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:'สลิป', source:'SalePro'
+        note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:p.SlipName||'สลิป', source:'SalePro', attachmentTarget:p.id?{source:'SalePro',id:p.id}:null
       };
     });
     // รายจ่ายจาก PurchasePro (Procurement → Purchase_<id> JSON → payment.vendors)
@@ -95,7 +96,7 @@ async function loadAll(){
           impTax.push({TaxVersion:'1',Date:String(p.date||'').slice(0,10),TaxDate:p.taxDate||String(p.date||'').slice(0,10),TaxDoc:p.invNo||'',TxType:'expense',...relation,Party:vName(vid),BaseAmount:p.baseAmount||'',VatAmount:p.vatAmount||0,VatEligible:p.vatEligible===true?'true':'false',WhtRate:p.whtPct||0,WhtAmount:wht,Amount:net,_source:'PurchasePro',_vatKnown:p.vatAmount!==undefined&&p.vatAmount!=='',_taxDateFallback:!p.taxDate});
           impExpense.push({ ...relation,...BankDetails.read(vendors.find(v=>String(v.id)===String(vid))), bankFromDirectory:true,date:(p.date||'').slice(0,10), type:'expense', category:'ค่าซื้อสินค้า/วัตถุดิบ',
             amount:net, party:vName(vid), method:p.method||'', note:(p.invNo?'INV '+p.invNo:'')+(ext.quoteTitle?' · '+ext.quoteTitle:''),
-            docUrl:p.slipUrl||p.invUrl||'', docName:'หลักฐานจ่าย', source:'PurchasePro' });
+            docUrl:p.slipUrl||p.invUrl||'', docName:(p.slipUrl?p.slipName:p.invName)||'หลักฐานจ่าย', source:'PurchasePro', attachmentTarget:{source:'PurchasePro',id:purchaseId,vendorId:vid} });
         });
       });
     }catch(e){ console.warn('load purchasepro expense',e.message); }
@@ -183,6 +184,7 @@ function drawCharts(){
 }
 
 // ── Ledger ──
+let ledgerAttachmentRows=[];
 function renderLedger(){
   let ents=allEntries().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const f=_ledgerFilter;
@@ -190,7 +192,8 @@ function renderLedger(){
   if(f.source!=='all') ents=ents.filter(e=>e.source===f.source);
   if(f.q){ const q=f.q.toLowerCase(); ents=ents.filter(e=>(e.party+' '+e.category+' '+e.note+' '+e.quoteTitle+' '+e.quoteCustomer+' '+e.purchaseId+' '+e.quoteId).toLowerCase().includes(q)); }
   const srcBadge=s=>{ const c={Manual:'#94a3b8',SalePro:'#4f8ef7',PurchasePro:'#2dd4bf',TechPro:'#fbbf24',SaleExpense:'#a78bfa','เบิกจ่าย':'#a78bfa'}[s]||'#94a3b8'; return `<span style="font-size:10px;background:${c}22;color:${c};padding:1px 6px;border-radius:8px">${s}</span>`; };
-  const rows=ents.length?ents.map(e=>`<tr>
+  ledgerAttachmentRows=ents;
+  const rows=ents.length?ents.map((e,index)=>`<tr>
     <td>${fmtDate(e.date)}</td>
     <td>${e.type==='income'?'<span style="color:var(--green)">▲ รับ</span>':'<span style="color:var(--red)">▼ จ่าย</span>'}</td>
     <td>${esc(e.category)}</td>
@@ -198,7 +201,7 @@ function renderLedger(){
     <td style="text-align:right;font-family:var(--mono);color:${e.type==='income'?'var(--green)':'var(--red)'}">${e.type==='income'?'+':'-'}${fmt0(e.amount)}</td>
     <td>${e.quoteId?'<div style="font-size:12px;color:var(--accent2)">'+esc(e.quoteTitle||e.quoteId)+'</div><div style="font-size:10px;color:var(--muted)">'+esc(e.quoteCustomer)+'</div>':'<span style="color:var(--muted)">ไม่ผูกใบเสนอราคา</span>'}${e.purchaseId?'<div style="font-size:10px;color:var(--muted)">งานจัดซื้อ '+esc(e.purchaseId)+'</div>':''}</td>
     <td>${srcBadge(e.source)}</td>
-    <td>${docChip(e.docUrl,e.docName)}</td>
+    <td>${docChip(e.docUrl,e.docName)} ${e.attachmentTarget&&isAdminUser()?'<button type="button" class="btn btn-sm" onclick="editLedgerAttachment('+index+')">แก้ไฟล์แนบ</button>':''}</td>
     <td style="text-align:right">${e.editable?`<button class="ic" onclick="editTx('${e._id}')" title="แก้ไข">✏️</button><button class="ic" onclick="delTx('${e._id}')" title="ลบ" style="color:var(--red)">✕</button>`:''}</td>
   </tr>`).join(''):'<tr><td colspan="9" class="empty">ไม่มีรายการ</td></tr>';
   const srcOpts=['all','Manual','SalePro','PurchasePro','TechPro','SaleExpense','เบิกจ่าย'].map(s=>`<option value="${s}" ${f.source===s?'selected':''}>${s==='all'?'ทุกแหล่ง':s}</option>`).join('');
@@ -212,6 +215,53 @@ function renderLedger(){
       <input placeholder="ค้นหาเลขใบเสนอราคา / ลูกค้า / รายละเอียด..." value="${esc(f.q)}" id="ledger-search" oninput="if(!event.isComposing)updateLedgerSearch(this)" oncompositionend="updateLedgerSearch(this)">
     </div>
     <div class="ledger-workspace"><div class="card ledger-table"><table class="tbl"><thead><tr><th>วันที่</th><th>ประเภท</th><th>หมวดหมู่</th><th>รายละเอียด</th><th style="text-align:right">จำนวนเงิน</th><th>ใบเสนอราคา / งานที่เกี่ยวข้อง</th><th>แหล่ง</th><th>เอกสาร</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${summary}</div>`;
+}
+
+function editLedgerAttachment(index){
+  const row=ledgerAttachmentRows[index];
+  if(!isAdminUser()||!row?.attachmentTarget)return;
+  const dialog=document.getElementById('finance-attachment');
+  const form=dialog.querySelector('form');
+  const fileInput=form.elements.namedItem('attachment');
+  const cancel=form.querySelector('[data-cancel]');
+  const submit=form.querySelector('[type="submit"]');
+  const status=form.querySelector('[role="status"]');
+  form.reset();
+  status.textContent='';
+  dialog.querySelector('[data-entry]').textContent=[row.source,row.quoteTitle,row.party].filter(Boolean).join(' · ');
+  dialog.querySelector('[data-current]').textContent=row.docUrl?'ไฟล์ปัจจุบัน: '+row.docName:'ยังไม่มีไฟล์แนบ';
+  let saving=false, uploadedFile=null, uploaded=null;
+  cancel.onclick=()=>dialog.close();
+  dialog.oncancel=event=>{if(saving)event.preventDefault();};
+  form.onsubmit=async event=>{
+    event.preventDefault();
+    if(saving)return;
+    const file=fileInput.files[0];
+    if(!file)return;
+    if(!/^(image\/|application\/pdf$)/.test(file.type)){status.textContent='เลือกไฟล์รูปภาพหรือ PDF';return;}
+    saving=true;
+    fileInput.disabled=submit.disabled=cancel.disabled=true;
+    try{
+      if(uploadedFile!==file){
+        status.textContent='กำลังอัปโหลดไฟล์…';
+        uploaded=await uploadDoc(fileInput);
+        if(!uploaded?.url)throw Error('ระบบยังไม่ส่งลิงก์ไฟล์กลับมา');
+        uploadedFile=file;
+      }
+      status.textContent='กำลังบันทึกกลับไปยังรายการต้นทาง…';
+      await _call({action:'replaceFinanceAttachment',target:row.attachmentTarget,previousUrl:row.docUrl,url:uploaded.url,filename:uploaded.name});
+      row.docUrl=uploaded.url;
+      row.docName=uploaded.name;
+      dialog.close();
+      if(_view==='ledger')go('ledger');
+      toast('เปลี่ยนไฟล์แนบแล้ว','success');
+    }catch(error){status.textContent=error.message;}
+    finally{
+      saving=false;
+      fileInput.disabled=submit.disabled=cancel.disabled=false;
+    }
+  };
+  dialog.showModal();
 }
 
 function updateLedgerSearch(input){const start=input.selectionStart,end=input.selectionEnd;_ledgerFilter.q=input.value;go('ledger');const next=document.getElementById('ledger-search');if(next){next.focus();next.setSelectionRange(start,end);}}
