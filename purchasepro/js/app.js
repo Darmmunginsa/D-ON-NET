@@ -1745,7 +1745,8 @@ function bahtText(amount){
     let res=''; for(let i=0;i<len;i++){ const d=+s[i],pos=len-i-1; if(d===0)continue;
       if(pos===0&&d===1&&len>1)res+='เอ็ด'; else if(pos===1&&d===2)res+='ยี่'; else if(pos===1&&d===1)res+=''; else res+=num[d]; res+=unit[pos]; }
     return res; }
-  let n=Math.abs(Number(amount)||0); const baht=Math.floor(n); const satang=Math.round((n-baht)*100);
+  const totalSatang=Math.round((Math.abs(Number(amount)||0)+Number.EPSILON)*100);
+  const baht=Math.floor(totalSatang/100),satang=totalSatang%100;
   if(baht===0&&satang===0)return 'ศูนย์บาทถ้วน';
   let t=''; if(baht>0)t+=readInt(String(baht))+'บาท';
   t+=satang>0?readInt(String(satang))+'สตางค์':(baht>0?'ถ้วน':'');

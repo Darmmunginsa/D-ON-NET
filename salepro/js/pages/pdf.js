@@ -26,9 +26,9 @@ function bahtText(amount) {
     }
     return res;
   }
-  let n = Math.abs(Number(amount) || 0);
-  const baht = Math.floor(n);
-  const satang = Math.round((n - baht) * 100);
+  const totalSatang = Math.round((Math.abs(Number(amount) || 0) + Number.EPSILON) * 100);
+  const baht = Math.floor(totalSatang / 100);
+  const satang = totalSatang % 100;
   if (baht === 0 && satang === 0) return 'ศูนย์บาทถ้วน';
   let t = '';
   if (baht > 0) t += readInt(String(baht)) + 'บาท';
