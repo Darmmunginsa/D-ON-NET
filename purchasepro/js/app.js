@@ -2710,25 +2710,51 @@ async function savePurchase(){
   try{
     editingPO.maxStage=Math.max(editingPO.maxStage||0, editingPO.stage||1);
     await putSetting('Purchase_'+editingPO.id, JSON.stringify({sv:2,stage:editingPO.stage,maxStage:editingPO.maxStage,closed:!!editingPO.closed,assetType:editingPO.assetType||'sale',assetCategory:editingPO.assetCategory||'',vendorId:editingPO.vendorId||'',vendorName:editingPO.vendorName||'',requiredDate:editingPO.requiredDate||'',note:editingPO.note||'',stageData:editingPO.stageData,history:editingPO.history.slice(-50)}));
-    // ส่ง progress ย่อให้ SalePro อ่าน (อิง quoteId)
-    if(editingPO.quoteId!=null){ await putSetting('PurchaseStatus_'+editingPO.quoteId, JSON.stringify({stage:editingPO.maxStage,text:SALE_PROGRESS[editingPO.maxStage]||'',vendorName:editingPO.vendorName||'',updatedAt:new Date().toISOString()})); }
+    // The purchase is already saved; report a separate warning if its summary cannot sync.
+    let syncWarning='';
+    if(editingPO.quoteId!=null){
+      try{await putSetting('PurchaseStatus_'+editingPO.quoteId, JSON.stringify({stage:editingPO.maxStage,text:SALE_PROGRESS[editingPO.maxStage]||'',vendorName:editingPO.vendorName||'',updatedAt:new Date().toISOString()}));}
+      catch(error){syncWarning=' แต่ยังอัปเดตสถานะไป SalePro ไม่สำเร็จ: '+error.message;}
+    }
     // ส่งราคาต้นทุนรายชิ้น (ที่จัดซื้อได้) กลับให้ SalePro โชว์อัตโนมัติ
     try{ await publishItemCosts(); }catch(e){ console.warn('publishItemCosts',e.message); }
     purchaseExt[String(editingPO.id)]={sv:2,stage:editingPO.stage,maxStage:editingPO.maxStage,closed:!!editingPO.closed,assetType:editingPO.assetType||'sale',assetCategory:editingPO.assetCategory||'',stageData:editingPO.stageData,history:editingPO.history};
     renderDash(); renderPurchases();
-    if(!_quietWrite) toast('บันทึกแล้ว','success');
+    if(syncWarning)toast('บันทึกงานจัดซื้อแล้ว'+syncWarning,'error');
+    else if(!_quietWrite)toast('บันทึกแล้ว','success');
   }catch(e){ toast('บันทึกไม่สำเร็จ: '+e.message,'error'); }
 }
 
-async function putSetting(key,value){
-  // เขียนลงลิสต์ ProcurementData เสมอ (ข้อมูลจัดซื้อ)
-  const L=CONFIG.lists.procurement;
-  const ex=_settingsCache.find(i=>i.Title===key);
-  if(ex && ex._srcList===L){ await updateListItem(L,ex.id,{Value:value}); ex.Value=value; }
-  else if(ex){ /* ค่าเก่ายังอยู่ที่ Settings → สร้างใหม่ในลิสต์จัดซื้อ (ย้าย) */ const c=await createListItem(L,{Title:key,Value:value}); ex.id=c.id; ex.Value=value; ex._srcList=L; }
-  else{ const c=await createListItem(L,{Title:key,Value:value}); _settingsCache.push({id:c.id,Title:key,Value:value,_srcList:L}); }
+const purchaseSettingWrites=new Map();
+function putSetting(key,value){
+  const previous=purchaseSettingWrites.get(key)||Promise.resolve();
+  const next=previous.catch(()=>{}).then(()=>writePurchaseSetting(key,value));
+  purchaseSettingWrites.set(key,next);
+  next.finally(()=>{if(purchaseSettingWrites.get(key)===next)purchaseSettingWrites.delete(key);}).catch(()=>{});
+  return next;
 }
-
+async function writePurchaseSetting(key,value){
+  const list=CONFIG.lists.procurement;
+  const existing=_settingsCache.find(row=>row.Title===key);
+  let saved;
+  try{
+    if(existing&&existing._srcList===list){
+      await updateListItem(list,existing.id,{Value:value});
+      saved={id:existing.id};
+    }else saved=await createListItem(list,{Title:key,Value:value});
+  }catch(error){
+    const uncertain=error instanceof TypeError||/เซิร์ฟเวอร์|Backend unavailable|Gateway HTTP 50[234]|Failed to fetch/i.test(error.message||'');
+    if(!uncertain)throw error;
+    try{
+      const rows=await getListItems(list);
+      saved=rows.find(row=>row.Title===key&&String(row.Value)===String(value));
+    }catch(readError){console.warn('ตรวจผลบันทึกจัดซื้อไม่สำเร็จ:',readError.message);}
+    if(!saved)throw error;
+  }
+  const current=_settingsCache.find(row=>row.Title===key);
+  if(current)Object.assign(current,{id:saved.id,Value:value,_srcList:list});
+  else _settingsCache.push({id:saved.id,Title:key,Value:value,_srcList:list});
+}
 // ===== ธีมสี (ต่อผู้ใช้/เครื่อง) =====
 const THEME_PRESETS=[
   {name:'ส้ม (ค่าเริ่มต้น)',c:'#d97706'},{name:'ฟ้า',c:'#2563eb'},{name:'เขียวมรกต',c:'#059669'},
