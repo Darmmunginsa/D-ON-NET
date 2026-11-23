@@ -2865,9 +2865,41 @@ async function buildApprovalReportHTML(q) {
     + '</table></div>';
 }
 
+function showApprovalMailStatus(quote, sent, error){
+  let panel=document.getElementById('approval-mail-status');
+  if(!panel){
+    panel=document.createElement('div');
+    panel.id='approval-mail-status';
+    panel.setAttribute('role','status');
+    panel.style.cssText='position:fixed;bottom:20px;right:20px;z-index:12000;max-width:min(460px,90vw);padding:14px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--text)';
+    document.body.append(panel);
+  }
+  panel.replaceChildren();
+  const text=document.createElement('div');
+  text.textContent=sent?'ส่งอีเมลแจ้งผู้อนุมัติแล้ว: '+quote.ApproverEmail:'ใบเสนอราคาบันทึกและรออนุมัติแล้ว แต่อีเมลยังไม่สำเร็จ: '+error;
+  panel.append(text);
+  if(!sent){
+    const retry=document.createElement('button');
+    retry.className='btn btn-sm';retry.textContent='ลองส่งอีเมลอีกครั้ง';
+    retry.onclick=async()=>{
+      if(retry.disabled)return;
+      retry.disabled=true;
+      try{
+        const current=(await getListItems(CONFIG.lists.quotations)).find(q=>String(q.id)===String(quote.id));
+        if(!current||current.Status!=='Pending')throw Error('ใบเสนอราคานี้ไม่ได้อยู่ระหว่างรออนุมัติแล้ว');
+        await sendApprovalRequestEmail(current);
+        showApprovalMailStatus(current,true);
+      }catch(e){showApprovalMailStatus(quote,false,e.message);}
+    };
+    panel.append(retry);
+  }
+  const close=document.createElement('button');
+  close.className='btn btn-sm';close.textContent='ปิด';close.onclick=()=>panel.remove();
+  panel.append(close);
+}
 async function sendApprovalRequestEmail(q, attachment) {
   const to = q.ApproverEmail || '';
-  if (!to || !to.includes('@')) return;
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(to.trim())) throw Error('ไม่พบอีเมลผู้อนุมัติที่ถูกต้อง กรุณาตรวจตั้งค่าลำดับผู้อนุมัติ');
   const subject = _approvalSubject(q);
   const tag = (q.Tag || '').trim();
   let body;

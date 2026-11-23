@@ -1726,7 +1726,13 @@ async function _saveQuoteImpl(status) {
       try {
         if (typeof currentQuotePDFAttachment === 'function') att = await currentQuotePDFAttachment();
       } catch(e) { console.warn('สร้าง PDF แนบเมลไม่สำเร็จ (ส่งเมลแบบไม่มีไฟล์แนบแทน):', e.message); }
-      sendApprovalRequestEmail(newQ, att).catch(e => console.warn('Approval email failed:', e.message));
+      try{
+        toast('กำลังส่งอีเมลแจ้งผู้อนุมัติ…','info');
+        await sendApprovalRequestEmail(newQ, att);
+        showApprovalMailStatus(newQ, true);
+      }catch(error){
+        showApprovalMailStatus(newQ, false, error.message);
+      }
     }
     // ★ ถ้าใบนี้มาจากการ "รวมใบ" → ลบใบต้นทางทั้งหมดถาวร (ไม่ให้ไปคิดซ้ำที่ผลการขาย)
     if (typeof _mergeSourceIds !== 'undefined' && _mergeSourceIds && _mergeSourceIds.length && typeof finalizeMerge === 'function') {
