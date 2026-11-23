@@ -57,7 +57,36 @@ async function _call(payload) {
   try { const d = await _callRaw(payload); ok = true; return d; }
   finally { _saveEnd(ok); }
 }
-async function _callRaw(payload) { return GatewayClient.call(CONFIG.appsScriptUrl,payload); }
+async function _callRaw(payload) {
+  try {
+    return await GatewayClient.call(CONFIG.appsScriptUrl,payload);
+  } catch(error) {
+    const transient=error instanceof TypeError||error.status>=500||
+      /เซิร์ฟเวอร์|Backend unavailable|Gateway HTTP 50[234]|Failed to fetch/i.test(error.message||'');
+    if(!transient)throw error;
+    if(payload.action==='list'||payload.action==='multiList'){
+      await _sleep(1000);
+      return GatewayClient.call(CONFIG.appsScriptUrl,payload);
+    }
+    // Verify only quotation display settings after a lost response.
+    const settings=typeof _settingsCache==='undefined'?[]:_settingsCache||[];
+    const settingTitle=payload.action==='create'?payload.fields?.Title:
+      settings.find(row=>String(row.id)===String(payload.id))?.Title;
+    const quoteSetting=/^(ZoneFonts|QuoteValidity|QuoteTag|QuoteSource|QuoteFax|QuoteDocEN|QuoteDisc|QuoteCols|QuoteRowH|QuoteSpacing|QuoteItemExtra)_/.test(settingTitle||'');
+    if(quoteSetting&&payload.list===CONFIG.lists.settings&&['create','update'].includes(payload.action)&&payload.fields){
+      await _sleep(1000);
+      try {
+        const result=await GatewayClient.call(CONFIG.appsScriptUrl,{action:'list',list:payload.list});
+        const item=(result.items||[]).find(row=>
+          (payload.action==='update'?String(row.id)===String(payload.id):row.Title===payload.fields.Title)&&
+          Object.entries(payload.fields).every(([key,value])=>String(row[key]??'')===String(value??''))
+        );
+        if(item)return {ok:true,item,id:item.id};
+      }catch(verificationError){console.warn('ตรวจผลบันทึก Settings ไม่สำเร็จ:',verificationError.message);}
+    }
+    throw error;
+  }
+}
 
 // แปลงชนิดข้อมูลตัวเลข/บูลีน ให้เก็บใน Sheet เป็นค่าที่ถูกต้อง
 // หมายเหตุ: ห้ามใส่ฟิลด์ที่เป็น "id อ้างอิง" (เช่น QuoteID) เพราะ Google version ใช้ UUID
