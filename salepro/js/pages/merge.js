@@ -93,7 +93,7 @@ function _mergeMapItems(sourceId, allItems, baseIdx, sourceQuote) {
       id: uid, type: 'item',
       no: ex.no || '', pn: ex.pn || '', name: it.Title || '', desc: it.Description || '',internalNotes:String(ex.internalNotes||''),catalogId:String(ex.catalogId||''),
       qty: (ex.qtyRaw !== undefined && ex.qtyRaw !== '') ? ex.qtyRaw : (it.Quantity != null ? it.Quantity : ''), unit: it.Unit || 'ชิ้น',
-      price: ex.travel ? ex.travel.basePrice : ((ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0)),
+      price: sourceQuote?.PricingMode==='inclusive'?Number(it.UnitPrice||0)/1.07:(ex.travel ? ex.travel.basePrice : ((ex.price !== undefined && ex.price !== '') ? ex.price : (it.UnitPrice || 0))),
       disc: 100*(1-(1-Number(it.DiscountPct||0)/100)*(1-Number(sourceQuote?.DiscountPct||0)/100)), rowH: rh, cost: +ex.cost || 0, vendorId: ex.vendorId || '', asHeader: !!ex.asHeader, travel: null
     };
   });
@@ -148,6 +148,7 @@ async function startMerge() {
     _set('q-no', newNo);
     _set('q-date', new Date().toISOString().split('T')[0]);
     _set('q-client', primary.ClientName);
+    _set('q-pricing-mode','exclusive');_set('q-customer-document',primary.CustomerDocumentType||'full');_set('q-customer-type',primary.CustomerType||'company');
     _set('q-contact', primary.ContactPerson);
     _set('q-phone', primary.Phone);
     _set('q-email', primary.Email);

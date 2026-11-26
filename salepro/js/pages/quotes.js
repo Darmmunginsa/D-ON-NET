@@ -230,6 +230,9 @@ function initNewQuote() {
   document.getElementById('q-cust-address').value = '';
   document.getElementById('q-site-address').value = '';
   document.getElementById('q-cust-taxid').value = '';
+  const documentType=document.getElementById('q-customer-document');if(documentType)documentType.value='full';
+  const customerType=document.getElementById('q-customer-type');if(customerType)customerType.value='company';
+  const pricingMode=document.getElementById('q-pricing-mode');if(pricingMode)pricingMode.value='exclusive';
   document.getElementById('q-cust-tel').value = '';
   { const _a=document.getElementById('q-client-en'); if(_a)_a.value=''; const _b=document.getElementById('q-cust-address-en'); if(_b)_b.value=''; }
   const _faxEl = document.getElementById('q-cust-fax'); if (_faxEl) _faxEl.value = '';
@@ -328,7 +331,7 @@ function updateAutoDates() {
 let _itemSeq = 0;
 function _nextItemId() { return Date.now() * 1000 + (_itemSeq++ % 1000); }
 function addItem(p = null) {
-  quoteItems.push({ id: _nextItemId(), type:'item', no:'', pn: p ? (p.PartNumber||p.SKU||'') : '', name: p ? p.Title : '', desc: p ? (p.Description||'') : '', internalNotes:p?String(p.InternalNotes||''):'', catalogId:p?String(p.id||''):'', qty: p ? 1 : '', unit: p ? (p.Unit||'ชิ้น') : 'ชิ้น', price: p ? (p.Price ?? '') : '', disc: 0, cost: p ? (+p.Cost||0) : 0, vendorId: p ? (p.VendorId||'') : '' });
+  quoteItems.push({ id: _nextItemId(), type:'item', no:'', pn: p ? (p.PartNumber||p.SKU||'') : '', name: p ? p.Title : '', desc: p ? (p.Description||'') : '', internalNotes:p?String(p.InternalNotes||''):'', catalogId:p?String(p.id||''):'', qty: p ? 1 : '', unit: p ? (p.Unit||'ชิ้น') : 'ชิ้น', price: p ? (document.getElementById('q-pricing-mode')?.value==='inclusive'&&Number.isFinite(Number(p.Price))?Math.round(Number(p.Price)*1.07*100)/100:(p.Price ?? '')) : '', disc: 0, cost: p ? (+p.Cost||0) : 0, vendorId: p ? (p.VendorId||'') : '' });
   renderItems();
 }
 
@@ -1090,15 +1093,18 @@ function calcTotals() {
   const sub = quoteItems.reduce((a, i) => a + lineTotal(i), 0);
   const discAmt = globalDiscAmt(sub);
   const after = sub - discAmt;
-  const vat = after * 0.07;
-  const grand = after + vat;
+  const inclusive=document.getElementById('q-pricing-mode')?.value==='inclusive';
+  const base=inclusive?Math.round(after/1.07*100)/100:after;
+  const vat = inclusive?Math.round((after-base)*100)/100:Math.round(after*0.07*100)/100;
+  const grand = inclusive?Math.round(after*100)/100:Math.round((after+vat)*100)/100;
   document.getElementById('t-sub').textContent = fmt(sub);
   document.getElementById('t-disc').textContent = fmt(discAmt);
   document.getElementById('t-after').textContent = fmt(after);
   document.getElementById('t-vat').textContent = fmt(vat);
+  const vatLabel=document.getElementById('t-vat-label');if(vatLabel)vatLabel.textContent=inclusive?'VAT 7% ที่รวมในราคา':'VAT 7%';
   document.getElementById('t-grand').textContent = fmt(grand);
   if (typeof renderBelowCostBanner === 'function') renderBelowCostBanner();
-  return { sub, discAmt, after, vat, grand };
+  return { sub, discAmt, after, vat, grand, base };
 }
 // Update approver box whenever totals change
 function calcTotalsAndApprover() {
@@ -1173,6 +1179,7 @@ async function editQuote(id) {
 
     // ข้อมูลลูกค้า
     _set('q-client',        q.ClientName);
+    _set('q-customer-type',q.CustomerType||'company');_set('q-customer-document',q.CustomerDocumentType||'full');_set('q-pricing-mode',q.PricingMode||'exclusive');
     _set('q-contact',       q.ContactPerson);
     _set('q-phone',         q.Phone);
     _set('q-email',         q.Email);
@@ -1495,6 +1502,7 @@ async function duplicateQuote(id) {
     _set('q-no',    newNo);                                        // ★ เลขใหม่
     _set('q-date',  new Date().toISOString().split('T')[0]);        // วันที่วันนี้
     _set('q-client',       q.ClientName);
+    _set('q-customer-type',q.CustomerType||'company');_set('q-customer-document',q.CustomerDocumentType||'full');_set('q-pricing-mode',q.PricingMode||'exclusive');
     _set('q-contact',      q.ContactPerson);
     _set('q-phone',        q.Phone);
     _set('q-email',        q.Email);
@@ -1569,6 +1577,9 @@ async function _saveQuoteImpl(status) {
   const t = calcTotals();
   const fields = {
     Title: document.getElementById('q-no').value,
+    CustomerType:document.getElementById('q-customer-type')?.value||'company',
+    CustomerDocumentType:document.getElementById('q-customer-document')?.value||'full',
+    PricingMode:document.getElementById('q-pricing-mode')?.value||'exclusive',
     DraftName:(document.getElementById('q-draft-name')?.value||'').trim(),
     ...(typeof LocalFirst!=='undefined'&&LocalFirst.activeId()?{LocalDraftId:LocalFirst.activeId()}:{}),
     ClientName: document.getElementById('q-client').value || '(ไม่ระบุ)',
@@ -1684,7 +1695,7 @@ async function _saveQuoteImpl(status) {
       let _totCost = 0;
       (quoteItems||[]).forEach(it => { if (it && it.type === 'item') { const qn = parseFloat(it.qty); _totCost += (+it.cost||0) * (isNaN(qn)?0:qn); } });
       const _tt = calcTotals();
-      await putSettingValue('QuoteMargin_' + quoteId, JSON.stringify({ cost: Math.round(_totCost*100)/100, sell: Math.round((_tt.after||0)*100)/100 }));
+      await putSettingValue('QuoteMargin_' + quoteId, JSON.stringify({ cost: Math.round(_totCost*100)/100, sell: Math.round((_tt.base??_tt.after??0)*100)/100 }));
     } catch(e) { console.warn('save margin:', e.message); }
     // บันทึกขนาดฟอนต์ 4 zone + อายุใบเสนอราคา ของใบนี้ (รายใบ)
     await saveQuoteZoneFonts(quoteId);
@@ -1709,7 +1720,7 @@ async function _saveQuoteImpl(status) {
     // เพิ่มลูกค้าเข้า CRM อัตโนมัติ ถ้ายังไม่มี (ไม่ทับข้อมูลเดิม)
     let customerSyncMessage='';
     if(typeof autoAddCustomerFromQuote==='function'){
-      try{const result=await autoAddCustomerFromQuote(fields,customerExtras.fax,customerExtras,{allowMissingTax:status==='Approved'});customerSyncMessage=result?.message||'';}
+      try{const result=await autoAddCustomerFromQuote(fields,customerExtras.fax,customerExtras,{allowMissingTax:status==='Approved'||fields.CustomerType==='individual'});customerSyncMessage=result?.message||'';}
       catch(e){customerSyncMessage='ใบเสนอราคาบันทึกแล้ว แต่ยังเพิ่ม CRM ไม่สำเร็จ: '+e.message;}
     }
     const customerSyncStatus=document.getElementById('quote-customer-sync-status');

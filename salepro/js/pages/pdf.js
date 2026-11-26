@@ -41,6 +41,8 @@ function buildCurrentQuoteData() {
   const t = calcTotals();
   const fakeQ = {
     Title: document.getElementById('q-no').value,
+    CustomerType:document.getElementById('q-customer-type')?.value||'company',
+    PricingMode:document.getElementById('q-pricing-mode')?.value||'exclusive',
     ClientName: document.getElementById('q-client').value,
     Tag: document.getElementById('q-tag')?.value||'',
     ContactPerson: document.getElementById('q-contact').value,
@@ -141,8 +143,10 @@ function buildPDFData(q, items) {
   const sub = (items||[]).reduce((a,i)=>(i.__group||i.__blank||i.__pagebreak||i.__note)?a:(_qn(i.Quantity)?a+(parseFloat(i.Quantity)*(i.UnitPrice||0)*(1-(i.DiscountPct||0)/100)):a),0);
   const disc = (q.DiscountPct||0)/100;
   const after = sub*(1-disc);
-  const vat = after*0.07;
-  const grand = q.TotalAmount || (after+vat);
+  const inclusive=q.PricingMode==='inclusive';
+  const base=inclusive?Math.round(after/1.07*100)/100:after;
+  const vat=inclusive?Math.round((after-base)*100)/100:Math.round(after*0.07*100)/100;
+  const grand = q.TotalAmount || (inclusive?after:after+vat);
   return {q,items:items||[],sub,discAmt:sub*disc,after,vat,grand};
 }
 
@@ -296,10 +300,10 @@ function renderPDFHTML(d) {
         </div>
       </div>
       <table style="width:240px;flex-shrink:0;border-collapse:collapse;color:#1a1a2e;font-size:${Zo.m};table-layout:fixed">
-        <tr><td style="padding:4px 16px 4px 0;color:#444">SUB TOTAL</td><td style="text-align:right;font-family:'Tahoma','Segoe UI',sans-serif;padding:4px 0;color:#1a1a2e;white-space:nowrap">${fmtP(d.sub)}</td></tr>
+        <tr><td style="padding:4px 16px 4px 0;color:#444">${q.PricingMode==='inclusive'?'SUB TOTAL (VAT INCLUDED)':'SUB TOTAL'}</td><td style="text-align:right;font-family:'Tahoma','Segoe UI',sans-serif;padding:4px 0;color:#1a1a2e;white-space:nowrap">${fmtP(d.sub)}</td></tr>
         ${d.discAmt>0 ? `<tr><td style="padding:4px 16px 4px 0;color:#444">DISCOUNT</td><td style="text-align:right;font-family:'Tahoma','Segoe UI',sans-serif;padding:4px 0;color:#e74c3c;white-space:nowrap">(${fmtP(d.discAmt)})</td></tr>
         <tr><td style="padding:4px 16px 4px 0;color:#444">TOTAL</td><td style="text-align:right;font-family:'Tahoma','Segoe UI',sans-serif;padding:4px 0;color:#1a1a2e;white-space:nowrap">${fmtP(d.after)}</td></tr>` : ''}
-        <tr><td style="padding:4px 16px 4px 0;color:#444">VAT 7%</td><td style="text-align:right;font-family:'Tahoma','Segoe UI',sans-serif;padding:4px 0;color:#1a1a2e;white-space:nowrap">${fmtP(d.vat)}</td></tr>
+        <tr><td style="padding:4px 16px 4px 0;color:#444">${q.PricingMode==='inclusive'?'VAT INCLUDED 7%':'VAT 7%'}</td><td style="text-align:right;font-family:'Tahoma','Segoe UI',sans-serif;padding:4px 0;color:#1a1a2e;white-space:nowrap">${fmtP(d.vat)}</td></tr>
         <tr style="border-top:2px solid ${primaryColor}">
           <td style="padding:8px 16px 4px 0;font-size:${Zo.l};font-weight:700;color:${primaryColor}">GRAND TOTAL</td>
           <td style="text-align:right;font-family:'Tahoma','Segoe UI',sans-serif;font-size:${Zo.xl};font-weight:700;color:${primaryColor};padding:8px 0 4px;white-space:nowrap">${fmtP(d.grand)}</td>

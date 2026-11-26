@@ -113,7 +113,7 @@ let _customerAutoSaveQueue=Promise.resolve();
 function quoteCustomerTax(value){return String(value||'').replace(/[๐-๙]/g,c=>String(c.charCodeAt(0)-0x0e50)).replace(/[\s-]/g,'');}
 function autoAddCustomerFromQuote(fields, fax, docEN={}, options={}) {
   const snapshot={...fields},extras={...docEN},owner=currentUser?.email;
-  const allowMissingTax=options.allowMissingTax===true;
+  const allowMissingTax=options.allowMissingTax===true||snapshot.CustomerType==='individual';
   const operation=_customerAutoSaveQueue.then(async()=>{
     const name=String(snapshot.ClientName||'').trim(),tax=quoteCustomerTax(snapshot.CustomerTaxID);
     if(!name||name==='(ไม่ระบุ)')return {state:'skipped',message:'ยังไม่เพิ่ม CRM: กรุณาระบุชื่อลูกค้า'};
@@ -125,11 +125,11 @@ function autoAddCustomerFromQuote(fields, fax, docEN={}, options={}) {
     const matches=tax?fresh.filter(c=>quoteCustomerTax(c.TaxID)===tax):[];
     if(matches.length)return {state:'existing',customer:matches[0],message:matches.length>1?'พบเลขผู้เสียภาษีซ้ำในทะเบียนเดิม กรุณาตรวจ CRM — ไม่ได้สร้างเพิ่ม':'พบเลขผู้เสียภาษีเดิม ใช้ลูกค้าใน CRM เดิมแล้ว — ไม่สร้างซ้ำ'};
     const nameKey=v=>String(v||'').normalize('NFKC').trim().toLowerCase().replace(/\s+/g,' ');
-    const sameName=fresh.filter(c=>nameKey(c.Title)===nameKey(name)&&(!tax||!quoteCustomerTax(c.TaxID)));
+    const sameName=fresh.filter(c=>nameKey(c.Title)===nameKey(name)&&(!tax||!quoteCustomerTax(c.TaxID))&&(snapshot.CustomerType!=='individual'||String(c.Phone||'').replace(/\D/g,'')===String(snapshot.CustomerTel||snapshot.Phone||'').replace(/\D/g,'')));
     if(sameName.length>1)return {state:'skipped',message:'ยังไม่เพิ่ม CRM: พบชื่อลูกค้าซ้ำหลายราย กรุณาตรวจทะเบียนลูกค้า'};
     if(sameName.length===1)return {state:'existing',customer:sameName[0],message:'พบชื่อลูกค้าใน CRM แล้ว — ไม่สร้างซ้ำและไม่ทับข้อมูลเดิม'};
     if(currentUser?.email!==owner)throw Error('บัญชีผู้ใช้งานเปลี่ยน กรุณาตรวจทะเบียนลูกค้า');
-    const cfields={Title:name,ContactPerson:snapshot.ContactPerson||'',TaxID:tax,Phone:snapshot.CustomerTel||snapshot.Phone||'',Email:snapshot.Email||'',Address:snapshot.CustomerAddress||''};
+    const cfields={Title:name,CustomerType:snapshot.CustomerType||'company',ContactPerson:snapshot.ContactPerson||'',TaxID:tax,Phone:snapshot.CustomerTel||snapshot.Phone||'',Email:snapshot.Email||'',Address:snapshot.CustomerAddress||''};
     const created=await createListItem(CONFIG.lists.customers,cfields);
     if(!created?.id)throw Error('ยังไม่ยืนยันการบันทึกลูกค้า กรุณาตรวจ CRM ก่อนเพิ่มซ้ำ');
     const customer={...cfields,...created};customersData.push(customer);
@@ -166,7 +166,7 @@ function renderCustomers() {
       <td>${escHtml(c.ContactPerson||'')}</td>
       <td>${escHtml(c.Phone||'')}</td>
       <td>${escHtml(c.Email||'')}</td>
-      <td style="font-family:var(--mono);font-size:11px">${escHtml(c.TaxID||'')}</td>
+      <td style="font-family:var(--mono);font-size:11px">${(c.CustomerType==='individual'?'บุคคลธรรมดา · ':'')+escHtml(c.TaxID||'')}</td>
       <td style="font-size:12px;color:var(--muted);max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(c.Address||'')}</td>
       <td style="display:flex;gap:4px"><button class="action-btn" onclick="toggleCustomerPartner('${c.id}')" aria-pressed="${isPartnerCustomer(c)}" title="${isPartnerCustomer(c)?'ยกเลิก Partner':'กำหนดเป็น Partner'}" style="color:${isPartnerCustomer(c)?'#f6c85f':'var(--muted)'}">👑</button>
         <button class="action-btn" onclick="selectCustomerForQuote('${c.id}')" style="color:var(--accent2)" title="ใช้ในใบเสนอราคา"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>

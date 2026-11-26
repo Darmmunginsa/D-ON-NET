@@ -106,7 +106,8 @@ function updateApproverBox() {
     if (typeof quoteItems !== 'undefined' && Array.isArray(quoteItems)) {
       let cost = 0;
       quoteItems.forEach(it => { if (it && it.type === 'item') { const qn = parseFloat(it.qty); cost += (+it.cost || 0) * (isNaN(qn) ? 0 : qn); } });
-      if (t.after > 0) liveMargin = Math.round((t.after - cost) / t.after * 100);
+      const sell=t.base??t.after;
+      if (sell > 0) liveMargin = Math.round((sell - cost) / sell * 100);
     }
   } catch(e) {}
   const cap = +(approvalPolicy.selfMaxAmount || 0);

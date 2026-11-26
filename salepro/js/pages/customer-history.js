@@ -83,7 +83,7 @@ const CustomerHistory=(()=>{
    if(editingQuoteId){const q=(quotesData||[]).find(q=>String(q.id)===String(editingQuoteId));if(!q||!canEditQuote(q)||['Pending','Cancelled','Closed','PO Received'].includes(q.Status))return status('ใบเสนอราคาปัจจุบันไม่พร้อมแก้ไข');}
    if(!C.matches(source,identity,profiles))return invalidate();
    const chosen=[...$('customer-history-items').querySelectorAll('.history-item-choice:checked')].map(cb=>Number(cb.value));if(!chosen.length)return status('เลือกรายการที่ต้องการดึงก่อน');
-   try{const items=chosen.map(i=>C.toItem(sourceRows[i],sourceExtras[i],_nextItemId())).filter(Boolean);quoteItems.push(...items);renderItemsInQuote();status('เพิ่ม '+items.length+' รายการจาก '+source.Title+' แล้ว ยังไม่บันทึกลงระบบ');$('customer-history-items').querySelectorAll('.history-item-choice').forEach(cb=>cb.checked=false);}catch(e){status(e.message);}
+   try{const items=chosen.map(i=>C.toItem(sourceRows[i],sourceExtras[i],_nextItemId())).filter(Boolean);const sourceInclusive=source.PricingMode==='inclusive',targetInclusive=$('q-pricing-mode')?.value==='inclusive';if(sourceInclusive!==targetInclusive){for(const item of items){if(item.type==='item'&&Number.isFinite(Number(item.price)))item.price=Number(item.price)*(targetInclusive?1.07:1/1.07);}}quoteItems.push(...items);renderItemsInQuote();status('เพิ่ม '+items.length+' รายการจาก '+source.Title+' แล้ว ยังไม่บันทึกลงระบบ');$('customer-history-items').querySelectorAll('.history-item-choice').forEach(cb=>cb.checked=false);}catch(e){status(e.message);}
  }
  function renderItemsInQuote(){renderItemsGlobal();}
  // Keep the editor renderer independent from this drawer's item-list renderer.

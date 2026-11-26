@@ -2,6 +2,17 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),vm=requir
 function core(){const ctx=vm.createContext({});vm.runInContext(fs.readFileSync('shared/billing-core.js','utf8'),ctx);return ctx.BillingCore;}
 const q=(id,over={})=>({id,Title:'JK'+id,ClientName:'ลูกค้าทดสอบ',CustomerTaxID:'0123456789012',Status:'PO Received',PONumber:'PO-'+id,SubTotal:1000,TotalAmount:1070,PaidAmount:0,...over});
 const item=(id,over={})=>({QuoteID:id,Title:'Battery replacement',Quantity:2,UnitPrice:500,LineTotal:1000,Unit:'เครื่อง',...over});
+test('inclusive quotation billing retains gross cash and does not add VAT twice',()=>{
+  const input=args({
+    quotes:[q('1',{PricingMode:'inclusive',SubTotal:1070,TotalAmount:1070})],
+    items:[item('1',{Quantity:1,UnitPrice:1070,LineTotal:1070})],
+  });
+  const document=core().build(input);
+  assert.equal(document.totals.net,1000);
+  assert.equal(document.totals.vat,70);
+  assert.equal(document.totals.total,1070);
+  assert.equal(document.rows.filter(row=>!row.t).reduce((sum,row)=>sum+row.amount,0),1000);
+});
 function args(over={}){return {quotes:[q('1'),q('2')],items:[item('1'),item('2')],id:'12345678-abcd',date:'2026-11-08',dueDate:'2026-12-08',owner:'sale@test.com',...over};}
 test('combines all lines and PO references without changing sources',()=>{const input=args(),before=JSON.stringify(input),d=core().build(input);assert.equal(d.totals.total,2140);assert.equal(d.totals.vat,140);assert.equal(d.rows.filter(r=>!r.t).length,2);assert.match(d.rows[0].name,/Refer PO เลขที่ PO-1/);assert.equal(d.number,'BL-20261108-12345678');assert.equal(JSON.stringify(input),before);});
 test('preserves line discounts, global discounts, exact source VAT and partial payments',()=>{const c=core(),d=c.build(args({quotes:[q('1',{SubTotal:900,DiscountPct:10,TotalAmount:866.7,PaidAmount:200}),q('2',{PaidAmount:100})],items:[item('1',{DiscountPct:10,LineTotal:900}),item('2')]}));assert.equal(d.totals.net,1810);assert.equal(d.totals.discount,90);assert.equal(d.totals.vat,126.7);assert.equal(d.totals.total,1936.7);assert.equal(d.totals.balance,1636.7);assert.equal(d.rows.find(r=>r.name?.startsWith('ส่วนลดท้ายใบ')).amount,-90);});

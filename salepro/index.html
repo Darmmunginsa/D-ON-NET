@@ -279,6 +279,9 @@
               <div class="form-group"><label>Expire <span style="color:var(--muted);font-weight:400;font-size:10px">(อัตโนมัติ)</span></label><input id="q-end" type="date" readonly tabindex="-1" style="opacity:0.75;cursor:not-allowed"></div>
               <div class="form-group" style="grid-column:1/-1"><label>ที่อยู่ลูกค้า (สำหรับออกใบ)</label><textarea id="q-cust-address" placeholder="ที่อยู่ลูกค้า..." style="min-height:64px"></textarea></div>
               <div class="form-group" style="grid-column:1/-1"><label for="q-site-address">สถานที่หน้างานจริง (สำหรับคำนวณเส้นทาง / นัดหมาย)</label><textarea id="q-site-address" placeholder="เช่น โรงงาน สาขา อาคาร หรือที่อยู่ที่ลูกค้านัดให้เข้าบริการ" style="min-height:64px"></textarea><small>ใช้เมื่อหน้างานต่างจากที่อยู่บริษัท · ไม่เปลี่ยนที่อยู่ออกเอกสาร · เว้นว่างเพื่อใช้ที่อยู่ลูกค้า</small></div>
+              <div class="form-group"><label>ประเภทลูกค้า</label><select id="q-customer-type"><option value="company">นิติบุคคล</option><option value="individual">บุคคลธรรมดา</option></select></div>
+              <div class="form-group"><label>เอกสารสำหรับลูกค้า</label><select id="q-customer-document"><option value="full">ใบกำกับภาษีเต็มรูป</option><option value="abbreviated">ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ</option></select></div>
+              <div class="form-group"><label>ราคาที่กรอกในรายการ</label><select id="q-pricing-mode" onchange="calcTotalsAndApprover()"><option value="exclusive">ก่อน VAT</option><option value="inclusive">รวม VAT แล้ว</option></select></div>
               <div class="form-group"><label>เลขประจำตัวผู้เสียภาษีลูกค้า</label><input id="q-cust-taxid" placeholder="0000000000000"></div>
               <div class="form-group"><label>เบอร์โทรลูกค้า</label><input id="q-cust-tel" placeholder="02-xxx-xxxx"></div>
               <div class="form-group"><label>Fax ลูกค้า</label><input id="q-cust-fax" placeholder="02-xxx-xxxx"></div>
@@ -419,7 +422,7 @@
                 <span id="t-disc">฿0.00</span>
               </div>
               <div class="total-row"><span>ยอดหลังส่วนลด</span><span id="t-after">฿0.00</span></div>
-              <div class="total-row"><span>VAT 7%</span><span id="t-vat">฿0.00</span></div>
+              <div class="total-row"><span id="t-vat-label">VAT 7%</span><span id="t-vat">฿0.00</span></div>
               <div class="total-row total-grand"><span>ยอดรวมสุทธิ</span><span id="t-grand">฿0.00</span></div>
             </div>
           </div>
@@ -1297,6 +1300,12 @@
           </div>
           <div style="margin-bottom:8px">
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">🧾 ใบกำกับภาษี (TAX INVOICE)</div>
+            <details id="cpo-retail-section" style="margin-bottom:12px"><summary>ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ</summary>
+              <label><input type="checkbox" id="cpo-retail-eligible"> รายการนี้เข้าเกณฑ์กิจการที่ออกใบกำกับภาษีอย่างย่อได้</label>
+              <label>วันที่เอกสาร / วันที่เกิดภาษี<input id="cpo-retail-date" type="date"></label>
+              <button class="btn btn-sm" onclick="issueRetailReceipt()">ออกเอกสารอย่างย่อและบันทึก VAT</button>
+              <div id="cpo-retail-status" role="status"></div>
+            </details>
             <input id="cpo-refnote-tax" onchange="saveDocReferNote('tax',this.value)" placeholder="ข้อความเหนือ E.&O.E. เช่น รบกวนหักภาษี ณ ที่จ่าย (%)" style="width:100%;font-size:11px;margin-bottom:5px">
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <button class="btn btn-primary" onclick="printCustomerDoc('tax','customer')" style="font-size:12px;padding:5px 12px">ต้นฉบับลูกค้า</button>
@@ -1539,6 +1548,7 @@
       <div class="form-grid">
         <div class="form-group"><label>รหัสลูกค้า</label><input id="cu-code" placeholder="เช่น E003"></div><div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input id="cu-partner" type="checkbox" style="width:auto"> 👑 ลูกค้ารายนี้เป็น Partner</label><small>เลือกออก Report ในนามบริษัทนี้ได้จาก Tech</small></div>
         <div class="form-group"><label>ผู้ติดต่อ</label><input id="cu-contact" placeholder="ชื่อผู้ติดต่อ"></div>
+        <div class="form-group"><label>ประเภทลูกค้า</label><select id="cu-customer-type"><option value="company">นิติบุคคล</option><option value="individual">บุคคลธรรมดา</option></select></div>
         <div class="form-group"><label>เลขประจำตัวผู้เสียภาษี</label><input id="cu-taxid" placeholder="0000000000000"></div>
         <div class="form-group"><label>เบอร์โทร</label><input id="cu-phone" placeholder="08x-xxx-xxxx"></div>
         <div class="form-group"><label>Fax</label><input id="cu-fax" placeholder="02-xxx-xxxx"></div>
@@ -1663,19 +1673,20 @@
 <script src="js/sync.js?v=billingeditor20261108"></script>
 <script src="js/pages/ui.js?v=billingeditor20261108"></script>
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
-<script src="../shared/travel-cost.js?v=routepin20261108"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=customsite20261112"></script><script src="js/pages/quotes.js?v=approvalmail20261123"></script>
+<script src="../shared/travel-cost.js?v=routepin20261108"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=customsite20261112"></script><script src="js/pages/quotes.js?v=individual20261126"></script>
 <script src="js/pages/approve.js?v=crm20261112"></script>
 <script src="js/pages/payment.js?v=taxdocuments20261115"></script>
 <script src="js/pages/catalog.js?v=baseprice20261111"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
-<script src="js/pages/settings.js?v=monitor20261107"></script>
-<script src="js/pages/customers.js?v=partner20261115"></script>
-<script src="js/pages/signature.js?v=partner20261115"></script>
+<script src="js/pages/settings.js?v=individual20261126"></script>
+<script src="js/pages/customers.js?v=individual20261126"></script>
+<script src="js/pages/signature.js?v=individual20261126"></script>
 <script src="js/pages/company.js?v=startup20261108"></script>
-<script src="js/pages/pdf.js?v=bahttext20261118"></script>
+<script src="js/pages/pdf.js?v=individual20261126"></script>
 <script src="../shared/sale-payment-core.js?v=taxdocuments20261115"></script>
 <script src="js/pages/purchase-expenses.js?v=whtcertificate20261115"></script>
-<script src="js/pages/saletracker.js?v=approvalmail20261123"></script>
-<script src="../shared/billing-core.js?v=billingbaskets20261108"></script>
+<script src="js/pages/saletracker.js?v=individual20261126"></script>
+<script src="../shared/billing-core.js?v=inclusive20261126"></script>
+<script src="js/pages/retail-receipt.js?v=individual20261126"></script>
 <script src="js/pages/billing.js?v=billingbaskets20261108"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>
@@ -1685,7 +1696,7 @@
 <script src="js/pages/expiry.js?v=published20261108"></script>
 <script src="js/pages/saleresult.js?v=replacement20261115"></script>
 <script src="js/pages/recurring.js?v=drafts20261108"></script>
-<script src="js/pages/merge.js?v=internal20261108"></script>
+<script src="js/pages/merge.js?v=individual20261126"></script>
 <script src="js/pages/activity.js?v=monitor20261107"></script>
 <script src="js/pages/contracts.js?v=contractsave20261108"></script>
 <script src="js/app.js?v=startup20261108"></script>
@@ -1699,7 +1710,7 @@
   <option value="เอกสารอื่น">
 </datalist>
 <script src="js/pages/service-agreements.js?v=conditional20261108"></script><script src="js/pages/prospects-core.js?v=20261101"></script><script src="js/pages/prospects.js?v=teamprospects20261102"></script><script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/queue-core.js?v=workflowstatus20261108"></script><script src="../shared/tech-route.js?v=20261105"></script><script src="../shared/work-calendar.js?v=pendingpo20261108"></script><script src="js/pages/datetime-picker.js?v=dtpall20261107"></script><script src="js/pages/personal-event.js?v=shared20261108"></script><script src="js/pages/queue-planner.js?v=site20261112"></script><script src="js/pages/queue-dispatch.js?v=20261105"></script><script src="js/pages/google-busy.js?v=googlebusy20261108"></script><script src="js/pages/calendar.js?v=googlebusy20261108"></script>
-<script src="../shared/customer-history-core.js?v=20261108"></script><script src="js/pages/customer-history.js?v=20261108"></script>
+<script src="../shared/customer-history-core.js?v=20261108"></script><script src="js/pages/customer-history.js?v=individual20261126"></script>
 <script src="js/pages/draft-drawer.js?v=draftnames20261108"></script>
 <script src="../shared/local-first-core.js?v=draftnames20261108"></script><script src="../shared/local-first-idb.js?v=20261108"></script><script src="js/local-first.js?v=startup20261108"></script>
 </body>

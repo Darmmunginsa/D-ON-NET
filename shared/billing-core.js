@@ -28,7 +28,7 @@
   for(const q of quotes){
    const deal=dealFor(q),why=reason(q,deal);if(why)throw Error((q.Title||'')+': '+why);
    const sub=cents(q.SubTotal),pct=Number(q.DiscountPct||0);if(!Number.isFinite(pct)||pct<0||pct>100)throw Error('ส่วนลดไม่ถูกต้อง');
-   const disc=Math.round(sub*pct/100),base=sub-disc,grand=cents(q.TotalAmount),p=cents(q.PaidAmount);
+   const disc=Math.round(sub*pct/100),after=sub-disc,base=q.PricingMode==='inclusive'?Math.round(after/1.07):after,grand=cents(q.TotalAmount),p=cents(q.PaidAmount);
    if(p<0||grand<base)throw Error('ยอดต้นฉบับไม่ถูกต้อง กรุณาตรวจ '+q.Title);
    const pos=poNumbers(q,deal),srcItems=items.filter(it=>String(it.QuoteID)===String(q.id)),extra=extraFor(q)||[];
    rows.push({t:'group',name:'Refer PO เลขที่ '+pos.join(', ')+' · '+q.Title});
@@ -45,6 +45,7 @@
    });
    if(!itemCount||Math.abs(lineSum-sub)>Math.max(2,itemCount))throw Error('รายการสินค้าไม่ตรงกับยอดต้นฉบับ '+q.Title+' กรุณาตรวจต้นฉบับก่อน');
    if(disc)rows.push({name:'ส่วนลดท้ายใบ '+q.Title,qty:1,unit:'รายการ',price:-money(disc),amount:-money(disc)});
+   if(q.PricingMode==='inclusive')rows.push({name:'ถอด VAT ที่รวมในราคา '+q.Title,qty:1,unit:'รายการ',price:-money(grand-base),amount:-money(grand-base)});
    gross+=sub;discount+=disc;net+=base;vat+=grand-base;total+=grand;paid+=p;
    sources.push({id:String(q.id),title:q.Title,poNumbers:pos,total:money(grand),paid:money(p)});
   }

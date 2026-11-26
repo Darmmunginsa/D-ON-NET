@@ -69,7 +69,7 @@ function openFinanceTaxCorrection(index){
           }
           pendingCertificate=certificateFile?.name?await uploadTaxFile(certificateFile,'PaymentCertificates','หนังสือรับรองหัก ณ ที่จ่าย'):null;
           message.textContent='กำลังบันทึกข้อมูลภาษี…';
-          await _call({action:tech&&data.whtStatus?'correctTechExpenseTax':'correctFinanceTax',target:row.attachmentTarget,data,expected:{gross:row.gross,revision:row.taxCorrection.revision,invoiceId:invoice?.id||'',invoiceRevision:invoice?.TaxRevision||''}});
+          await _call({action:tech&&data.whtStatus?'correctTechExpenseTax':'correctFinanceTax',target:row.attachmentTarget,data,expected:{gross:row.gross,revision:row.taxCorrection.revision,invoiceId:row.taxCorrection.linkedInvoiceId??invoice?.id??'',invoiceRevision:invoice?.TaxRevision||''}});
           taxSaved=true;
           for(const control of form.elements)control.disabled=true;
         }

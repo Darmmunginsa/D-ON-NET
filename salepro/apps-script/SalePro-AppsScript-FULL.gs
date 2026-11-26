@@ -85,7 +85,18 @@ function createRow(name, fields) {
     if(name==='SalesTaxInvoices'){
       var title=String(fields&&fields.Title||'').trim();
       if(!title||title.length>100||title.charAt(0)==='='||!fields.QuoteID||!/^\d{4}-\d{2}-\d{2}$/.test(fields.TaxDate)||!/^\d{4}-\d{2}-\d{2}$/.test(fields.DocumentDate)||typeof fields.BaseAmount!=='number'||!(fields.BaseAmount>0)||typeof fields.VatAmount!=='number'||!(fields.VatAmount>=0))throw Error('ข้อมูลใบกำกับภาษีไม่ครบ');
-      var duplicate=listRows(name).find(function(row){return String(row.Title||'').trim().toLowerCase()===title.toLowerCase();});
+      var invoices=listRows(name);
+      if(fields.DocumentType==='abbreviated'){
+        if(!fields.Snapshot||String(fields.Snapshot).length>45000||typeof fields.GrossAmount!=='number'||!Number.isFinite(fields.GrossAmount))throw Error('ข้อมูลสำเนาเอกสารไม่ครบหรือใหญ่เกินไป');
+        var snapshot=JSON.parse(fields.Snapshot);
+        if(!snapshot.totals||![snapshot.totals.base,snapshot.totals.vat,fields.BaseAmount,fields.VatAmount].every(Number.isFinite)||Math.abs(Number(snapshot.totals.base)-fields.BaseAmount)>0.01||Math.abs(Number(snapshot.totals.vat)-fields.VatAmount)>0.01||Math.abs(fields.BaseAmount+fields.VatAmount-fields.GrossAmount)>0.01)throw Error('ยอดเอกสารอย่างย่อไม่ตรงกัน');
+        var quote=listRows('Quotations').find(function(row){return String(row.id)===String(fields.QuoteID);});
+        if(!quote||quote.Status==='Cancelled'||Math.abs(Number(quote.TotalAmount)-fields.GrossAmount)>0.02)throw Error('ยอดใบเสนอราคาถูกแก้แล้ว กรุณาโหลดข้อมูลใหม่');
+        var received=listRows('Payments').filter(function(row){return String(row.QuoteID)===String(fields.QuoteID);}).reduce(function(sum,row){return sum+Number(row.AmountPaid||0);},0);
+        if(received<fields.GrossAmount-0.01)throw Error('ยังรับชำระไม่ครบยอด');
+        if(invoices.some(function(row){return String(row.QuoteID)===String(fields.QuoteID);}))throw Error('งานนี้มีใบกำกับภาษีแล้ว กรุณาตรวจเอกสารเดิม');
+      }else if(invoices.some(function(row){return row.DocumentType==='abbreviated'&&String(row.QuoteID)===String(fields.QuoteID);}))throw Error('งานนี้ออกใบกำกับอย่างย่อแล้ว กรุณาตรวจเอกสารเดิม');
+      var duplicate=invoices.find(function(row){return String(row.Title||'').trim().toLowerCase()===title.toLowerCase();});
       if(duplicate)throw Error('เลขที่ใบกำกับภาษีนี้ถูกบันทึกแล้ว');
       fields.Title=title;
     }

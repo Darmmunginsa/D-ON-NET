@@ -77,7 +77,7 @@ async function loadAll({strict=false}={}){
       const quoteLabel=relation.quoteTitle ? 'ใบเสนอราคา '+relation.quoteTitle : 'รายรับจากการขาย';
       const party=String(p.ClientName||'').trim() || relation.quoteCustomer || quoteLabel;
       const date=String(p.PaymentDate||'').slice(0,10);
-      const invoice=invoiceById.get(String(p.TaxInvoiceId||''));
+      const invoice=invoiceById.get(String(p.TaxInvoiceId||''))||invoices.find(i=>i.DocumentType==='abbreviated'&&String(i.QuoteID)===String(p.QuoteID));
       const taxDate=p.TaxDocumentMode==='document'||invoice||distinctInvoices.has(String(p.TaxDoc||'').trim().toLowerCase())?'':p.TaxDate||'';
       const vat=SalePaymentCore.optional(p.PaymentVatAmount),wht=SalePaymentCore.optional(p.WHTAmount);
       const base=SalePaymentCore.optional(p.PaymentBaseAmount)??(vat==null?null:Math.round((Number(p.AmountPaid)-vat)*100)/100);
@@ -85,7 +85,7 @@ async function loadAll({strict=false}={}){
       return {
         ...relation,date:(p.PaymentDate||'').slice(0,10), type:'income', category:'รายรับจากการขาย',
         amount:SalePaymentCore.cash(p),whtAmount:wht,settledAmount:+p.AmountPaid||0,base,vat,gross:Number(p.AmountPaid),vatStatus:invoice||taxDate?'':'pending',taxKnown:!!(invoice||taxDate)&&wht!=null,taxDoc:invoice?.Title||p.TaxDoc,taxDocUrl:invoice?.DocURL,party, method:p.PaymentMethod||'',
-        note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:p.SlipName||'สลิป', whtCertificateUrl:p.WHTCertificateURL||'', source:'SalePro', taxCorrection:{invoice,revision:p.TaxRevision,whtRate:p.WHTPercent,whtBase:p.WHTBaseAmount,taxDate:invoice?.TaxDate||p.TaxDate,documentDate:invoice?.DocumentDate||p.TaxDate}, attachmentTarget:p.id?{source:'SalePro',id:p.id}:null
+        note:p.Note||p.Reference||'', docUrl:p.SlipURL||'', docName:p.SlipName||'สลิป', whtCertificateUrl:p.WHTCertificateURL||'', source:'SalePro', taxCorrection:{invoice,linkedInvoiceId:p.TaxInvoiceId||'',revision:p.TaxRevision,whtRate:p.WHTPercent,whtBase:p.WHTBaseAmount,taxDate:invoice?.TaxDate||p.TaxDate,documentDate:invoice?.DocumentDate||p.TaxDate}, attachmentTarget:p.id?{source:'SalePro',id:p.id}:null
       };
     });
     // รายจ่ายจาก PurchasePro (Procurement → Purchase_<id> JSON → payment.vendors)

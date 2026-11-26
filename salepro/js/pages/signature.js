@@ -166,6 +166,7 @@ function selectCustomerForQuote(id) {
       document.getElementById('q-email').value = c.Email||'';
       document.getElementById('q-cust-address').value = c.Address||'';
       document.getElementById('q-cust-taxid').value = c.TaxID||'';
+    const typeInput=document.getElementById('q-customer-type');if(typeInput)typeInput.value=c.CustomerType||'company';
       document.getElementById('q-cust-tel').value = c.Phone||'';
       const _f=document.getElementById('q-cust-fax'); if(_f && typeof getCustomerFax==='function') _f.value = getCustomerFax(c.id)||'';
       const _en=(typeof getCustomerDocEN==='function')?getCustomerDocEN(c.id):null;
@@ -180,6 +181,7 @@ function openAddCustomer() {
   editingCustomerId = null;
   document.getElementById('cu-partner').checked=false;
   document.getElementById('cm-title').textContent = 'เพิ่มลูกค้าใหม่';
+  const customerType=document.getElementById('cu-customer-type');if(customerType)customerType.value='company';
   ['cu-name','cu-contact','cu-taxid','cu-phone','cu-fax','cu-email','cu-address','cu-name-en','cu-address-en'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const codeEl = document.getElementById('cu-code'); if (codeEl) codeEl.value = (typeof nextCustomerCode==='function') ? nextCustomerCode() : '';
   openModal('customer-modal');
@@ -195,6 +197,7 @@ function editCustomer(id) {
   document.getElementById('cu-name').value = c.Title||'';
   document.getElementById('cu-contact').value = c.ContactPerson||'';
   document.getElementById('cu-taxid').value = c.TaxID||'';
+  const typeInput=document.getElementById('cu-customer-type');if(typeInput)typeInput.value=c.CustomerType||'company';
   document.getElementById('cu-phone').value = c.Phone||'';
   const _cf=document.getElementById('cu-fax'); if(_cf) _cf.value = (typeof getCustomerFax==='function')?getCustomerFax(id):'';
   document.getElementById('cu-email').value = c.Email||'';
@@ -208,7 +211,7 @@ function editCustomer(id) {
 async function saveCustomer() {
   const name = document.getElementById('cu-name').value;
   if (!name) { toast('กรุณาระบุชื่อลูกค้า','error'); return; }
-  const fields = { IsPartner:document.getElementById('cu-partner').checked, Title:name, ContactPerson:document.getElementById('cu-contact').value, TaxID:document.getElementById('cu-taxid').value, Phone:document.getElementById('cu-phone').value, Email:document.getElementById('cu-email').value, Address:document.getElementById('cu-address').value };
+  const fields = { CustomerType:document.getElementById('cu-customer-type')?.value||'company', IsPartner:document.getElementById('cu-partner').checked, Title:name, ContactPerson:document.getElementById('cu-contact').value, TaxID:document.getElementById('cu-taxid').value, Phone:document.getElementById('cu-phone').value, Email:document.getElementById('cu-email').value, Address:document.getElementById('cu-address').value };
   try {
     toast('กำลังบันทึก...','info');
     const code = (document.getElementById('cu-code')?.value || '').trim();

@@ -1484,12 +1484,17 @@ function _cdWarnHtml() {
   if(_cdExternal)return _cdExternal.warning();
   const man=_cdManualSum();
   const fmt2=n=>Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const base='<span style="color:#15803d">Σ รวมรายการ (ก่อน VAT) = <b>'+fmt2(man)+'</b> บาท · VAT 7% = '+fmt2(man*0.07)+' · รวมสุทธิ '+fmt2(man*1.07)+'</span>';
+  const inclusive=_cdQCache?.PricingMode==='inclusive';
+  const after=man*(1-Number(_cdQCache?.DiscountPct||0)/100);
+  const net=inclusive?Math.round(after/1.07*100)/100:after;
+  const vat=inclusive?Math.round((after-net)*100)/100:Math.round(net*0.07*100)/100;
+  const gross=inclusive?after:net+vat;
+  const base='<span style="color:#15803d">Σ ยอดหลังส่วนลด (ก่อน VAT) = <b>'+fmt2(net)+'</b> บาท · VAT 7% = '+fmt2(vat)+' · รวมสุทธิ '+fmt2(gross)+'</span>';
   // เทียบกับยอดจริงของใบเสนอราคา — ไม่ตรงให้เตือน
   const ref=+((_cdQCache&&_cdQCache.TotalAmount)||0);
   if(ref>0){
-    const net=man, gross=man*1.07;
-    const ok=(Math.abs(gross-ref)<=1)||(Math.abs(net-ref)<=1);
+
+    const ok=Math.abs(gross-ref)<=1;
     if(!ok){
       return '<span style="color:#b91c1c;font-weight:600">⚠ ยอดไม่ตรงกับใบเสนอราคา</span> '
         +'<span style="color:#b91c1c">(ใบเสนอราคา = <b>'+fmt2(ref)+'</b> บาท · เอกสารนี้รวมสุทธิ '+fmt2(gross)+')</span> '
@@ -2079,9 +2084,11 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
     ? _manualRows.reduce((s,r)=> s + (_isGN(r)?0:_amtNum(r.amount)), 0)
     : items.reduce((s,it)=>{ const d=parseFloat(it.DiscountPct||0)/100; return s + parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d); }, 0);
   const discountAmt = kind==='billing' ? 0 : subTotal * (Number(q.DiscountPct)||0) / 100;
-  const netTotal = subTotal - discountAmt;
-  const vatAmt = kind==='billing' ? q._billing.totals.vat : netTotal * 0.07;
-  const grand = kind==='billing' ? q._billing.totals.total : netTotal + vatAmt;
+  const amountAfterDiscount=subTotal-discountAmt;
+  const inclusive=kind!=='billing'&&q.PricingMode==='inclusive';
+  const netTotal=inclusive?Math.round(amountAfterDiscount/1.07*100)/100:amountAfterDiscount;
+  const vatAmt=kind==='billing'?q._billing.totals.vat:inclusive?Math.round((amountAfterDiscount-netTotal)*100)/100:Math.round(netTotal*0.07*100)/100;
+  const grand=kind==='billing'?q._billing.totals.total:inclusive?amountAfterDiscount:netTotal+vatAmt;
   const bahtWords = (typeof bahtText === 'function') ? bahtText(kind==='billing'?q._billing.totals.balance:grand) : '';
 
   // ── คอลัมน์ตาราง (ซ่อน/แสดง + ความกว้าง) — ตั้งค่าจากพรีวิว, เก็บใน manual.cols ──
@@ -2253,8 +2260,8 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const discountRows = discountAmt > 0 ? '<tr>'+totLabel('ส่วนลด','DISCOUNT')+totVal(fmt2(discountAmt))+'</tr><tr>'+totLabel('ยอดหลังหักส่วนลด','NET TOTAL')+totVal(fmt2(netTotal))+'</tr>' : '';
   const totalsBox = noPrice ? '' :
     '<table style="border-collapse:collapse;width:100%;font-size:12px">'
-    +'<tr>'+totLabel('รวมเงิน','TOTAL')+totVal(fmt2(subTotal))+'</tr>'+discountRows
-    +'<tr>'+totLabel('ภาษีมูลค่าเพิ่ม','PLUS VAT')+totVal(fmt2(vatAmt))+'</tr>'
+    +'<tr>'+totLabel(inclusive?'รวมเงิน (รวม VAT)':'รวมเงิน','TOTAL')+totVal(fmt2(subTotal))+'</tr>'+discountRows
+    +'<tr>'+totLabel(inclusive?'VAT ที่รวมในราคา':'ภาษีมูลค่าเพิ่ม',inclusive?'VAT INCLUDED':'PLUS VAT')+totVal(fmt2(vatAmt))+'</tr>'
     +'<tr>'+totLabel('ยอดเงินสุทธิ','GRAND TOTAL')+'<td style="border:1px solid '+NAVY+';padding:6px 10px;text-align:right;font-family:'+F_NUM+';font-weight:700;font-size:14px">'+fmt2(grand)+'</td></tr>'
     +'</table>';
 
@@ -2384,6 +2391,10 @@ function openSaleTrackerModal(id) {
   renderSTPaySummary(q);
   renderSTPayHistory(q).catch(()=>{});
   loadSTTaxInvoices(q.id);
+  const retailSection=document.getElementById('cpo-retail-section');if(retailSection)retailSection.open=q.CustomerDocumentType==='abbreviated';
+  const retailEligible=document.getElementById('cpo-retail-eligible');if(retailEligible)retailEligible.checked=false;
+  const retailDate=document.getElementById('cpo-retail-date');if(retailDate)retailDate.value='';
+  const retailStatus=document.getElementById('cpo-retail-status');if(retailStatus)retailStatus.textContent='';
   renderPOStatusBar(q);
   renderPayDueDateDisplay(q);
   renderReminderDisplay();
@@ -2600,7 +2611,7 @@ async function reviseQuote(id) {
       Phone: q.Phone||'', Email: q.Email||'',
       QuoteDate: new Date().toISOString().split('T')[0],
       PaymentMethod: q.PaymentMethod||'เงินสด',
-      SubTotal: q.SubTotal||0, DiscountPct: q.DiscountPct||0,
+      SubTotal: q.SubTotal||0, DiscountPct: q.DiscountPct||0,CustomerType:q.CustomerType||'company',PricingMode:q.PricingMode||'exclusive',
       TotalAmount: q.TotalAmount||0, Status: 'Draft',
       Note: q.Note||'', Terms: q.Terms||'',
       SaleName: q.SaleName||'', SaleTel: q.SaleTel||'', SaleEmail: q.SaleEmail||'',
@@ -2782,7 +2793,7 @@ async function _collectApprovalInsight(q) {
       const cost = +ex.cost || 0;
       const line = { name: t, qty: qty, unit: it.Unit || '', priceNum: priceN, cost: cost, disc: disc, net: null, profitUnit: null, lineProfit: null, marginPct: null };
       if (priceN != null) {
-        const net = priceN * (1 - disc/100);
+        const net = priceN * (1 - disc/100)/(q.PricingMode==='inclusive'?1.07:1);
         line.net = net; line.profitUnit = net - cost; line.lineProfit = (net - cost) * qty;
         line.marginPct = net > 0 ? (net - cost)/net*100 : 0;
         out.sell += net * qty; out.cost += cost * qty;
