@@ -25,37 +25,33 @@ function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=fal
   const logo=[company.LogoBase64,company.LogoURL,branding.LogoBase64,branding.LogoURL].find(value=>typeof value==='string'&&(/^[Hh][Tt][Tt][Pp][Ss]:\/\//.test(value)||/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(value)))||'';
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const money=value=>Number(value).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const inclusive=quote.PricingMode==='inclusive';
-  const lines=totals.lines.map((item,index)=>{
-    const price=Number(item.UnitPrice);
-    const amount=Number(item.Quantity)*price*(1-Number(item.DiscountPct||0)/100);
-    return '<tr><td>'+(index+1)+'</td><td>'+esc(item.Title)+(item.Description?'<small>'+esc(item.Description)+'</small>':'')+'</td><td class="num">'+esc(item.Quantity)+' '+esc(item.Unit)+'</td><td class="num">'+money(price)+'</td><td class="num">'+money(amount)+'</td></tr>';
-  }).join('');
-  return `<!doctype html><html lang="th"><head><meta charset="utf-8"><title>${esc(invoice.Title)}</title>
-    <style>
-      @page{size:A4;margin:16mm}*{box-sizing:border-box}body{margin:0 auto;padding:20px;max-width:850px;color:#162b40;font:14px/1.6 Tahoma,"Leelawadee UI",sans-serif}
-      header{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #173e60;padding-bottom:18px}
-      .company-logo{display:block;max-width:190px;max-height:72px;width:auto;height:auto;object-fit:contain;margin-bottom:10px}h1{font-size:23px;margin:0}h2{font-size:20px;margin:25px 0 4px}p{margin:4px 0}.company{max-width:65%}
-      .copy{font-size:13px;text-align:right;color:#526b7e}.meta{display:flex;justify-content:space-between;margin:18px 0}
-      table{width:100%;border-collapse:collapse;margin:18px 0}thead{display:table-header-group;background:#173e60;color:#fff}
-      th,td{padding:10px 8px;border-bottom:1px solid #ccd6de;vertical-align:top}th{text-align:left}tr{break-inside:avoid}
-      .num{text-align:right;white-space:nowrap}small{display:block;color:#64788b}.totals{width:48%;margin-left:auto}
-      .grand{font-size:18px;font-weight:bold;background:#eaf1f6}.words{padding:12px;background:#f2f6f9;text-align:center}
-      footer{margin-top:32px;border-top:1px solid #ccd6de;padding-top:12px} .signature{margin-top:40px;text-align:right}@media print{body{padding:0;max-width:none}}
-    </style></head><body>
-    <header><div class="company">${logo?'<img class="company-logo" src="'+esc(logo)+'" alt="โลโก้บริษัท">':''}<h1>${esc(company.CompanyName)}</h1><p>${esc(company.Address)}</p>
-    <p>เลขประจำตัวผู้เสียภาษี ${esc(company.TaxID)} · ${esc(company.Branch||'สำนักงานใหญ่')}</p><p>โทร. ${esc(company.Phone)}</p></div>
-    <div class="copy">${copy==='company'?'สำเนาบริษัท':'ต้นฉบับลูกค้า'}<br>เลขที่ ${esc(invoice.Title)}</div></header>
-    ${review?'<p style="border:2px solid #be123c;padding:12px;color:#be123c">ฉบับตรวจสอบ — ยังไม่อนุมัติให้ใช้รับเงิน</p>':''}<h2>ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ</h2><small>RECEIPT / ABBREVIATED TAX INVOICE</small>
-    <div class="meta"><div>วันที่ ${esc(advance?'____ / ____ / ______':invoice.DocumentDate.split('-').reverse().join('/'))}<br>อ้างอิง ${esc(quote.Title)}</div>
-    <div>ลูกค้า ${esc(quote.ClientName)}<br>${inclusive?'ราคาต่อหน่วยและจำนวนเงินรวม VAT แล้ว':'ราคาต่อหน่วยและจำนวนเงินก่อน VAT'}</div></div>
-    <table><thead><tr><th>#</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคาต่อหน่วย</th><th class="num">จำนวนเงิน</th></tr></thead><tbody>${lines}</tbody></table>
-    <table class="totals"><tr><td>รวมรายการ</td><td class="num">${money(totals.subtotal)}</td></tr>
-    ${totals.discount?'<tr><td>ส่วนลด</td><td class="num">'+money(totals.discount)+'</td></tr>':''}
-    <tr><td>มูลค่าก่อน VAT</td><td class="num">${money(totals.base)}</td></tr><tr><td>VAT 7%</td><td class="num">${money(totals.vat)}</td></tr>
-    <tr class="grand"><td>${advance?'ยอดรวม VAT':'รับเงินรวม VAT แล้ว'}</td><td class="num">${money(totals.gross)}</td></tr></table>
-    <div class="words">${esc(bahtText(totals.gross))}</div><p class="signature">ผู้รับเงิน ____________________</p>
-    <footer>ราคาสินค้า/ค่าบริการสุทธิรวมภาษีมูลค่าเพิ่มแล้ว<br>${esc(company.FooterText||'')}</footer></body></html>`;
+  const customer=typeof quotesData!=='undefined'?quotesData.find(row=>String(row.id)===String(invoice.QuoteID))||{}:{};
+  const date=advance?'____ / ____ / ______':String(invoice.DocumentDate||'').split('-').reverse().join('/');
+  const rows='<tr><td class="center">1</td><td>รับชำระตามใบเสนอราคา '+esc(quote.Title)+'</td><td class="num">'+money(totals.gross)+'</td></tr>'
+    +Array.from({length:11},()=>'<tr class="empty"><td>&nbsp;</td><td></td><td></td></tr>').join('');
+  return `<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบเสร็จรับเงิน ${esc(invoice.Title)}</title>
+  <style>
+    @page{size:A4;margin:12mm}*{box-sizing:border-box}body{margin:0 auto;padding:16px;max-width:820px;color:#172b42;font:13px/1.5 Tahoma,"Leelawadee UI",sans-serif}
+    header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.brand{display:flex;gap:18px;align-items:center;max-width:80%}
+    .company-logo{display:block;max-width:190px;max-height:72px;width:auto;height:auto;object-fit:contain}h1{font-size:21px;margin:0 0 4px}p{margin:3px 0}.small{font-size:11px}
+    .copy{border:1px solid #69517f;border-radius:3px;padding:5px 12px;white-space:nowrap;font-size:11px}
+    h2{border:2px solid #69517f;border-radius:5px;width:180px;margin:22px auto;text-align:center;font-size:19px;line-height:1.4;padding:5px}h2 small{display:block;font-size:12px;font-weight:400}
+    .meta{display:flex;justify-content:space-between;gap:24px;margin:16px 0}.customer{flex:1}.under{display:inline-block;min-width:160px;border-bottom:1px dotted #b3bbc5;padding:2px 6px}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group;background:#68517e;color:white}th,td{border:1px solid #8d96a3;padding:6px 8px}th{font-weight:500;text-align:center}tr{break-inside:avoid}.empty td{height:23px;padding:0 8px}.center{text-align:center}.num{text-align:right;white-space:nowrap}
+    .total{display:flex;border:1px solid #606b78;border-top:0;align-items:stretch;break-inside:avoid}.words{padding:10px;flex:1;border-right:1px solid #606b78;font-size:12px}.amount{padding:8px 12px;min-width:220px;display:flex;justify-content:space-between;align-items:center}.amount strong{font-size:18px}
+    .payment{padding:17px 12px;line-height:2}.note{text-align:center;font-size:10px;margin:12px 0}.signatures{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #606b78;break-inside:avoid}.signatures>div{padding:18px 12px 12px;min-height:105px;border-right:1px solid #606b78}.signatures>div:last-child{border:0}.line{margin-top:16px;border-bottom:1px dotted #b3bbc5}.review{border:2px solid #be123c;color:#be123c;padding:10px}
+    @media print{body{padding:0;max-width:none}.total,.payment,.signatures{break-inside:avoid}}
+  </style></head><body>
+  <header><div class="brand">${logo?'<img class="company-logo" src="'+esc(logo)+'" alt="โลโก้บริษัท">':''}<div><h1>${esc(company.CompanyName)}</h1>${company.CompanyNameEn?'<p>'+esc(company.CompanyNameEn)+'</p>':''}<p class="small">${esc(company.Address)}</p><p class="small">โทร. ${esc(company.Phone)} · เลขประจำตัวผู้เสียภาษี ${esc(company.TaxID)}</p><p class="small">${esc(company.Branch||'สำนักงานใหญ่')}</p></div></div><div class="copy">${copy==='company'?'สำเนาบริษัท':'ต้นฉบับลูกค้า'}</div></header>
+  <h2>ใบเสร็จรับเงิน<small>RECEIPT</small></h2>
+  ${review?'<p class="review">ฉบับตรวจสอบ — ยังไม่อนุมัติให้ใช้รับเงิน</p>':''}
+  <div class="meta"><div class="customer"><p>นามลูกค้า <span class="under">${esc(quote.ClientName)}</span></p><p>ที่อยู่ <span class="under">${esc(quote.CustomerAddress||quote.ClientAddress||customer.CustomerAddress||'')}</span></p><p>เลขประจำตัวผู้เสียภาษี <span class="under">${esc(quote.CustomerTaxID||quote.ClientTaxID||customer.CustomerTaxID||'')}</span></p></div><div><p>เลขที่ <span class="under">${esc(invoice.Title)}</span></p><p>วันที่ <span class="under">${esc(date)}</span></p></div></div>
+  <table><colgroup><col style="width:9%"><col style="width:66%"><col style="width:25%"></colgroup><thead><tr><th>ลำดับ</th><th>รายการ / เอกสารอ้างอิง</th><th>จำนวนเงิน</th></tr></thead><tbody>${rows}</tbody></table>
+  <div class="total"><div class="words">ตัวอักษร: ${esc(bahtText(totals.gross))}</div><div class="amount"><span>รวมเงิน<br><small>TOTAL</small></span><strong>${money(totals.gross)}</strong></div></div>
+  <div class="payment">□ เงินสด &nbsp; __________________ บาท<br>□ เงินโอน &nbsp; __________________ บาท<br>□ เช็คธนาคาร __________________ เลขที่ __________________<br>ลงวันที่ __________________ จำนวนเงิน __________________ บาท</div>
+  <p class="note">กรณีชำระด้วยเช็ค ใบเสร็จรับเงินจะสมบูรณ์เมื่อบริษัทฯ ได้รับเงินแล้วเท่านั้น</p>
+  <div class="signatures"><div>ผู้รับเงิน<div class="line"></div><p>ลงวันที่ __________________</p></div><div>ผู้รับใบเสร็จ<div class="line"></div><p>ลงวันที่ __________________</p></div><div>ในนาม ${esc(company.CompanyName)}<div class="line"></div><p class="center">ผู้มีอำนาจลงนาม</p></div></div>
+  </body></html>`;
 }
 
 let retailReceiptBusy=false;

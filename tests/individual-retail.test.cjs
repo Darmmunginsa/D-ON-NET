@@ -21,8 +21,8 @@ test('inclusive individual price, quotation PDF and retail receipt agree on 1070
   assert.equal(pdf.grand,1070);
   const invoice={Title:'AR-SAMPLE',DocumentDate:'2026-11-26',Snapshot:JSON.stringify({quote:q,company:{CompanyName:'บริษัท ตัวอย่าง',TaxID:'1234567890123'},totals})};
   const html=c.buildRetailReceiptHTML(invoice);
-  assert.match(html,/ใบเสร็จรับเงิน\/ใบกำกับภาษีอย่างย่อ/);
-  assert.match(html,/ราคาสินค้า\/ค่าบริการสุทธิรวมภาษีมูลค่าเพิ่มแล้ว/);
+  assert.match(html,/ใบเสร็จรับเงิน/);
+  assert.doesNotMatch(html,/VAT|ภาษีมูลค่าเพิ่ม|ใบกำกับภาษี|TAX INVOICE/i);
   assert.match(html,/หนึ่งพันเจ็ดสิบบาทถ้วน/);
   assert.match(c.buildRetailReceiptHTML(invoice,'company'),/สำเนาบริษัท/);
 });
@@ -229,4 +229,23 @@ test('receipt logo uses company settings for existing approvals, respects snapsh
   assert.match(c.buildRetailReceiptHTML(make({LogoURL:'https://example.com/saved.png'})),/src="https:\/\/example.com\/saved.png"/);
   c.companySettings={LogoURL:'javascript:alert(1)'};assert.doesNotMatch(c.buildRetailReceiptHTML(make({})),/<img/);
   c.companySettings={LogoBase64:'data:image/png;base64,aGVsbG8='};assert.match(c.buildRetailReceiptHTML(make({}), 'company',true,true),/src="data:image\/png;base64,aGVsbG8="/);
+});
+
+
+test('receipt-only layout hides tax rows in every copy while retaining gross and internal tax calculation',()=>{
+  const c=runtime();
+  for(const mode of ['inclusive','exclusive']){
+    const q={Title:'TEST',ClientName:'Customer',PricingMode:mode,DiscountPct:10,TotalAmount:963};
+    const totals=c.retailReceiptTotals(q,[{Title:'Service',Quantity:1,UnitPrice:mode==='inclusive'?1070:1000}]);
+    assert.equal(totals.base,900);assert.equal(totals.vat,63);assert.equal(totals.gross,963);
+    const invoice={Title:'AR-TEST',DocumentDate:'2026-11-27',Snapshot:JSON.stringify({quote:q,company:{},totals})};
+    const before=JSON.stringify(invoice);
+    for(const copy of ['customer','company'])for(const advance of [true,false]){
+      const html=c.buildRetailReceiptHTML(invoice,copy,advance);
+      assert.doesNotMatch(html,/VAT|ภาษีมูลค่าเพิ่ม|TAX INVOICE|ใบกำกับภาษี/i);
+      assert.match(html,/963.00/);assert.match(html,/เก้าร้อยหกสิบสามบาทถ้วน/);
+      assert.match(html,/ผู้รับใบเสร็จ/);assert.match(html,/ผู้มีอำนาจลงนาม/);
+    }
+    assert.equal(JSON.stringify(invoice),before);
+  }
 });
