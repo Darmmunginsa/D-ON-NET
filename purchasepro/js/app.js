@@ -48,6 +48,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');if(
 
 // ── auth: ดู auth.js (Google Sign-In). afterLogin() ถูกเรียกหลังล็อกอินสำเร็จ ──
 async function afterLogin(){
+  if(typeof StockPortal!=='undefined')StockPortal.reset();
   document.getElementById('user-name').textContent=currentUser.displayName||currentUser.email;
   document.getElementById('user-email').textContent=currentUser.email;
   document.getElementById('user-avatar').textContent=(currentUser.displayName||'U')[0].toUpperCase();

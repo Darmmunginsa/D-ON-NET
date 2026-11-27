@@ -16,7 +16,7 @@
 <link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="assets/prospects.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="assets/catalog-drawer.css?v=service20261102"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="assets/travel.css?v=travel-layout20261108"><link rel="stylesheet" href="assets/calendar.css?v=googlebusy20261108"><link rel="stylesheet" href="assets/customer-history.css?v=20261108">
 <link rel="stylesheet" href="assets/draft-drawer.css?v=draftnames20261108">
 <link rel="stylesheet" href="assets/billing.css?v=billingbaskets20261108">
-</head>
+<link rel="stylesheet" href="../shared/stock.css?v=stock20261128"></head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -62,6 +62,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
           สร้างใหม่
         </div>
+        <div class="nav-item" onclick="StockPortal.open('sale')">🏬 สถานะ Stock</div>
         <div class="nav-item" onclick="showPage('approve',this)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
           อนุมัติ
@@ -1011,6 +1012,7 @@
     <div class="modal-header" style="position:sticky;top:0;z-index:10;background:var(--surface)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       <h3 id="st-title">ติดตามการขาย</h3>
+      <button class="btn btn-sm" onclick="StockPortal.open('sale',{quoteId:stQuoteId})">🏬 Stock / รายการเบิกของงานนี้</button>
       <button class="btn btn-sm" id="st-billing-add" onclick="Billing.add(stQuoteId)">ส่งเข้างานวางบิล</button>
       <span id="st-status-badge" style="margin-left:4px"></span>
       <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
@@ -1673,7 +1675,7 @@
 <script src="../shared/gateway-client.js?v=idle4h20261112"></script>
 <script src="../shared/service-plan.js?v=service1"></script>
 <script src="js/config.js?v=admin1"></script>
-<script src="js/auth.js?v=googlebusy20261108"></script>
+<script src="js/auth.js?v=stock20261128"></script>
 <script src="js/api.js?v=recover20261123"></script>
 <script src="js/sync.js?v=billingeditor20261108"></script>
 <script src="js/pages/ui.js?v=billingeditor20261108"></script>
@@ -1718,5 +1720,5 @@
 <script src="../shared/customer-history-core.js?v=20261108"></script><script src="js/pages/customer-history.js?v=individual20261126"></script>
 <script src="js/pages/draft-drawer.js?v=draftnames20261108"></script>
 <script src="../shared/local-first-core.js?v=draftnames20261108"></script><script src="../shared/local-first-idb.js?v=20261108"></script><script src="js/local-first.js?v=startup20261108"></script>
-</body>
+<script src="../shared/stock.js?v=stock20261128"></script></body>
 </html>

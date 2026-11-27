@@ -107,6 +107,7 @@ async function tryRestoreSession() {
 }
 
 async function afterLogin() {
+  if(typeof StockPortal!=='undefined')StockPortal.reset();
   try {
     document.getElementById('user-name').textContent = currentUser.displayName || currentUser.email;
     document.getElementById('user-email').textContent = currentUser.email;
@@ -147,6 +148,7 @@ async function afterLogin() {
 }
 
 async function logout() {
+  if(typeof StockPortal!=='undefined')StockPortal.reset();
   if(typeof LocalFirst!=='undefined'){try{await LocalFirst.pause();}catch(e){toast('ยังบันทึก Draft ในเครื่องไม่สำเร็จ: '+e.message,'error');return;}}
   if(typeof GoogleBusy!=='undefined')GoogleBusy.clear();
   AuthSession.clear();

@@ -141,7 +141,7 @@ select.form-control option{background:var(--card)}
   .job-meta{gap:6px}
 }
 </style>
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="route.css?v=aiplan20261103"><link rel="stylesheet" href="reports.css?v=logoupload20261115"></head>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="route.css?v=aiplan20261103"><link rel="stylesheet" href="reports.css?v=logoupload20261115"><link rel="stylesheet" href="../shared/stock.css?v=stock20261128"></head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -169,7 +169,7 @@ select.form-control option{background:var(--card)}
     </div>
   </div>
 
-  <div class="filter-bar">
+  <button class="btn btn-outline" style="margin:10px" onclick="StockPortal.open('tech')">🏬 เบิก / คืน Stock</button><div class="filter-bar">
     <button class="filter-chip active" data-filter="all" onclick="setFilter('all',this)">ทั้งหมด</button>
     <button class="filter-chip" data-filter="assigned" onclick="setFilter('assigned',this)">⏳ รอยืนยัน</button>
     <button class="filter-chip" data-filter="accepted" onclick="setFilter('accepted',this)">✅ ยืนยันแล้ว</button>
@@ -253,6 +253,7 @@ async function msalLogin(){
   try{ google.accounts.id.prompt(); }catch(e){ toast('กดปุ่ม Google เพื่อเข้าสู่ระบบ','info'); }
 }
 function showApp() {
+  if(typeof StockPortal!=='undefined')StockPortal.reset();
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-name').textContent = currentUser.name || currentUser.email;
@@ -260,6 +261,7 @@ function showApp() {
   if (currentUser.picture && av) av.src = currentUser.picture;
 }
 async function signOut() {
+  if(typeof StockPortal!=='undefined')StockPortal.reset();
   AuthSession.clear();
   try{ if(typeof google!=='undefined'&&google.accounts) google.accounts.id.disableAutoSelect(); }catch(e){}
   try{ AppStorage.removeItem('techuser'); }catch(e){}
@@ -451,6 +453,7 @@ function renderJobBody(item) {
     </div>`).join('');
 
   return `
+    <button class="btn btn-outline" onclick="StockPortal.open('tech',{quoteId:'${DonnetReport.esc(q.id)}',jobId:'${DonnetReport.esc(job.id)}'})">🏬 เบิก / คืน Stock ของงานนี้</button>
     ${detailsHtml}
 
     ${docsHtml}
@@ -982,5 +985,5 @@ function toast(msg, type='info') {
 </script>
 <script src="../shared/donnet-report.js?v=strings44_20261115"></script><script src="../salepro/js/pages/datetime-picker.js?v=dtpall20261107"></script><script src="reports.js?v=gallery20261115"></script>
 <script src="../shared/tech-document-preview.js?v=gallery20261115"></script>
-<script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/tech-route.js?v=20261103"></script><script src="route.js?v=aiplan20261103"></script></body>
+<script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/tech-route.js?v=20261103"></script><script src="route.js?v=aiplan20261103"></script><script src="../shared/stock.js?v=stock20261128"></script></body>
 </html>

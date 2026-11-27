@@ -529,6 +529,8 @@ function writeFinanceTaxFields(name,id,fields,create) {
 
 function handle(req) {
   var a = req.action;
+  if(a==='inventory')return stockHandle(req);
+  if(['StockMoves','StockAccess'].indexOf(req.list)>=0||(req.lists||[]).some(function(n){return ['StockMoves','StockAccess'].indexOf(n)>=0;}))throw Error('ใช้เมนู Stock เพื่ออ่านหรือบันทึกข้อมูลคลัง');
   if(a==='replaceFinanceAttachment')return replaceFinanceAttachment(req);
   if(a==='correctTechExpenseTax'&&req.target?.source==='TechPro')return correctFinanceTax(req);
   if(a==='correctFinanceTax')return correctFinanceTax(req);
@@ -984,4 +986,72 @@ function retailApprovalNotify(record){
     history.push({action:'emailFailed',by:record.ApproverEmail,at:new Date().toISOString()});
   }
   record.History=JSON.stringify(history);record.UpdatedAt=new Date().toISOString();retailApprovalWrite(record);
+}
+
+// Stock: immutable movement ledger. Quantities use thousandths to avoid floating drift.
+function stockEmail(value){return String(value||'').trim().toLowerCase();}
+function stockUnits(value,zero){var n=Number(value);if(!['number','string'].includes(typeof value)||String(value).trim()===''||!Number.isFinite(n)||n<0||(!zero&&n===0)||n>100000000||Math.abs(n*1000-Math.round(n*1000))>0.00001)throw Error('จำนวนต้องเป็นเลขบวก ทศนิยมไม่เกิน 3 ตำแหน่ง');return Math.round(n*1000);}
+function stockWrite(table,id,fields){
+  var sh=_sheet(table),hdr=_ensureCols(sh,[ID_COL].concat(Object.keys(fields))),at=_findRowIndex(sh,id);
+  if(at<0)at=sh.getLastRow()+1;
+  sh.getRange(at,1,1,hdr.length).setNumberFormat('@').setValues([hdr.map(function(key){var value=String(key===ID_COL?id:(fields[key]==null?'':fields[key]));return value.charAt(0)==='='?String.fromCharCode(39)+value:value;})]);
+}
+function stockPermissions(email){
+  var access=listRows('StockAccess').find(function(r){return r.id==='purchasers';}),purchasers=access?JSON.parse(access.Emails||'[]'):[];
+  return {admin:email==='admin@dongroups.com',receive:email==='admin@dongroups.com'||purchasers.indexOf(email)>=0,purchasers:purchasers};
+}
+function stockJobs(email,manager,quotes){
+  var result=[];listRows('Settings').forEach(function(row){if(String(row.Title||'').indexOf('DealStatus_')!==0)return;var qid=row.Title.slice(11),q=quotes.find(function(r){return String(r.id)===qid;});if(!q)return;
+    var value=JSON.parse(row.Value||'{}');(value.techJobs||[]).forEach(function(job){if(manager||stockEmail(job.techEmail)===email)result.push({quoteId:qid,quoteTitle:q.Title,customer:q.ClientName,jobId:String(job.id),techEmail:stockEmail(job.techEmail),techName:job.techName||'',status:job.status||'assigned',cancelled:q.Status==='Cancelled'});});
+  });return result;
+}
+function stockBalances(moves){var balances=Object.create(null);moves.forEach(function(m){var id=String(m.ProductID),delta=Number(m.DeltaUnits);if(!Number.isSafeInteger(delta))throw Error('ข้อมูลจำนวนใน Stock ไม่ถูกต้อง กรุณาแจ้ง Admin');balances[id]=(balances[id]||0)+delta;});return balances;}
+function stockHandle(req){
+  var email=stockEmail(req._actor&&req._actor.email);if(!email)throw Error('เข้าสู่ระบบก่อนใช้งาน Stock');
+  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  try{
+    var permissions=stockPermissions(email),quotes=listRows('Quotations'),jobs=stockJobs(email,permissions.receive,quotes),moves=listRows('StockMoves'),balances=stockBalances(moves);
+    if(req.op==='status'){var found=moves.find(function(m){return m.id===String(req.requestId)&&stockEmail(m.Actor)===email;});return {ok:true,item:found||null};}
+    if(req.op==='access'){
+      if(!permissions.admin)throw Error('เฉพาะ Admin ที่กำหนดสิทธิ์จัดซื้อ Stock');
+      if(!Array.isArray(req.emails)||req.emails.length>100)throw Error('รายชื่อผู้รับผิดชอบไม่ถูกต้อง');
+      var emails=req.emails.map(stockEmail);if(emails.some(function(v){return !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(v);}))throw Error('ตรวจรูปแบบอีเมล');
+      emails=Array.from(new Set(emails));stockWrite('StockAccess','purchasers',{Emails:JSON.stringify(emails),UpdatedBy:email,UpdatedAt:new Date().toISOString()});return {ok:true};
+    }
+    if(req.op==='list'){
+      var allowedQuote=function(id){return permissions.receive||quotes.some(function(q){return String(q.id)===String(id)&&(stockEmail(q.SaleEmail)===email||stockEmail(q.ApproverEmail)===email);})||jobs.some(function(j){return j.quoteId===String(id);});};
+      if(req.quoteId&&!allowedQuote(req.quoteId))throw Error('ไม่มีสิทธิดู Stock ของงานนี้');
+      var products=listRows('Catalog').filter(function(p){return !['Draft','Archived','Deleted'].includes(p.CatalogStatus)&&!['Service','Software'].includes(p.Category)||Object.prototype.hasOwnProperty.call(balances,p.id);}).map(function(p){return {id:p.id,title:p.Title,sku:p.SKU||p.PartNumber||'',unit:p.Unit||'ชิ้น',quantity:(balances[p.id]||0)/1000,active:!['Draft','Archived','Deleted'].includes(p.CatalogStatus)&&!['Service','Software'].includes(p.Category)};});
+      var history=moves.filter(function(m){return (!req.quoteId||String(m.QuoteID)===String(req.quoteId))&&(!req.jobId||String(m.JobID)===String(req.jobId))&&(permissions.receive||stockEmail(m.Actor)===email||(m.QuoteID&&allowedQuote(m.QuoteID)));}).slice(-200).reverse();
+      var jobBalances=Object.create(null);if(req.quoteId)moves.filter(function(m){return String(m.QuoteID)===String(req.quoteId)&&(!req.jobId||String(m.JobID)===String(req.jobId))&&['issue','return'].includes(m.Type);}).forEach(function(m){jobBalances[m.ProductID]=(jobBalances[m.ProductID]||0)-Number(m.DeltaUnits);});Object.keys(jobBalances).forEach(function(id){jobBalances[id]/=1000;});
+      return {ok:true,products:products,moves:history,jobBalances:jobBalances,jobs:jobs,permissions:{admin:permissions.admin,receive:permissions.receive},purchasers:permissions.admin?permissions.purchasers:[],quotes:quotes.filter(function(q){return q.Status!=='Cancelled'&&(permissions.receive||allowedQuote(q.id));}).map(function(q){return {id:q.id,title:q.Title,customer:q.ClientName};})};
+    }
+    if(!['receive','issue','return','count'].includes(req.op))throw Error('ขั้นตอน Stock ไม่ถูกต้อง');
+    if(!/^[A-Za-z0-9_-]{8,80}$/.test(String(req.requestId||'')))throw Error('รหัสรายการไม่ถูกต้อง');
+    var input={op:req.op,productId:String(req.productId||''),units:stockUnits(req.quantity,req.op==='count'),quoteId:String(req.quoteId||''),jobId:String(req.jobId||''),reference:String(req.reference||'').trim(),note:String(req.note||'').trim()};
+    if(input.reference.length>200||input.note.length>1000)throw Error('รายละเอียดรายการยาวเกินไป');
+    if((req.op==='receive'||req.op==='count')&&!permissions.receive)throw Error('เฉพาะจัดซื้อที่ได้รับสิทธิ์รับเข้าและปรับ Stock');
+    var job;
+    if(req.op==='issue'||req.op==='return'){
+      job=jobs.find(function(j){return j.quoteId===input.quoteId&&j.jobId===input.jobId;});if(!job)throw Error('เลือกงานช่างที่ได้รับมอบหมายก่อนเบิกหรือคืน');
+      if(req.op==='issue'&&!permissions.admin&&job.techEmail!==email)throw Error('เฉพาะช่างที่ได้รับมอบหมายเบิกสินค้าได้');
+    }
+    var fingerprint=JSON.stringify(input),prior=moves.find(function(m){return m.id===req.requestId;});
+    if(prior){if(prior.Request!==fingerprint||stockEmail(prior.Actor)!==email)throw Error('รหัสรายการนี้ถูกใช้แล้ว');return {ok:true,item:prior,reused:true};}
+    var product=listRows('Catalog').find(function(p){return String(p.id)===input.productId;});if(!product)throw Error('ไม่พบสินค้าใน Catalog');
+    if(['receive','issue'].includes(req.op)&&(['Draft','Archived','Deleted'].includes(product.CatalogStatus)||['Service','Software'].includes(product.Category)))throw Error('รายการนี้ไม่ใช่สินค้าคลังที่เปิดใช้งาน');
+    var quote=input.quoteId?quotes.find(function(q){return String(q.id)===input.quoteId;}):null;
+    if(input.quoteId&&!quote)throw Error('ไม่พบใบเสนอราคาที่อ้างอิง');
+    if(req.op==='issue'&&(job.cancelled||job.status==='completed'))throw Error('งานนี้เสร็จหรือถูกยกเลิกแล้ว ไม่สามารถเบิกเพิ่ม');
+    if(req.op==='count'&&!input.note)throw Error('ระบุเหตุผลปรับยอดตรวจนับ');
+    if(req.op==='receive'&&!input.reference)throw Error('ระบุเลขเอกสารรับเข้า เช่น PO / ใบส่งของ');
+    var current=balances[input.productId]||0,delta=req.op==='issue'?-input.units:req.op==='count'?input.units-current:input.units;
+    if(current+delta<0)throw Error('Stock ไม่เพียงพอ คงเหลือ '+current/1000+' '+(product.Unit||'ชิ้น'));
+    if(req.op==='return'){
+      var issued=-moves.filter(function(m){return String(m.ProductID)===input.productId&&String(m.QuoteID)===input.quoteId&&String(m.JobID)===input.jobId&&(m.Type==='issue'||m.Type==='return');}).reduce(function(sum,m){return sum+Number(m.DeltaUnits);},0);
+      if(input.units>issued)throw Error('จำนวนคืนเกินยอดที่เบิกค้างของงานนี้');
+    }
+    var record={ProductID:product.id,ProductTitle:product.Title,SKU:product.SKU||product.PartNumber||'',Unit:product.Unit||'ชิ้น',Type:req.op,DeltaUnits:delta,BalanceUnits:current+delta,QuoteID:input.quoteId,QuoteTitle:quote?quote.Title:'',Customer:quote?quote.ClientName:'',JobID:input.jobId,Reference:input.reference,Note:input.note,Actor:email,ActorName:String(req._actor.name||email),At:new Date().toISOString(),Request:fingerprint};
+    stockWrite('StockMoves',req.requestId,record);record.id=req.requestId;return {ok:true,item:record};
+  }finally{lock.releaseLock();}
 }

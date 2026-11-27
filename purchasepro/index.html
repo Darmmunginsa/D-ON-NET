@@ -11,7 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link href="assets/style.css?v=catalogdrawer20261113" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"></head>
+<link rel="icon" type="image/webp" href="../shared/assets/d-on-net-logo.webp"><link rel="stylesheet" href="../shared/brand.css?v=20261101"><link rel="stylesheet" href="../shared/cyber.css?v=20261101"><script src="../shared/catalog-policy.js?v=draft20261101"></script><link rel="stylesheet" href="../shared/catalog-baskets.css?v=20261101"><link rel="stylesheet" href="../shared/workspace-appearance.css?v=20261103"><link rel="stylesheet" href="../shared/stock.css?v=stock20261128"></head>
 <body class="cyber-app">
 
 <!-- LOGIN -->
@@ -34,6 +34,7 @@
     </div>
     <div class="nav-group">จัดซื้อ</div>
     <div class="nav-item active" data-page="dashboard" onclick="showPage('dashboard',this)">📊 ภาพรวม</div>
+    <div class="nav-item" onclick="StockPortal.open('purchase')">🏬 Stock สินค้า</div>
     <div class="nav-item" data-page="purchases" onclick="showPage('purchases',this)">📦 งานจัดซื้อ</div>
     <div class="nav-item" data-page="approvals" onclick="showPage('approvals',this)">✅ รออนุมัติ PO<span id="appr-navcount"></span></div>
     <div class="nav-group">ข้อมูลหลัก</div>
@@ -407,10 +408,10 @@
 <script src="../shared/bank-details.js?v=bank1"></script>
 <script src="js/config.js?v=admin1"></script>
 <script src="js/api.js?v=monitor20261107"></script>
-<script src="js/auth.js?v=idle60-20261104"></script>
+<script src="js/auth.js?v=stock20261128"></script>
 <script src="../shared/sale-payment-core.js?v=taxdocuments20261115"></script>
-<script src="js/app.js?v=saveshipping20261123"></script>
+<script src="js/app.js?v=stock20261128"></script>
 <script src="js/manage.js?v=internal20261108"></script>
 <script src="js/tour.js?v=admin1"></script>
-<script src="js/catalog-draft-import.js?v=20261101"></script><script src="../shared/workspace-appearance.js?v=20261103"></script></body>
+<script src="js/catalog-draft-import.js?v=20261101"></script><script src="../shared/workspace-appearance.js?v=20261103"></script><script src="../shared/stock.js?v=stock20261128"></script></body>
 </html>

@@ -48,6 +48,7 @@ async function tryRestoreSession() {
 }
 
 async function logout() {
+  if(typeof StockPortal!=='undefined')StockPortal.reset();
   AuthSession.clear();
   currentUser = null;
   try { AppStorage.removeItem('ppuser'); } catch(e) {}
