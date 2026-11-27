@@ -122,3 +122,32 @@ test('advance approval enforces assigned actor, revision, stale quote and print 
   row=c.retailReceiptApproval(req).item;assert.equal(row.Status,'pending');
   assert.ok(JSON.parse(row.History).length>=5);assert.ok(released>=8);
 });
+
+
+test('request emails assigned approver once, preserves failed request, and retries existing request explicitly',()=>{
+  const source=fs.readFileSync('salepro/apps-script/Code.gs','utf8');
+  const q={id:'q',Title:'TEST',ClientName:'Customer <tag>',TotalAmount:1070,PricingMode:'inclusive',SaleEmail:'sale@example.com',ApproverEmail:'boss@example.com'};
+  let records=[],sent=[],fail=true;
+  const c=vm.createContext({LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},_uuid:()=> 'approval-q',listRows:name=>name==='Quotations'?[q]:name==='QuoteItems'?[{Title:'Service',QuoteID:'q',Quantity:1,UnitPrice:1070}]:name==='RetailReceiptApprovals'?records:[],sendEmail:mail=>{assert.equal(records[0].Status,'pending');assert.equal(records[0].EmailStatus,'sending');sent.push(mail);if(fail)throw Error('mail quota');}});
+  vm.runInContext(source.slice(source.indexOf('// Advance retail receipt printing')),c);
+  c.retailApprovalWrite=r=>{records=[JSON.parse(JSON.stringify(r))];};
+  const req={quoteId:'q',_actor:{email:'sale@example.com'},op:'request',eligible:true,company:{CompanyName:'Test',Address:'Address',TaxID:'1234567890123'}};
+  let row=c.retailReceiptApproval(req).item;
+  assert.equal(row.Status,'pending');assert.equal(row.EmailStatus,'failed');assert.equal(row.EmailError,'mail quota');
+  assert.equal(sent[0].to,'boss@example.com');assert.equal(sent[0].replyTo,'sale@example.com');assert.equal(sent[0].textOnly,true);assert.match(sent[0].body,/1,070.00/);
+  fail=false;
+  assert.throws(()=>c.retailReceiptApproval({...req,op:'notify',revision:row.UpdatedAt,_actor:{email:'stranger@example.com'}}),/เฉพาะเจ้าของ/);
+  row=c.retailReceiptApproval({...req,op:'notify',revision:row.UpdatedAt}).item;
+  assert.equal(row.EmailStatus,'accepted');assert.equal(row.EmailError,'');assert.equal(records.length,1);assert.equal(sent.length,2);
+  c.retailReceiptApproval(req);assert.equal(sent.length,2);
+  assert.ok(JSON.parse(row.History).some(h=>h.action==='emailAccepted'));
+  records[0].EmailStatus=''; // existing request from before mail feature
+  row=c.retailReceiptApproval(req).item;assert.equal(row.EmailStatus,'accepted');assert.equal(sent.length,3);
+});
+
+test('mail UI distinguishes queued delivery, failure and pre-existing requests',()=>{
+  const c=runtime();
+  assert.match(c.retailApprovalEmailMessage({EmailStatus:'accepted',ApproverEmail:'boss@example.com'}),/ยังไม่ยืนยัน/);
+  assert.match(c.retailApprovalEmailMessage({EmailStatus:'failed',EmailError:'quota'}),/quota/);
+  assert.match(c.retailApprovalEmailMessage({}),/ยังไม่ได้ส่ง/);
+});

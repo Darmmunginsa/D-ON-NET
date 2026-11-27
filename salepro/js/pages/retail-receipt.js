@@ -114,7 +114,8 @@ async function loadRetailAdvance(){
     retailAdvanceRecord=result.item;const r=result.item;
     const labels={pending:'รออนุมัติ',approved:'อนุมัติให้พิมพ์แล้ว',rejected:'ไม่อนุมัติ / ยกเลิกคำขอ'};
     el.textContent=r?(labels[r.Status]||r.Status)+' · '+r.Title+' · ผู้อนุมัติ '+r.ApproverEmail:'ยังไม่มีคำขอพิมพ์ล่วงหน้า';
-    if(r){for(const entry of JSON.parse(r.History||'[]')){const line=document.createElement('small');line.style.display='block';line.textContent=({requested:'ส่งขออนุมัติ',approve:'อนุมัติ',reject:'ไม่อนุมัติ',print:'สั่งพิมพ์',withdraw:'ยกเลิกคำขอ'}[entry.action]||entry.action)+' · '+entry.by+' · '+new Date(entry.at).toLocaleString('th-TH');el.append(line);}}
+    if(r?.Status==='pending'){const mail=document.createElement('div');mail.textContent=retailApprovalEmailMessage(r);el.append(mail);const retry=document.createElement('button');retry.className='btn btn-sm';retry.textContent='ส่งอีเมลแจ้งอีกครั้ง';retry.onclick=()=>retailAdvanceAction('notify');el.append(retry);}
+    if(r){for(const entry of JSON.parse(r.History||'[]')){const line=document.createElement('small');line.style.display='block';line.textContent=({requested:'ส่งขออนุมัติ',approve:'อนุมัติ',reject:'ไม่อนุมัติ',print:'สั่งพิมพ์',withdraw:'ยกเลิกคำขอ',emailAccepted:'ระบบรับคำขอส่งอีเมลแล้ว',emailFailed:'ส่งอีเมลไม่สำเร็จ'}[entry.action]||entry.action)+' · '+entry.by+' · '+new Date(entry.at).toLocaleString('th-TH');el.append(line);}}
     document.getElementById('cpo-retail-print').disabled=!r||r.Status!=='approved';
   }catch(error){el.textContent=error.message;}
 }
@@ -125,7 +126,8 @@ async function retailAdvanceAction(op,quoteId=stQuoteId,revision){
     if(op==='request'){req.eligible=document.getElementById('cpo-retail-eligible').checked;req.company=Object.fromEntries(['CompanyName','Address','TaxID','Phone','Branch','FooterText'].map(k=>[k,companySettings[k]||'']));}
     const result=await _call(req);
     if(op==='print')printViaIframe(buildRetailReceiptHTML({...result.item,DocumentDate:''},document.getElementById('cpo-copy')?.value==='company'?'company':'customer',true));
-    toast(op==='request'?'ส่งขออนุมัติแล้ว ดูได้ที่หน้าอนุมัติ':op==='print'?'บันทึกประวัติการพิมพ์แล้ว':'บันทึกผลแล้ว','success');
+    if(op==='request'||op==='notify')toast('คำขอ'+(result.item.Status==='approved'?'อนุมัติแล้ว':': '+retailApprovalEmailMessage(result.item)),result.item.EmailStatus==='failed'?'warning':'success');
+    else toast(op==='print'?'บันทึกประวัติการพิมพ์แล้ว':'บันทึกผลแล้ว','success');
     if(String(quoteId)===String(stQuoteId))await loadRetailAdvance();
     if(typeof renderRetailApprovals==='function')await renderRetailApprovals();
   }catch(error){toast(error.message,'error');}finally{retailReceiptBusy=false;}
@@ -141,4 +143,11 @@ async function renderRetailApprovals(){
       for(const [label,action] of [['ตรวจเอกสาร','preview'],['อนุมัติ','approve'],['ไม่อนุมัติ','reject']]){const button=document.createElement('button');button.className='btn btn-sm';button.textContent=label;button.onclick=()=>action==='preview'?printViaIframe(buildRetailReceiptHTML({...record,DocumentDate:''},'company',true,true)):retailAdvanceAction(action,record.QuoteID,record.UpdatedAt);card.append(button);}box.append(card);
     }
   }catch(error){box.textContent='โหลดคำขอพิมพ์ล่วงหน้าไม่สำเร็จ: '+error.message;}
+}
+
+function retailApprovalEmailMessage(record){
+  if(record.EmailStatus==='accepted')return 'ระบบรับคำขอส่งอีเมลถึง '+record.ApproverEmail+' แล้ว (ยังไม่ยืนยันการเข้ากล่องผู้รับ)';
+  if(record.EmailStatus==='failed')return 'บันทึกคำขอแล้ว แต่อีเมลไม่สำเร็จ: '+(record.EmailError||'โปรดลองส่งอีกครั้ง');
+  if(record.EmailStatus==='sending')return 'กำลังส่งอีเมล / ยังยืนยันผลไม่ได้ กรุณาโหลดสถานะ';
+  return 'คำขอนี้ยังไม่ได้ส่งอีเมลแจ้งผู้อนุมัติ';
 }

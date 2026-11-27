@@ -219,7 +219,7 @@ function sendEmail(req) {
   var recipients = String(req.to || '').split(/[;,\n]+/).map(function (s) { return s.trim(); }).filter(Boolean);
   if (!recipients.length || recipients.some(function (s) { return !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(s); })) throw new Error('อีเมลผู้รับไม่ถูกต้อง');
   if (MailApp.getRemainingDailyQuota() < recipients.length) throw new Error('โควตาส่งอีเมลของ Apps Script ไม่เพียงพอ');
-  var isHtml = /<[a-z][\s\S]*>/i.test(req.body || '');
+  var isHtml = req.textOnly!==true && /<[a-z][\s\S]*>/i.test(req.body || '');
   var opts = { name: req.fromName || 'SalePro' };        // ชื่อผู้ส่ง = ผู้ที่ล็อกอิน (ถ้าส่งมา)
   if (req.replyTo) opts.replyTo = req.replyTo;            // ตอบกลับไปหาผู้ที่ล็อกอินโดยตรง
   // CC แจ้งเตือนกลาง (กรองเฉพาะอีเมลถูกต้อง)
@@ -927,7 +927,7 @@ function retailReceiptApproval(req){
     var now=new Date().toISOString();
     if(req.op==='request'){
       if(!owner)throw Error('เฉพาะเจ้าของงานหรือ Admin');
-      if(record&&['pending','approved'].indexOf(record.Status)>=0)return {ok:true,item:record};
+      if(record&&['pending','approved'].indexOf(record.Status)>=0){if(record.Status==='pending'&&['accepted','sending'].indexOf(record.EmailStatus)<0)retailApprovalNotify(record);return {ok:true,item:record};}
       if(!q.ApproverEmail)throw Error('ระบุผู้อนุมัติในใบเสนอราคาก่อน');
       if(!req.eligible)throw Error('ยืนยันว่าเข้าเกณฑ์ออกเอกสารอย่างย่อ');
       var company={},input=req.company||{};['CompanyName','Address','TaxID','Phone','Branch','FooterText'].forEach(function(k){company[k]=String(input[k]||'').slice(0,2000);});
@@ -936,6 +936,7 @@ function retailReceiptApproval(req){
       record={id:record?record.id:_uuid(),QuoteID:q.id,Title:'AR-'+q.Title,Status:'pending',ApproverEmail:String(q.ApproverEmail).toLowerCase(),Snapshot:snapshot,RequestedBy:email,RequestedAt:now,History:JSON.stringify(JSON.parse(record&&record.History||'[]').concat([{action:'requested',by:email,at:now}]))};
     }else{
       if(!record||String(req.revision)!==String(record.UpdatedAt))throw Error('ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่');
+      if(req.op==='notify'){if(!owner||record.Status!=='pending')throw Error('เฉพาะเจ้าของงานหรือ Admin ส่งแจ้งเตือนคำขอที่รออนุมัติได้');retailApprovalNotify(record);return {ok:true,item:record};}
       var history=JSON.parse(record.History||'[]');
       if(req.op==='withdraw'){
         if(!owner)throw Error('เฉพาะเจ้าของงานหรือ Admin');record.Status='rejected';
@@ -951,6 +952,27 @@ function retailReceiptApproval(req){
       }else throw Error('ขั้นตอนไม่ถูกต้อง');
       history.push({action:req.op,by:email,at:now});record.History=JSON.stringify(history);
     }
-    record.UpdatedAt=now;retailApprovalWrite(record);return {ok:true,item:record};
+    record.UpdatedAt=now;retailApprovalWrite(record);if(req.op==='request')retailApprovalNotify(record);return {ok:true,item:record};
   }finally{lock.releaseLock();}
+}
+
+function retailApprovalNotify(record){
+  var snapshot=JSON.parse(record.Snapshot),history=JSON.parse(record.History||'[]');
+  var now=new Date().toISOString();
+  record.EmailStatus='sending';record.EmailError='';record.EmailAttemptAt=now;record.UpdatedAt=now;
+  retailApprovalWrite(record);
+  try{
+    var body='มีคำขออนุมัติพิมพ์ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อแบบเว้นวันที่\n\n'
+      +'เอกสาร: '+record.Title+'\nใบเสนอราคา: '+snapshot.quote.Title+'\nลูกค้า: '+snapshot.quote.ClientName
+      +'\nยอดรวม VAT: '+Number(snapshot.totals.gross).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2})+' บาท'
+      +'\nผู้ขอ: '+record.RequestedBy+'\n\nกรุณาเข้าสู่ SalePro > หน้าอนุมัติ > ขอพิมพ์ใบเสร็จอย่างย่อเว้นวันที่ เพื่อตรวจเอกสารและอนุมัติหรือปฏิเสธ'
+      +'\nhttps://darmmunginsa.github.io/D-ON-NET/salepro/\n\nคำขอนี้ยังไม่ใช่การรับชำระหรือบันทึก VAT จากเอกสาร';
+    sendEmail({textOnly:true,to:record.ApproverEmail,replyTo:record.RequestedBy,subject:'[SalePro] ขออนุมัติพิมพ์เว้นวันที่ '+record.Title,body:body});
+    record.EmailStatus='accepted';record.EmailAcceptedAt=new Date().toISOString();
+    history.push({action:'emailAccepted',by:record.ApproverEmail,at:record.EmailAcceptedAt});
+  }catch(error){
+    record.EmailStatus='failed';record.EmailError=String(error.message||error).slice(0,1000);
+    history.push({action:'emailFailed',by:record.ApproverEmail,at:new Date().toISOString()});
+  }
+  record.History=JSON.stringify(history);record.UpdatedAt=new Date().toISOString();retailApprovalWrite(record);
 }
