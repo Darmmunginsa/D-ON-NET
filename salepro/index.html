@@ -161,7 +161,7 @@
     <dialog id="draft-delete-dialog" aria-labelledby="draft-delete-heading" class="draft-action-dialog"><h3 id="draft-delete-heading">ลบ Draft</h3><p id="draft-delete-text"></p><p id="draft-delete-error" role="status"></p><div><button type="button" class="btn" id="draft-delete-cancel">ยกเลิก</button><button type="button" class="btn btn-danger" id="draft-delete-confirm">ลบ Draft</button></div></dialog>
     <div class="content">
       <!-- DASHBOARD -->
-      <div class="page active" id="page-dashboard">
+      <div class="page active" id="page-dashboard"><div id="retail-dashboard-approvals" class="card" style="padding:14px;margin-bottom:14px" role="status"></div>
         <div class="stats-grid">
           <div class="stat blue"><div class="stat-label">ใบเสนอราคาทั้งหมด</div><div class="stat-value" id="d-total">—</div><div class="stat-sub">เดือนนี้</div></div>
           <div class="stat amber"><div class="stat-label">รอการอนุมัติ</div><div class="stat-value" id="d-pending">—</div><div class="stat-sub">รายการ</div></div>
@@ -489,7 +489,8 @@
 
       <!-- APPROVE -->
       <div class="page" id="page-approve">
-        <div id="approve-list"></div>
+        <section class="card" style="padding:16px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><h3>ใบเสร็จอย่างย่อ · ขอพิมพ์เว้นวันที่</h3><button class="btn btn-sm" onclick="renderRetailApprovals()">โหลดคำขอล่าสุด</button></div><p style="color:var(--muted)">ตรวจคำขอด้านล่าง · หลังอนุมัติกด “พิมพ์เว้นวันที่” ได้จากรายการนี้</p><div id="retail-approval-list" role="status"></div></section>
+        <h3>ใบเสนอราคารออนุมัติ</h3><div id="approve-list"></div>
       </div>
 
       <!-- PAYMENT -->
@@ -1676,9 +1677,9 @@
 <script src="js/api.js?v=recover20261123"></script>
 <script src="js/sync.js?v=billingeditor20261108"></script>
 <script src="js/pages/ui.js?v=billingeditor20261108"></script>
-<script src="js/pages/dashboard.js?v=cancel20261103"></script>
+<script src="js/pages/dashboard.js?v=retailvisible20261127"></script>
 <script src="../shared/travel-cost.js?v=routepin20261108"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=customsite20261112"></script><script src="js/pages/quotes.js?v=individual20261126"></script>
-<script src="js/pages/approve.js?v=advance20261127"></script>
+<script src="js/pages/approve.js?v=retailvisible20261127"></script>
 <script src="js/pages/payment.js?v=taxdocuments20261115"></script>
 <script src="js/pages/catalog.js?v=baseprice20261111"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
 <script src="js/pages/settings.js?v=individual20261126"></script>
@@ -1690,7 +1691,7 @@
 <script src="js/pages/purchase-expenses.js?v=whtcertificate20261115"></script>
 <script src="js/pages/saletracker.js?v=advance20261127"></script>
 <script src="../shared/billing-core.js?v=inclusive20261126"></script>
-<script src="js/pages/retail-receipt.js?v=advancemail20261127"></script>
+<script src="js/pages/retail-receipt.js?v=retailvisible20261127"></script>
 <script src="js/pages/billing.js?v=billingbaskets20261108"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>

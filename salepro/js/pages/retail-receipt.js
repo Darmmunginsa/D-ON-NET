@@ -112,6 +112,7 @@ async function loadRetailAdvance(){
   el.textContent='กำลังโหลดสถานะเอกสารล่วงหน้า…';
   try{const result=await _call({action:'retailReceiptApproval',op:'get',quoteId});if(String(stQuoteId)!==String(quoteId))return;
     retailAdvanceRecord=result.item;const r=result.item;
+    if(r){const section=document.getElementById('cpo-retail-section');if(section)section.open=true;}
     const labels={pending:'รออนุมัติ',approved:'อนุมัติให้พิมพ์แล้ว',rejected:'ไม่อนุมัติ / ยกเลิกคำขอ'};
     el.textContent=r?(labels[r.Status]||r.Status)+' · '+r.Title+' · ผู้อนุมัติ '+r.ApproverEmail:'ยังไม่มีคำขอพิมพ์ล่วงหน้า';
     if(r?.Status==='pending'){const mail=document.createElement('div');mail.textContent=retailApprovalEmailMessage(r);el.append(mail);const retry=document.createElement('button');retry.className='btn btn-sm';retry.textContent='ส่งอีเมลแจ้งอีกครั้ง';retry.onclick=()=>retailAdvanceAction('notify');el.append(retry);}
@@ -119,30 +120,51 @@ async function loadRetailAdvance(){
     document.getElementById('cpo-retail-print').disabled=!r||r.Status!=='approved';
   }catch(error){el.textContent=error.message;}
 }
-async function retailAdvanceAction(op,quoteId=stQuoteId,revision){
+async function retailAdvanceAction(op,quoteId=stQuoteId,revision,copy){
   if(retailReceiptBusy)return;retailReceiptBusy=true;
   try{
     const req={action:'retailReceiptApproval',op,quoteId,revision:revision||retailAdvanceRecord?.UpdatedAt};
     if(op==='request'){req.eligible=document.getElementById('cpo-retail-eligible').checked;req.company=Object.fromEntries(['CompanyName','Address','TaxID','Phone','Branch','FooterText'].map(k=>[k,companySettings[k]||'']));}
     const result=await _call(req);
-    if(op==='print')printViaIframe(buildRetailReceiptHTML({...result.item,DocumentDate:''},document.getElementById('cpo-copy')?.value==='company'?'company':'customer',true));
+    if(op==='print')printViaIframe(buildRetailReceiptHTML({...result.item,DocumentDate:''},(copy||document.getElementById('cpo-copy')?.value)==='company'?'company':'customer',true));
     if(op==='request'||op==='notify')toast('คำขอ'+(result.item.Status==='approved'?'อนุมัติแล้ว':': '+retailApprovalEmailMessage(result.item)),result.item.EmailStatus==='failed'?'warning':'success');
     else toast(op==='print'?'บันทึกประวัติการพิมพ์แล้ว':'บันทึกผลแล้ว','success');
     if(String(quoteId)===String(stQuoteId))await loadRetailAdvance();
     if(typeof renderRetailApprovals==='function')await renderRetailApprovals();
   }catch(error){toast(error.message,'error');}finally{retailReceiptBusy=false;}
 }
+let retailApprovalPendingCount=0;
+let retailApprovalLoadGeneration=0;
 async function renderRetailApprovals(){
-  const host=document.getElementById('approve-list');if(!host)return;
-  let box=document.getElementById('retail-approval-list');if(!box){box=document.createElement('div');box.id='retail-approval-list';host.prepend(box);}
+  const box=document.getElementById('retail-approval-list');if(!box)return;
+  const generation=++retailApprovalLoadGeneration,account=String(currentUser?.email||'').trim().toLowerCase();
   box.textContent='กำลังโหลดคำขอพิมพ์เอกสารล่วงหน้า…';
-  try{const result=await _call({action:'retailReceiptApproval',op:'pending'});box.replaceChildren();
-    const empty=host.querySelector('.empty');if(empty)empty.hidden=!!result.items?.length;
-    for(const record of result.items||[]){const card=document.createElement('div');card.className='card';card.style.padding='16px';
-      const snapshot=JSON.parse(record.Snapshot),title=document.createElement('p');title.textContent='ขอพิมพ์ใบเสร็จอย่างย่อเว้นวันที่ · '+record.Title+' · '+snapshot.quote.ClientName+' · '+Number(snapshot.totals.gross).toLocaleString('th-TH')+' บาท';card.append(title);
-      for(const [label,action] of [['ตรวจเอกสาร','preview'],['อนุมัติ','approve'],['ไม่อนุมัติ','reject']]){const button=document.createElement('button');button.className='btn btn-sm';button.textContent=label;button.onclick=()=>action==='preview'?printViaIframe(buildRetailReceiptHTML({...record,DocumentDate:''},'company',true,true)):retailAdvanceAction(action,record.QuoteID,record.UpdatedAt);card.append(button);}box.append(card);
+  try{
+    const result=await _call({action:'retailReceiptApproval',op:'pending'});
+    if(generation!==retailApprovalLoadGeneration||account!==String(currentUser?.email||'').trim().toLowerCase())return;
+    const records=result.items||[];retailApprovalPendingCount=records.filter(r=>r.Status==='pending').length;
+    if(typeof updateBadge==='function')updateBadge();
+    box.replaceChildren();
+    const summary=document.getElementById('retail-dashboard-approvals');
+    if(summary){summary.replaceChildren();const text=document.createElement('p');text.textContent='ใบเสร็จอย่างย่อ · รออนุมัติ '+retailApprovalPendingCount+' รายการ · อนุมัติให้พิมพ์แล้ว '+records.filter(r=>r.Status==='approved').length+' รายการ';summary.append(text);const button=document.createElement('button');button.className='btn btn-sm';button.textContent='ตรวจคำขอ / พิมพ์เอกสาร';button.onclick=()=>showPage('approve');summary.append(button);}
+    if(!records.length){box.textContent='ไม่มีคำขอพิมพ์ล่วงหน้าที่เกี่ยวข้องกับบัญชีนี้';return;}
+    for(const record of records){
+      const card=document.createElement('div');card.className='card';card.style.padding='16px';card.style.marginBottom='10px';
+      const snapshot=JSON.parse(record.Snapshot),title=document.createElement('p');title.textContent=(record.Status==='approved'?'✓ อนุมัติให้พิมพ์แล้ว':'รออนุมัติ')+' · '+record.Title+' · '+snapshot.quote.ClientName+' · '+Number(snapshot.totals.gross).toLocaleString('th-TH')+' บาท';card.append(title);
+      const recipient=document.createElement('p');recipient.textContent='ผู้อนุมัติ: '+record.ApproverEmail;card.append(recipient);
+      const mayDecide=account===String(record.ApproverEmail||'').trim().toLowerCase()||account==='admin@dongroups.com';
+      const actions=record.Status==='approved'?[['พิมพ์เว้นวันที่','print']]:[['ตรวจเอกสาร','preview'],...(mayDecide?[['อนุมัติ','approve'],['ไม่อนุมัติ','reject']]:[])];
+      const copySelect=document.createElement('select');copySelect.setAttribute('aria-label','สำเนาที่ต้องการพิมพ์');for(const [value,label] of [['customer','ต้นฉบับลูกค้า'],['company','สำเนาบริษัท']]){const option=document.createElement('option');option.value=value;option.textContent=label;copySelect.append(option);}if(record.Status==='approved')card.append(copySelect);
+      for(const [label,action] of actions){const button=document.createElement('button');button.className='btn btn-sm'+(action==='print'?' btn-primary':'');button.textContent=label;
+        button.onclick=()=>action==='preview'?printViaIframe(buildRetailReceiptHTML({...record,DocumentDate:''},'company',true,true)):retailAdvanceAction(action,record.QuoteID,record.UpdatedAt,copySelect.value||'customer');card.append(button);}
+      if(record.Status==='approved'){const hint=document.createElement('small');hint.style.display='block';hint.textContent='เลือกพิมพ์ได้ทันที หรือเปิดงานขาย > PO ลูกค้า > ใบเสร็จอย่างย่อ > พิมพ์เว้นวันที่';card.append(hint);}
+      box.append(card);
     }
-  }catch(error){box.textContent='โหลดคำขอพิมพ์ล่วงหน้าไม่สำเร็จ: '+error.message;}
+  }catch(error){
+    if(generation!==retailApprovalLoadGeneration)return;
+    box.textContent='โหลดคำขอพิมพ์ล่วงหน้าไม่สำเร็จ: '+error.message+' · กรุณาตรวจว่า Deploy Apps Script รุ่นล่าสุดแล้ว';
+    const summary=document.getElementById('retail-dashboard-approvals');if(summary)summary.textContent=box.textContent;
+  }
 }
 
 function retailApprovalEmailMessage(record){

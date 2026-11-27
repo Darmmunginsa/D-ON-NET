@@ -121,7 +121,7 @@ function renderSalesReport() {
 }
 
 function updateBadge() {
-  const n = pendingApprovalsForUser().length;
+  const n = pendingApprovalsForUser().length+(typeof retailApprovalPendingCount==='number'?retailApprovalPendingCount:0);
   document.getElementById('badge-approve').textContent = n;
 }
 

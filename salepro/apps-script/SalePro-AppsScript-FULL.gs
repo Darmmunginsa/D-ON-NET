@@ -912,17 +912,17 @@ function retailApprovalSnapshot(q,company){
   return JSON.stringify({quote:{Title:q.Title,ClientName:q.ClientName,PricingMode:q.PricingMode},company:company,totals:{subtotal:sub,discount:discount,base:base,vat:vat,gross:gross,lines:lines}});
 }
 function retailReceiptApproval(req){
-  var email=String(req._actor&&req._actor.email||'').toLowerCase();if(!email)throw Error('เข้าสู่ระบบก่อน');
+  var email=String(req._actor&&req._actor.email||'').trim().toLowerCase();if(!email)throw Error('เข้าสู่ระบบก่อน');
   var records=listRows('RetailReceiptApprovals');
-  if(req.op==='pending')return {ok:true,items:records.filter(function(r){return r.Status==='pending'&&(String(r.ApproverEmail).toLowerCase()===email||email==='admin@dongroups.com');})};
+  if(req.op==='pending'){var issued=listRows('SalesTaxInvoices');return {ok:true,items:records.filter(function(r){return !issued.some(function(i){return String(i.QuoteID)===String(r.QuoteID);})&&['pending','approved'].indexOf(r.Status)>=0&&(String(r.ApproverEmail).trim().toLowerCase()===email||String(r.RequestedBy).trim().toLowerCase()===email||email==='admin@dongroups.com');})};}
   var lock=LockService.getScriptLock();lock.waitLock(20000);
   try{
     records=listRows('RetailReceiptApprovals');
     var q=listRows('Quotations').find(function(r){return String(r.id)===String(req.quoteId);});
     if(!q||q.Status==='Cancelled')throw Error('ไม่พบงานหรือถูกยกเลิกแล้ว');
-    var owner=email==='admin@dongroups.com'||email===String(q.SaleEmail||'').toLowerCase();
+    var owner=email==='admin@dongroups.com'||email===String(q.SaleEmail||'').trim().toLowerCase();
     var record=records.find(function(r){return String(r.QuoteID)===String(q.id);});
-    if(req.op==='get'){if(!owner&&email!==String(q.ApproverEmail||'').toLowerCase())throw Error('ไม่มีสิทธิ');return {ok:true,item:record||null};}
+    if(req.op==='get'){if(!owner&&email!==String(q.ApproverEmail||'').trim().toLowerCase())throw Error('ไม่มีสิทธิ');return {ok:true,item:record||null};}
     if(listRows('SalesTaxInvoices').some(function(r){return String(r.QuoteID)===String(q.id);}))throw Error('งานนี้ออกใบกำกับภาษีแล้ว กรุณาเปิดเอกสารเดิม');
     var now=new Date().toISOString();
     if(req.op==='request'){
@@ -933,7 +933,7 @@ function retailReceiptApproval(req){
       var company={},input=req.company||{};['CompanyName','Address','TaxID','Phone','Branch','FooterText'].forEach(function(k){company[k]=String(input[k]||'').slice(0,2000);});
       if(!company.CompanyName||!company.Address||!/^\d{13}$/.test(company.TaxID.replace(/\D/g,'')))throw Error('ข้อมูลบริษัทไม่ครบ');
       var snapshot=retailApprovalSnapshot(q,company);if(snapshot.length>45000)throw Error('รายการยาวเกินไป');
-      record={id:record?record.id:_uuid(),QuoteID:q.id,Title:'AR-'+q.Title,Status:'pending',ApproverEmail:String(q.ApproverEmail).toLowerCase(),Snapshot:snapshot,RequestedBy:email,RequestedAt:now,History:JSON.stringify(JSON.parse(record&&record.History||'[]').concat([{action:'requested',by:email,at:now}]))};
+      record={id:record?record.id:_uuid(),QuoteID:q.id,Title:'AR-'+q.Title,Status:'pending',ApproverEmail:String(q.ApproverEmail).trim().toLowerCase(),Snapshot:snapshot,RequestedBy:email,RequestedAt:now,History:JSON.stringify(JSON.parse(record&&record.History||'[]').concat([{action:'requested',by:email,at:now}]))};
     }else{
       if(!record||String(req.revision)!==String(record.UpdatedAt))throw Error('ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่');
       if(req.op==='notify'){if(!owner||record.Status!=='pending')throw Error('เฉพาะเจ้าของงานหรือ Admin ส่งแจ้งเตือนคำขอที่รออนุมัติได้');retailApprovalNotify(record);return {ok:true,item:record};}
@@ -941,12 +941,12 @@ function retailReceiptApproval(req){
       if(req.op==='withdraw'){
         if(!owner)throw Error('เฉพาะเจ้าของงานหรือ Admin');record.Status='rejected';
       }else if(req.op==='approve'||req.op==='reject'){
-        if(record.Status!=='pending'||(email!==String(record.ApproverEmail).toLowerCase()&&email!=='admin@dongroups.com'))throw Error('เฉพาะผู้อนุมัติที่กำหนดหรือ Admin');
+        if(record.Status!=='pending'||(email!==String(record.ApproverEmail).trim().toLowerCase()&&email!=='admin@dongroups.com'))throw Error('เฉพาะผู้อนุมัติที่กำหนดหรือ Admin');
         var old=JSON.parse(record.Snapshot),fresh=JSON.parse(retailApprovalSnapshot(q,old.company));
         if(req.op==='approve'&&JSON.stringify(old)!==JSON.stringify(fresh))throw Error('รายละเอียดงานเปลี่ยน ต้องส่งขออนุมัติใหม่');
         record.Status=req.op==='approve'?'approved':'rejected';record.DecidedBy=email;record.DecidedAt=now;
       }else if(req.op==='print'){
-        if(!owner||record.Status!=='approved')throw Error('ต้องได้รับอนุมัติก่อนพิมพ์');
+        if((!owner&&email!==String(record.ApproverEmail).trim().toLowerCase())||record.Status!=='approved')throw Error('ต้องได้รับอนุมัติก่อนพิมพ์');
         var old=JSON.parse(record.Snapshot),fresh=JSON.parse(retailApprovalSnapshot(q,old.company));
         if(JSON.stringify(old)!==JSON.stringify(fresh))throw Error('รายละเอียดงานเปลี่ยน ต้องขออนุมัติใหม่');
       }else throw Error('ขั้นตอนไม่ถูกต้อง');

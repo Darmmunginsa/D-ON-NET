@@ -151,3 +151,34 @@ test('mail UI distinguishes queued delivery, failure and pre-existing requests',
   assert.match(c.retailApprovalEmailMessage({EmailStatus:'failed',EmailError:'quota'}),/quota/);
   assert.match(c.retailApprovalEmailMessage({}),/ยังไม่ได้ส่ง/);
 });
+
+
+test('assigned approver sees pending and approved requests including legacy email whitespace and may print approved copy',()=>{
+  const source=fs.readFileSync('salepro/apps-script/Code.gs','utf8');
+  const q={id:'q',Title:'TEST',TotalAmount:1070,PricingMode:'inclusive',SaleEmail:'sale@example.com'};
+  let rows=[],issued=[];
+  const c=vm.createContext({LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},listRows:n=>n==='RetailReceiptApprovals'?rows:n==='Quotations'?[q]:n==='QuoteItems'?[{QuoteID:'q',Title:'Service',Quantity:1,UnitPrice:1070}]:n==='SalesTaxInvoices'?issued:[]});
+  vm.runInContext(source.slice(source.indexOf('// Advance retail receipt printing')),c);
+  const snapshot=c.retailApprovalSnapshot(q,{});
+  rows=[{id:'a',QuoteID:'q',Status:'approved',ApproverEmail:' BOSS@EXAMPLE.COM ',RequestedBy:'sale@example.com',UpdatedAt:'v1',Snapshot:snapshot,History:'[]'}];
+  c.retailApprovalWrite=r=>{rows=[JSON.parse(JSON.stringify(r))];};
+  assert.equal(c.retailReceiptApproval({op:'pending',_actor:{email:'boss@example.com'}}).items.length,1);
+  assert.equal(c.retailReceiptApproval({op:'pending',_actor:{email:'stranger@example.com'}}).items.length,0);
+  const result=c.retailReceiptApproval({op:'print',quoteId:'q',revision:'v1',_actor:{email:'boss@example.com'}});
+  assert.equal(result.item.Status,'approved');assert.equal(JSON.parse(result.item.History).at(-1).action,'print');
+  issued=[{QuoteID:'q'}];assert.equal(c.retailReceiptApproval({op:'pending',_actor:{email:'boss@example.com'}}).items.length,0);
+});
+
+test('receipt queue shows on dedicated approval panel and dashboard, updates badge, and prints after approval',async()=>{
+  class Element{constructor(tag){this.tag=tag;this.children=[];this.style={};this.value='';}append(e){this.children.push(e);}replaceChildren(){this.children=[];}setAttribute(){}}
+  const box=new Element('div'),summary=new Element('div'),c=runtime();
+  c.document={getElementById:id=>({'retail-approval-list':box,'retail-dashboard-approvals':summary}[id]||null),createElement:tag=>new Element(tag)};
+  c.currentUser={email:'boss@example.com'};c.stQuoteId='other';c.toast=()=>{};
+  let badges=0,html='',requests=[];c.updateBadge=()=>badges++;c.printViaIframe=value=>html=value;
+  const q={Title:'TEST',ClientName:'Test',PricingMode:'inclusive',TotalAmount:1070};
+  const record={QuoteID:'q',Title:'AR-TEST',Status:'approved',ApproverEmail:'boss@example.com',UpdatedAt:'v1',Snapshot:JSON.stringify({quote:q,company:{},totals:c.retailReceiptTotals(q,[{Title:'Service',Quantity:1,UnitPrice:1070}])})};
+  c._call=async req=>{requests.push(req);return req.op==='pending'?{items:[{...record,Status:'pending'},record]}:{item:record};};
+  await c.renderRetailApprovals();assert.equal(box.children.length,2);assert.ok(badges>0);assert.match(summary.children[0].textContent,/รออนุมัติ 1/);
+  const button=box.children[1].children.find(e=>e.textContent==='พิมพ์เว้นวันที่');assert.ok(button);await button.onclick();
+  assert.equal(requests.find(r=>r.op==='print').quoteId,'q');assert.match(html,/ต้นฉบับลูกค้า/);assert.match(html,/____/);
+});
