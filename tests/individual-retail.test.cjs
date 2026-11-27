@@ -219,3 +219,14 @@ test('repairs legacy blank IDs using latest request per quote, preserves raw aud
   c.retailApprovalWrite({...records.find(r=>r.id==='b'),Status:'approved'});
   assert.equal(cells.length,6);assert.equal(c.listRows('RetailReceiptApprovals').find(r=>r.id==='b').Status,'approved');
 });
+
+
+test('receipt logo uses company settings for existing approvals, respects snapshot logo and rejects unsafe images',()=>{
+  const c=runtime(),q={Title:'TEST',TotalAmount:1070,PricingMode:'inclusive'},totals=c.retailReceiptTotals(q,[{Title:'Service',Quantity:1,UnitPrice:1070}]);
+  const make=company=>({Title:'AR-TEST',DocumentDate:'2026-11-27',Snapshot:JSON.stringify({quote:q,company,totals})});
+  c.companySettings={LogoURL:'https://example.com/logo.png'};
+  for(const copy of ['customer','company']){const html=c.buildRetailReceiptHTML(make({}),copy,true);assert.match(html,/class="company-logo" src="https:\/\/example.com\/logo.png"/);assert.match(html,/max-width:190px;max-height:72px/);}
+  assert.match(c.buildRetailReceiptHTML(make({LogoURL:'https://example.com/saved.png'})),/src="https:\/\/example.com\/saved.png"/);
+  c.companySettings={LogoURL:'javascript:alert(1)'};assert.doesNotMatch(c.buildRetailReceiptHTML(make({})),/<img/);
+  c.companySettings={LogoBase64:'data:image/png;base64,aGVsbG8='};assert.match(c.buildRetailReceiptHTML(make({}), 'company',true,true),/src="data:image\/png;base64,aGVsbG8="/);
+});

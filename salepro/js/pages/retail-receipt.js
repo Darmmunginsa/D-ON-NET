@@ -20,6 +20,9 @@ function retailReceiptTotals(quote,items){
 function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=false){
   const snapshot=JSON.parse(invoice.Snapshot);
   const {quote,company,totals}=snapshot;
+  // Older receipt snapshots predate logo support; use the saved company settings.
+  const branding=typeof companySettings==='object'&&companySettings?companySettings:{};
+  const logo=[company.LogoBase64,company.LogoURL,branding.LogoBase64,branding.LogoURL].find(value=>typeof value==='string'&&(/^[Hh][Tt][Tt][Pp][Ss]:\/\//.test(value)||/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(value)))||'';
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const money=value=>Number(value).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
   const inclusive=quote.PricingMode==='inclusive';
@@ -32,7 +35,7 @@ function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=fal
     <style>
       @page{size:A4;margin:16mm}*{box-sizing:border-box}body{margin:0 auto;padding:20px;max-width:850px;color:#162b40;font:14px/1.6 Tahoma,"Leelawadee UI",sans-serif}
       header{display:flex;justify-content:space-between;gap:24px;border-bottom:3px solid #173e60;padding-bottom:18px}
-      h1{font-size:23px;margin:0}h2{font-size:20px;margin:25px 0 4px}p{margin:4px 0}.company{max-width:65%}
+      .company-logo{display:block;max-width:190px;max-height:72px;width:auto;height:auto;object-fit:contain;margin-bottom:10px}h1{font-size:23px;margin:0}h2{font-size:20px;margin:25px 0 4px}p{margin:4px 0}.company{max-width:65%}
       .copy{font-size:13px;text-align:right;color:#526b7e}.meta{display:flex;justify-content:space-between;margin:18px 0}
       table{width:100%;border-collapse:collapse;margin:18px 0}thead{display:table-header-group;background:#173e60;color:#fff}
       th,td{padding:10px 8px;border-bottom:1px solid #ccd6de;vertical-align:top}th{text-align:left}tr{break-inside:avoid}
@@ -40,7 +43,7 @@ function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=fal
       .grand{font-size:18px;font-weight:bold;background:#eaf1f6}.words{padding:12px;background:#f2f6f9;text-align:center}
       footer{margin-top:32px;border-top:1px solid #ccd6de;padding-top:12px} .signature{margin-top:40px;text-align:right}@media print{body{padding:0;max-width:none}}
     </style></head><body>
-    <header><div class="company"><h1>${esc(company.CompanyName)}</h1><p>${esc(company.Address)}</p>
+    <header><div class="company">${logo?'<img class="company-logo" src="'+esc(logo)+'" alt="โลโก้บริษัท">':''}<h1>${esc(company.CompanyName)}</h1><p>${esc(company.Address)}</p>
     <p>เลขประจำตัวผู้เสียภาษี ${esc(company.TaxID)} · ${esc(company.Branch||'สำนักงานใหญ่')}</p><p>โทร. ${esc(company.Phone)}</p></div>
     <div class="copy">${copy==='company'?'สำเนาบริษัท':'ต้นฉบับลูกค้า'}<br>เลขที่ ${esc(invoice.Title)}</div></header>
     ${review?'<p style="border:2px solid #be123c;padding:12px;color:#be123c">ฉบับตรวจสอบ — ยังไม่อนุมัติให้ใช้รับเงิน</p>':''}<h2>ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ</h2><small>RECEIPT / ABBREVIATED TAX INVOICE</small>
