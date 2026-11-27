@@ -105,6 +105,7 @@ test('advance approval enforces assigned actor, revision, stale quote and print 
   const items=[{Title:'Service',QuoteID:'q',Quantity:1,UnitPrice:1070}];let records=[],released=0;
   const c=vm.createContext({console,LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){released++;}})},_uuid:()=> 'approval-q',listRows:name=>name==='Quotations'?[quote]:name==='QuoteItems'?items:name==='RetailReceiptApprovals'?records:[]});
   vm.runInContext(source.slice(source.indexOf('// Advance retail receipt printing')),c);
+  c.retailApprovalRepair=()=>{};
   c.retailApprovalWrite=r=>{records=[JSON.parse(JSON.stringify(r))];};
   const req={quoteId:'q',_actor:{email:'sale@example.com'},op:'request',eligible:true,company:{CompanyName:'Test',Address:'Address',TaxID:'1234567890123'}};
   let row=c.retailReceiptApproval(req).item;assert.equal(row.Status,'pending');
@@ -130,6 +131,7 @@ test('request emails assigned approver once, preserves failed request, and retri
   let records=[],sent=[],fail=true;
   const c=vm.createContext({LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){}})},_uuid:()=> 'approval-q',listRows:name=>name==='Quotations'?[q]:name==='QuoteItems'?[{Title:'Service',QuoteID:'q',Quantity:1,UnitPrice:1070}]:name==='RetailReceiptApprovals'?records:[],sendEmail:mail=>{assert.equal(records[0].Status,'pending');assert.equal(records[0].EmailStatus,'sending');sent.push(mail);if(fail)throw Error('mail quota');}});
   vm.runInContext(source.slice(source.indexOf('// Advance retail receipt printing')),c);
+  c.retailApprovalRepair=()=>{};
   c.retailApprovalWrite=r=>{records=[JSON.parse(JSON.stringify(r))];};
   const req={quoteId:'q',_actor:{email:'sale@example.com'},op:'request',eligible:true,company:{CompanyName:'Test',Address:'Address',TaxID:'1234567890123'}};
   let row=c.retailReceiptApproval(req).item;
@@ -161,6 +163,7 @@ test('assigned approver sees pending and approved requests including legacy emai
   vm.runInContext(source.slice(source.indexOf('// Advance retail receipt printing')),c);
   const snapshot=c.retailApprovalSnapshot(q,{});
   rows=[{id:'a',QuoteID:'q',Status:'approved',ApproverEmail:' BOSS@EXAMPLE.COM ',RequestedBy:'sale@example.com',UpdatedAt:'v1',Snapshot:snapshot,History:'[]'}];
+  c.retailApprovalRepair=()=>{};
   c.retailApprovalWrite=r=>{rows=[JSON.parse(JSON.stringify(r))];};
   assert.equal(c.retailReceiptApproval({op:'pending',_actor:{email:'boss@example.com'}}).items.length,1);
   assert.equal(c.retailReceiptApproval({op:'pending',_actor:{email:'stranger@example.com'}}).items.length,0);
@@ -181,4 +184,38 @@ test('receipt queue shows on dedicated approval panel and dashboard, updates bad
   await c.renderRetailApprovals();assert.equal(box.children.length,2);assert.ok(badges>0);assert.match(summary.children[0].textContent,/รออนุมัติ 1/);
   const button=box.children[1].children.find(e=>e.textContent==='พิมพ์เว้นวันที่');assert.ok(button);await button.onclick();
   assert.equal(requests.find(r=>r.op==='print').quoteId,'q');assert.match(html,/ต้นฉบับลูกค้า/);assert.match(html,/____/);
+});
+
+
+function sheetRuntime(initial=[]){
+  const source=fs.readFileSync('salepro/apps-script/Code.gs','utf8'),cells=initial.map(r=>r.slice());
+  const sheet={getLastRow:()=>cells.length,getLastColumn:()=>Math.max(0,...cells.map(r=>r.length)),getRange:(row,col,height=1,width=1)=>({getValues:()=>Array.from({length:height},(_,r)=>Array.from({length:width},(_,c)=>cells[row+r-1]?.[col+c-1]??'')),setNumberFormat(){return this;},setValues(values){for(let r=0;r<height;r++){cells[row+r-1]??=[];for(let c=0;c<width;c++)cells[row+r-1][col+c-1]=values[r][c];}return this;}})};
+  const c=vm.createContext({ID_COL:'_id',_sheet:()=>sheet});
+  vm.runInContext(source.slice(source.indexOf('function _headers('),source.indexOf('function _uuid(')),c);
+  vm.runInContext(source.slice(source.indexOf('function listRows('),source.indexOf('function createRow(')),c);
+  vm.runInContext(source.slice(source.indexOf('function _findRowIndex('),source.indexOf('function updateRow(')),c);
+  vm.runInContext(source.slice(source.indexOf('// Advance retail receipt printing')),c);
+  return {c,cells};
+}
+
+test('real sheet write uses canonical ID so listRows returns emailed requests and updates same row',()=>{
+  const {c,cells}=sheetRuntime([['_id']]);
+  const record={id:'approval-q',QuoteID:'q',Snapshot:'{}',Status:'pending',EmailStatus:'sending'};
+  c.retailApprovalWrite(record);
+  assert.equal(cells[1][0],'approval-q');assert.equal(c.listRows('RetailReceiptApprovals').length,1);
+  c.retailApprovalWrite({...record,EmailStatus:'accepted'});
+  assert.equal(cells.length,2);assert.equal(c.listRows('RetailReceiptApprovals')[0].EmailStatus,'accepted');
+});
+
+test('repairs legacy blank IDs using latest request per quote, preserves raw audit rows, and is idempotent',()=>{
+  const header=['_id','id','QuoteID','Snapshot','Status','EmailStatus'];
+  const {c,cells}=sheetRuntime([header,['','a','q','{}','pending',''],['','a','q','{}','pending','sending'],['','a','q','{}','pending','accepted'],['','b','q','{}','pending','accepted'],['','c','other','{}','pending','accepted']]);
+  assert.equal(c.listRows('RetailReceiptApprovals').length,0);
+  c.retailApprovalRepair();
+  const records=c.listRows('RetailReceiptApprovals');assert.equal(records.length,2);
+  assert.equal(records.find(r=>r.QuoteID==='q').id,'b');assert.equal(records.find(r=>r.QuoteID==='q').EmailStatus,'accepted');
+  assert.equal(cells.length,6);assert.equal(cells[1][0],'');
+  c.retailApprovalRepair();assert.equal(c.listRows('RetailReceiptApprovals').length,2);
+  c.retailApprovalWrite({...records.find(r=>r.id==='b'),Status:'approved'});
+  assert.equal(cells.length,6);assert.equal(c.listRows('RetailReceiptApprovals').find(r=>r.id==='b').Status,'approved');
 });

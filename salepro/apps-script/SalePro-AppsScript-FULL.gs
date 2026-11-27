@@ -899,7 +899,16 @@ function srProtectGeneric(req){
 function retailApprovalWrite(record){
   var sh=_sheet('RetailReceiptApprovals'),hdr=_ensureCols(sh,[ID_COL].concat(Object.keys(record))),idx=_findRowIndex(sh,record.id);
   if(idx<0)idx=sh.getLastRow()+1;
-  var range=sh.getRange(idx,1,1,hdr.length);range.setNumberFormat('@');range.setValues([hdr.map(function(key){return String(record[key]||'');})]);
+  var range=sh.getRange(idx,1,1,hdr.length);range.setNumberFormat('@');range.setValues([hdr.map(function(key){return String(key===ID_COL?record.id:(record[key]||''));})]);
+}
+// Repair legacy writes which filled id but left the canonical _id empty.
+// Retain earlier physical rows as audit evidence; expose only the latest request per quotation.
+function retailApprovalRepair(){
+  var sh=_sheet('RetailReceiptApprovals'),hdr=_headers(sh),canonical=hdr.indexOf(ID_COL),legacy=hdr.indexOf('id'),quote=hdr.indexOf('QuoteID'),snapshot=hdr.indexOf('Snapshot');
+  if(canonical<0||legacy<0||quote<0||snapshot<0||sh.getLastRow()<2)return;
+  var values=sh.getRange(2,1,sh.getLastRow()-1,hdr.length).getValues(),live=Object.create(null),candidates=Object.create(null);
+  values.forEach(function(row,index){var id=String(row[canonical]||''),qid=String(row[quote]||'');if(id)live[qid]=true;var old=String(row[legacy]||'');if(!id&&old&&qid&&row[snapshot])candidates[qid]={id:old,row:index+2};});
+  Object.keys(candidates).forEach(function(qid){var item=candidates[qid];if(!live[qid])sh.getRange(item.row,canonical+1,1,1).setNumberFormat('@').setValues([[item.id]]);});
 }
 function retailApprovalSnapshot(q,company){
   var lines=listRows('QuoteItems').filter(function(it){return String(it.QuoteID)===String(q.id)&&String(it.Title||'').indexOf('__')!==0;}),round=function(n){return Math.round((n+Number.EPSILON)*100)/100;};
@@ -913,11 +922,11 @@ function retailApprovalSnapshot(q,company){
 }
 function retailReceiptApproval(req){
   var email=String(req._actor&&req._actor.email||'').trim().toLowerCase();if(!email)throw Error('เข้าสู่ระบบก่อน');
-  var records=listRows('RetailReceiptApprovals');
-  if(req.op==='pending'){var issued=listRows('SalesTaxInvoices');return {ok:true,items:records.filter(function(r){return !issued.some(function(i){return String(i.QuoteID)===String(r.QuoteID);})&&['pending','approved'].indexOf(r.Status)>=0&&(String(r.ApproverEmail).trim().toLowerCase()===email||String(r.RequestedBy).trim().toLowerCase()===email||email==='admin@dongroups.com');})};}
   var lock=LockService.getScriptLock();lock.waitLock(20000);
   try{
-    records=listRows('RetailReceiptApprovals');
+    retailApprovalRepair();
+    var records=listRows('RetailReceiptApprovals');
+    if(req.op==='pending'){var issued=listRows('SalesTaxInvoices');return {ok:true,items:records.filter(function(r){return !issued.some(function(i){return String(i.QuoteID)===String(r.QuoteID);})&&['pending','approved'].indexOf(r.Status)>=0&&(String(r.ApproverEmail).trim().toLowerCase()===email||String(r.RequestedBy).trim().toLowerCase()===email||email==='admin@dongroups.com');})};}
     var q=listRows('Quotations').find(function(r){return String(r.id)===String(req.quoteId);});
     if(!q||q.Status==='Cancelled')throw Error('ไม่พบงานหรือถูกยกเลิกแล้ว');
     var owner=email==='admin@dongroups.com'||email===String(q.SaleEmail||'').trim().toLowerCase();
