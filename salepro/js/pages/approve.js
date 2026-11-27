@@ -2,6 +2,7 @@
 // APPROVE
 // ============================================================
 function renderApprove() {
+  setTimeout(()=>renderRetailApprovals(),0);
   const pending = pendingApprovalsForUser();
   document.getElementById('approve-list').innerHTML = pending.length ? pending.map(q => `
     <div class="card" style="margin-bottom:10px">

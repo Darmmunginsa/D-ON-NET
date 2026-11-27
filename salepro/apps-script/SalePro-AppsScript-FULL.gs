@@ -87,6 +87,15 @@ function createRow(name, fields) {
       if(!title||title.length>100||title.charAt(0)==='='||!fields.QuoteID||!/^\d{4}-\d{2}-\d{2}$/.test(fields.TaxDate)||!/^\d{4}-\d{2}-\d{2}$/.test(fields.DocumentDate)||typeof fields.BaseAmount!=='number'||!(fields.BaseAmount>0)||typeof fields.VatAmount!=='number'||!(fields.VatAmount>=0))throw Error('ข้อมูลใบกำกับภาษีไม่ครบ');
       var invoices=listRows(name);
       if(fields.DocumentType==='abbreviated'){
+        var advance=listRows('RetailReceiptApprovals').find(function(r){return String(r.QuoteID)===String(fields.QuoteID);});
+        if(advance&&fields.ApprovalID!==advance.id)throw Error('ต้องยืนยันเอกสารจากคำขอพิมพ์ล่วงหน้า');
+        if(fields.ApprovalID){
+          var approved=listRows('RetailReceiptApprovals').find(function(r){return String(r.id)===String(fields.ApprovalID);});
+          if(!approved||approved.Status!=='approved'||String(approved.QuoteID)!==String(fields.QuoteID)||approved.Snapshot!==fields.Snapshot)throw Error('เอกสารไม่ตรงกับฉบับที่อนุมัติ');
+          if(!fields.DocURL)throw Error('แนบเอกสารที่ลงวันที่จริงแล้วก่อนยืนยัน');
+          var approvedSnapshot=JSON.parse(approved.Snapshot),currentQuote=listRows('Quotations').find(function(r){return String(r.id)===String(fields.QuoteID);});
+          if(!currentQuote||retailApprovalSnapshot(currentQuote,approvedSnapshot.company)!==approved.Snapshot)throw Error('รายละเอียดเปลี่ยนจากฉบับอนุมัติ กรุณาขออนุมัติใหม่');
+        }
         if(!fields.Snapshot||String(fields.Snapshot).length>45000||typeof fields.GrossAmount!=='number'||!Number.isFinite(fields.GrossAmount))throw Error('ข้อมูลสำเนาเอกสารไม่ครบหรือใหญ่เกินไป');
         var snapshot=JSON.parse(fields.Snapshot);
         if(!snapshot.totals||![snapshot.totals.base,snapshot.totals.vat,fields.BaseAmount,fields.VatAmount].every(Number.isFinite)||Math.abs(Number(snapshot.totals.base)-fields.BaseAmount)>0.01||Math.abs(Number(snapshot.totals.vat)-fields.VatAmount)>0.01||Math.abs(fields.BaseAmount+fields.VatAmount-fields.GrossAmount)>0.01)throw Error('ยอดเอกสารอย่างย่อไม่ตรงกัน');
@@ -526,6 +535,8 @@ function handle(req) {
   if(a==='reviewTechExpenseTax')return reviewTechExpenseTax(req);
   if(a==='attachFinanceWhtCertificate')return replaceFinanceAttachment(req,true);
   if(a==='correctClosedPurchasePayment')return correctClosedPurchasePayment(req);
+  if(a==='retailReceiptApproval')return retailReceiptApproval(req);
+  if(req.list==='RetailReceiptApprovals'&&!['list','multiList'].includes(a))throw Error('ใช้ขั้นตอนอนุมัติเอกสารอย่างย่อเท่านั้น');
   if(a==='serviceReport')return serviceReport(req);
   srProtectGeneric(req);
   if(a==='localDraftSync')return localDraftSync(req);
@@ -882,4 +893,64 @@ function srProtectGeneric(req){
   if(req.action==='batchCreate'&&(req.rows||[]).some(function(r){return protectedKey(r.Title);}))throw Error('Use serviceReport operation');
   if(['update','delete'].indexOf(req.action)>=0){var row=srRows().filter(function(r){return String(r.id)===String(req.id);})[0];if(row&&protectedKey(row.Title)||protectedKey((req.fields||req.data||{}).Title))throw Error('รายงานต้องแก้ผ่านระบบ Report เท่านั้น');}
   if(req.action==='deleteWhere'&&srRows().some(function(r){return protectedKey(r.Title)&&String(r[req.field])===String(req.value);}))throw Error('Cannot delete report records');
+}
+
+// Advance retail receipt printing is separate from issued tax documents.
+function retailApprovalWrite(record){
+  var sh=_sheet('RetailReceiptApprovals'),hdr=_ensureCols(sh,[ID_COL].concat(Object.keys(record))),idx=_findRowIndex(sh,record.id);
+  if(idx<0)idx=sh.getLastRow()+1;
+  var range=sh.getRange(idx,1,1,hdr.length);range.setNumberFormat('@');range.setValues([hdr.map(function(key){return String(record[key]||'');})]);
+}
+function retailApprovalSnapshot(q,company){
+  var lines=listRows('QuoteItems').filter(function(it){return String(it.QuoteID)===String(q.id)&&String(it.Title||'').indexOf('__')!==0;}),round=function(n){return Math.round((n+Number.EPSILON)*100)/100;};
+  var sub=0;
+  if(!lines.length)throw Error('ไม่พบรายการขาย');
+  lines.forEach(function(it){var qty=Number(it.Quantity),price=Number(it.UnitPrice),disc=Number(it.DiscountPct||0);if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0||!Number.isFinite(disc)||disc<0||disc>100)throw Error('ตรวจจำนวน ราคา และส่วนลด');sub+=qty*price*(1-disc/100);});
+  var pct=Number(q.DiscountPct||0);if(!Number.isFinite(pct)||pct<0||pct>100)throw Error('ส่วนลดไม่ถูกต้อง');
+  sub=round(sub);var discount=round(sub*pct/100),after=round(sub-discount),base=q.PricingMode==='inclusive'?round(after/1.07):after,vat=q.PricingMode==='inclusive'?round(after-base):round(base*0.07),gross=round(base+vat);
+  if(!Number.isFinite(Number(q.TotalAmount))||gross<=0||Math.abs(gross-Number(q.TotalAmount))>0.02)throw Error('ยอดใบเสนอราคาไม่ตรง กรุณาโหลดใหม่');
+  return JSON.stringify({quote:{Title:q.Title,ClientName:q.ClientName,PricingMode:q.PricingMode},company:company,totals:{subtotal:sub,discount:discount,base:base,vat:vat,gross:gross,lines:lines}});
+}
+function retailReceiptApproval(req){
+  var email=String(req._actor&&req._actor.email||'').toLowerCase();if(!email)throw Error('เข้าสู่ระบบก่อน');
+  var records=listRows('RetailReceiptApprovals');
+  if(req.op==='pending')return {ok:true,items:records.filter(function(r){return r.Status==='pending'&&(String(r.ApproverEmail).toLowerCase()===email||email==='admin@dongroups.com');})};
+  var lock=LockService.getScriptLock();lock.waitLock(20000);
+  try{
+    records=listRows('RetailReceiptApprovals');
+    var q=listRows('Quotations').find(function(r){return String(r.id)===String(req.quoteId);});
+    if(!q||q.Status==='Cancelled')throw Error('ไม่พบงานหรือถูกยกเลิกแล้ว');
+    var owner=email==='admin@dongroups.com'||email===String(q.SaleEmail||'').toLowerCase();
+    var record=records.find(function(r){return String(r.QuoteID)===String(q.id);});
+    if(req.op==='get'){if(!owner&&email!==String(q.ApproverEmail||'').toLowerCase())throw Error('ไม่มีสิทธิ');return {ok:true,item:record||null};}
+    if(listRows('SalesTaxInvoices').some(function(r){return String(r.QuoteID)===String(q.id);}))throw Error('งานนี้ออกใบกำกับภาษีแล้ว กรุณาเปิดเอกสารเดิม');
+    var now=new Date().toISOString();
+    if(req.op==='request'){
+      if(!owner)throw Error('เฉพาะเจ้าของงานหรือ Admin');
+      if(record&&['pending','approved'].indexOf(record.Status)>=0)return {ok:true,item:record};
+      if(!q.ApproverEmail)throw Error('ระบุผู้อนุมัติในใบเสนอราคาก่อน');
+      if(!req.eligible)throw Error('ยืนยันว่าเข้าเกณฑ์ออกเอกสารอย่างย่อ');
+      var company={},input=req.company||{};['CompanyName','Address','TaxID','Phone','Branch','FooterText'].forEach(function(k){company[k]=String(input[k]||'').slice(0,2000);});
+      if(!company.CompanyName||!company.Address||!/^\d{13}$/.test(company.TaxID.replace(/\D/g,'')))throw Error('ข้อมูลบริษัทไม่ครบ');
+      var snapshot=retailApprovalSnapshot(q,company);if(snapshot.length>45000)throw Error('รายการยาวเกินไป');
+      record={id:record?record.id:_uuid(),QuoteID:q.id,Title:'AR-'+q.Title,Status:'pending',ApproverEmail:String(q.ApproverEmail).toLowerCase(),Snapshot:snapshot,RequestedBy:email,RequestedAt:now,History:JSON.stringify(JSON.parse(record&&record.History||'[]').concat([{action:'requested',by:email,at:now}]))};
+    }else{
+      if(!record||String(req.revision)!==String(record.UpdatedAt))throw Error('ข้อมูลเปลี่ยนแล้ว กรุณาโหลดใหม่');
+      var history=JSON.parse(record.History||'[]');
+      if(req.op==='withdraw'){
+        if(!owner)throw Error('เฉพาะเจ้าของงานหรือ Admin');record.Status='rejected';
+      }else if(req.op==='approve'||req.op==='reject'){
+        if(record.Status!=='pending'||(email!==String(record.ApproverEmail).toLowerCase()&&email!=='admin@dongroups.com'))throw Error('เฉพาะผู้อนุมัติที่กำหนดหรือ Admin');
+        var old=JSON.parse(record.Snapshot),fresh=JSON.parse(retailApprovalSnapshot(q,old.company));
+        if(req.op==='approve'&&JSON.stringify(old)!==JSON.stringify(fresh))throw Error('รายละเอียดงานเปลี่ยน ต้องส่งขออนุมัติใหม่');
+        record.Status=req.op==='approve'?'approved':'rejected';record.DecidedBy=email;record.DecidedAt=now;
+      }else if(req.op==='print'){
+        if(!owner||record.Status!=='approved')throw Error('ต้องได้รับอนุมัติก่อนพิมพ์');
+        var old=JSON.parse(record.Snapshot),fresh=JSON.parse(retailApprovalSnapshot(q,old.company));
+        if(JSON.stringify(old)!==JSON.stringify(fresh))throw Error('รายละเอียดงานเปลี่ยน ต้องขออนุมัติใหม่');
+      }else throw Error('ขั้นตอนไม่ถูกต้อง');
+      history.push({action:req.op,by:email,at:now});record.History=JSON.stringify(history);
+    }
+    record.UpdatedAt=now;retailApprovalWrite(record);return {ok:true,item:record};
+  }finally{lock.releaseLock();}
 }

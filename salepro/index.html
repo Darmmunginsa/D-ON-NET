@@ -1302,7 +1302,11 @@
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px">🧾 ใบกำกับภาษี (TAX INVOICE)</div>
             <details id="cpo-retail-section" style="margin-bottom:12px"><summary>ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ</summary>
               <label><input type="checkbox" id="cpo-retail-eligible"> รายการนี้เข้าเกณฑ์กิจการที่ออกใบกำกับภาษีอย่างย่อได้</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button class="btn btn-sm" onclick="retailAdvanceAction('request')">ขออนุมัติพิมพ์เว้นวันที่</button><button class="btn btn-sm" id="cpo-retail-print" disabled onclick="retailAdvanceAction('print')">พิมพ์เว้นวันที่</button><button class="btn btn-sm" onclick="loadRetailAdvance()">โหลดสถานะ</button><button class="btn btn-sm" onclick="retailAdvanceAction('withdraw')">ยกเลิกคำขอ / ขอใหม่</button></div>
+              <div id="cpo-retail-advance" role="status"></div>
+              <p>หลังรับเงินจริง: ระบุวันที่ตรงกับเอกสาร แนบฉบับที่ลงวันที่ แล้วกดยืนยันด้านล่าง</p>
               <label>วันที่เอกสาร / วันที่เกิดภาษี<input id="cpo-retail-date" type="date"></label>
+              <label>ฉบับที่ลงวันที่จริง (กรณีพิมพ์ล่วงหน้า)<input id="cpo-retail-signed" type="file" accept="image/*,application/pdf"></label>
               <button class="btn btn-sm" onclick="issueRetailReceipt()">ออกเอกสารอย่างย่อและบันทึก VAT</button>
               <div id="cpo-retail-status" role="status"></div>
             </details>
@@ -1674,7 +1678,7 @@
 <script src="js/pages/ui.js?v=billingeditor20261108"></script>
 <script src="js/pages/dashboard.js?v=cancel20261103"></script>
 <script src="../shared/travel-cost.js?v=routepin20261108"></script><script src="js/pages/quote-tools.js?v=templatespaces20261103"></script><script src="js/pages/travel.js?v=customsite20261112"></script><script src="js/pages/quotes.js?v=individual20261126"></script>
-<script src="js/pages/approve.js?v=crm20261112"></script>
+<script src="js/pages/approve.js?v=advance20261127"></script>
 <script src="js/pages/payment.js?v=taxdocuments20261115"></script>
 <script src="js/pages/catalog.js?v=baseprice20261111"></script><script src="js/pages/service-catalog.js?v=travel20261103"></script>
 <script src="js/pages/settings.js?v=individual20261126"></script>
@@ -1684,9 +1688,9 @@
 <script src="js/pages/pdf.js?v=individual20261126"></script>
 <script src="../shared/sale-payment-core.js?v=taxdocuments20261115"></script>
 <script src="js/pages/purchase-expenses.js?v=whtcertificate20261115"></script>
-<script src="js/pages/saletracker.js?v=individual20261126"></script>
+<script src="js/pages/saletracker.js?v=advance20261127"></script>
 <script src="../shared/billing-core.js?v=inclusive20261126"></script>
-<script src="js/pages/retail-receipt.js?v=individual20261126"></script>
+<script src="js/pages/retail-receipt.js?v=advance20261127"></script>
 <script src="js/pages/billing.js?v=billingbaskets20261108"></script>
 <script src="js/pages/forecast.js?v=admin1"></script>
 <script src="js/pages/vendor.js?v=admin1"></script>

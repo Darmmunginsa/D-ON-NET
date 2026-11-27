@@ -17,7 +17,7 @@ function retailReceiptTotals(quote,items){
   return {subtotal,discount,base,vat,gross,lines};
 }
 
-function buildRetailReceiptHTML(invoice,copy='customer'){
+function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=false){
   const snapshot=JSON.parse(invoice.Snapshot);
   const {quote,company,totals}=snapshot;
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -43,14 +43,14 @@ function buildRetailReceiptHTML(invoice,copy='customer'){
     <header><div class="company"><h1>${esc(company.CompanyName)}</h1><p>${esc(company.Address)}</p>
     <p>เลขประจำตัวผู้เสียภาษี ${esc(company.TaxID)} · ${esc(company.Branch||'สำนักงานใหญ่')}</p><p>โทร. ${esc(company.Phone)}</p></div>
     <div class="copy">${copy==='company'?'สำเนาบริษัท':'ต้นฉบับลูกค้า'}<br>เลขที่ ${esc(invoice.Title)}</div></header>
-    <h2>ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ</h2><small>RECEIPT / ABBREVIATED TAX INVOICE</small>
-    <div class="meta"><div>วันที่ ${esc(invoice.DocumentDate.split('-').reverse().join('/'))}<br>อ้างอิง ${esc(quote.Title)}</div>
+    ${review?'<p style="border:2px solid #be123c;padding:12px;color:#be123c">ฉบับตรวจสอบ — ยังไม่อนุมัติให้ใช้รับเงิน</p>':''}<h2>ใบเสร็จรับเงิน/ใบกำกับภาษีอย่างย่อ</h2><small>RECEIPT / ABBREVIATED TAX INVOICE</small>
+    <div class="meta"><div>วันที่ ${esc(advance?'____ / ____ / ______':invoice.DocumentDate.split('-').reverse().join('/'))}<br>อ้างอิง ${esc(quote.Title)}</div>
     <div>ลูกค้า ${esc(quote.ClientName)}<br>${inclusive?'ราคาต่อหน่วยและจำนวนเงินรวม VAT แล้ว':'ราคาต่อหน่วยและจำนวนเงินก่อน VAT'}</div></div>
     <table><thead><tr><th>#</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคาต่อหน่วย</th><th class="num">จำนวนเงิน</th></tr></thead><tbody>${lines}</tbody></table>
     <table class="totals"><tr><td>รวมรายการ</td><td class="num">${money(totals.subtotal)}</td></tr>
     ${totals.discount?'<tr><td>ส่วนลด</td><td class="num">'+money(totals.discount)+'</td></tr>':''}
     <tr><td>มูลค่าก่อน VAT</td><td class="num">${money(totals.base)}</td></tr><tr><td>VAT 7%</td><td class="num">${money(totals.vat)}</td></tr>
-    <tr class="grand"><td>รับเงินรวม VAT แล้ว</td><td class="num">${money(totals.gross)}</td></tr></table>
+    <tr class="grand"><td>${advance?'ยอดรวม VAT':'รับเงินรวม VAT แล้ว'}</td><td class="num">${money(totals.gross)}</td></tr></table>
     <div class="words">${esc(bahtText(totals.gross))}</div><p class="signature">ผู้รับเงิน ____________________</p>
     <footer>ราคาสินค้า/ค่าบริการสุทธิรวมภาษีมูลค่าเพิ่มแล้ว<br>${esc(company.FooterText||'')}</footer></body></html>`;
 }
@@ -74,6 +74,9 @@ async function issueRetailReceipt(){
     const issued=existing.find(row=>row.DocumentType==='abbreviated'&&row.Snapshot);
     if(issued){printViaIframe(buildRetailReceiptHTML(issued,document.getElementById('cpo-copy')?.value==='company'?'company':'customer'));status.textContent='เปิดเอกสารเดิม '+issued.Title;return;}
     if(existing.length)throw Error('งานนี้มีใบกำกับภาษีแล้ว กรุณาตรวจเอกสารเดิมก่อนออกเพิ่ม');
+    const approvalResult=await _call({action:'retailReceiptApproval',op:'get',quoteId});
+    const approval=approvalResult.item;
+    if(approval&&approval.Status!=='approved')throw Error('คำขอพิมพ์ล่วงหน้ายังไม่อนุมัติ');
     const payments=await getListItems(CONFIG.lists.payments);
     const paid=Math.round(payments.filter(row=>String(row.QuoteID)===String(quoteId)).reduce((sum,row)=>sum+Number(row.AmountPaid||0),0)*100)/100;
     if(paid<Number(quote.TotalAmount)-0.01)throw Error('ใบเสร็จอย่างย่อฉบับนี้ใช้สำหรับรับชำระครบยอด กรุณาบันทึกรับเงินให้ครบก่อน');
@@ -86,10 +89,56 @@ async function issueRetailReceipt(){
       DocumentDate:date,TaxDate:date,BaseAmount:totals.base,VatAmount:totals.vat,GrossAmount:totals.gross,
       IssuedBy:currentUser.email,Snapshot:JSON.stringify({quote:{Title:quote.Title,ClientName:quote.ClientName,PricingMode:quote.PricingMode},company,totals}),
     };
+    if(approval){
+      const file=document.getElementById('cpo-retail-signed').files[0];
+      if(!file||file.size>5*1024*1024||!(/^image\//.test(file.type)||file.type==='application/pdf'))throw Error('แนบรูปหรือ PDF ที่เขียนวันที่จริงแล้ว ขนาดไม่เกิน 5 MB');
+      const original=JSON.parse(approval.Snapshot);
+      if(Math.abs(original.totals.gross-totals.gross)>0.01)throw Error('รายการเปลี่ยนจากที่อนุมัติ กรุณาขออนุมัติใหม่');
+      invoice.Title=approval.Title;invoice.ApprovalID=approval.id;invoice.Snapshot=approval.Snapshot;
+      const uploaded=await _call({action:'uploadFile',folder:'SalesTaxInvoices',fileName:file.name,mimeType:file.type,base64:(await fileToBase64(file)).split(',')[1],privateFile:true});
+      if(!uploaded.fileUrl)throw Error('แนบเอกสารไม่สำเร็จ');invoice.DocURL=uploaded.fileUrl;
+    }
     const saved=await createListItem('SalesTaxInvoices',invoice);
     status.textContent='ออกเอกสาร '+invoice.Title+' และบันทึก VAT แล้ว';
     printViaIframe(buildRetailReceiptHTML({...invoice,...saved},document.getElementById('cpo-copy')?.value==='company'?'company':'customer'));
     if(String(stQuoteId)===String(quoteId))await loadSTTaxInvoices(quoteId);
   }catch(error){status.textContent=error.message;toast(error.message,'error');}
   finally{retailReceiptBusy=false;}
+}
+
+let retailAdvanceRecord=null;
+async function loadRetailAdvance(){
+  const quoteId=stQuoteId,el=document.getElementById('cpo-retail-advance');if(!el)return;
+  el.textContent='กำลังโหลดสถานะเอกสารล่วงหน้า…';
+  try{const result=await _call({action:'retailReceiptApproval',op:'get',quoteId});if(String(stQuoteId)!==String(quoteId))return;
+    retailAdvanceRecord=result.item;const r=result.item;
+    const labels={pending:'รออนุมัติ',approved:'อนุมัติให้พิมพ์แล้ว',rejected:'ไม่อนุมัติ / ยกเลิกคำขอ'};
+    el.textContent=r?(labels[r.Status]||r.Status)+' · '+r.Title+' · ผู้อนุมัติ '+r.ApproverEmail:'ยังไม่มีคำขอพิมพ์ล่วงหน้า';
+    if(r){for(const entry of JSON.parse(r.History||'[]')){const line=document.createElement('small');line.style.display='block';line.textContent=({requested:'ส่งขออนุมัติ',approve:'อนุมัติ',reject:'ไม่อนุมัติ',print:'สั่งพิมพ์',withdraw:'ยกเลิกคำขอ'}[entry.action]||entry.action)+' · '+entry.by+' · '+new Date(entry.at).toLocaleString('th-TH');el.append(line);}}
+    document.getElementById('cpo-retail-print').disabled=!r||r.Status!=='approved';
+  }catch(error){el.textContent=error.message;}
+}
+async function retailAdvanceAction(op,quoteId=stQuoteId,revision){
+  if(retailReceiptBusy)return;retailReceiptBusy=true;
+  try{
+    const req={action:'retailReceiptApproval',op,quoteId,revision:revision||retailAdvanceRecord?.UpdatedAt};
+    if(op==='request'){req.eligible=document.getElementById('cpo-retail-eligible').checked;req.company=Object.fromEntries(['CompanyName','Address','TaxID','Phone','Branch','FooterText'].map(k=>[k,companySettings[k]||'']));}
+    const result=await _call(req);
+    if(op==='print')printViaIframe(buildRetailReceiptHTML({...result.item,DocumentDate:''},document.getElementById('cpo-copy')?.value==='company'?'company':'customer',true));
+    toast(op==='request'?'ส่งขออนุมัติแล้ว ดูได้ที่หน้าอนุมัติ':op==='print'?'บันทึกประวัติการพิมพ์แล้ว':'บันทึกผลแล้ว','success');
+    if(String(quoteId)===String(stQuoteId))await loadRetailAdvance();
+    if(typeof renderRetailApprovals==='function')await renderRetailApprovals();
+  }catch(error){toast(error.message,'error');}finally{retailReceiptBusy=false;}
+}
+async function renderRetailApprovals(){
+  const host=document.getElementById('approve-list');if(!host)return;
+  let box=document.getElementById('retail-approval-list');if(!box){box=document.createElement('div');box.id='retail-approval-list';host.prepend(box);}
+  box.textContent='กำลังโหลดคำขอพิมพ์เอกสารล่วงหน้า…';
+  try{const result=await _call({action:'retailReceiptApproval',op:'pending'});box.replaceChildren();
+    const empty=host.querySelector('.empty');if(empty)empty.hidden=!!result.items?.length;
+    for(const record of result.items||[]){const card=document.createElement('div');card.className='card';card.style.padding='16px';
+      const snapshot=JSON.parse(record.Snapshot),title=document.createElement('p');title.textContent='ขอพิมพ์ใบเสร็จอย่างย่อเว้นวันที่ · '+record.Title+' · '+snapshot.quote.ClientName+' · '+Number(snapshot.totals.gross).toLocaleString('th-TH')+' บาท';card.append(title);
+      for(const [label,action] of [['ตรวจเอกสาร','preview'],['อนุมัติ','approve'],['ไม่อนุมัติ','reject']]){const button=document.createElement('button');button.className='btn btn-sm';button.textContent=label;button.onclick=()=>action==='preview'?printViaIframe(buildRetailReceiptHTML({...record,DocumentDate:''},'company',true,true)):retailAdvanceAction(action,record.QuoteID,record.UpdatedAt);card.append(button);}box.append(card);
+    }
+  }catch(error){box.textContent='โหลดคำขอพิมพ์ล่วงหน้าไม่สำเร็จ: '+error.message;}
 }

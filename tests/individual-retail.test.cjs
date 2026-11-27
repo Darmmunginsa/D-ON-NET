@@ -45,6 +45,7 @@ test('retail receipt blocks issue without full payment and reprints its saved sn
   c.quotesData=[{id:'q',Title:'SAMPLE',TotalAmount:1070,PricingMode:'inclusive'}];
   c.stQuoteId='q';c.canManageSaleActions=()=>true;c.CONFIG={lists:{payments:'Payments',quoteItems:'QuoteItems'}};
   let writes=0,preview='',lastError='';
+  c._call=async()=>({item:null});
   c.currentUser={email:'test@example.com'};
   c.companySettings={CompanyName:'บริษัท ตัวอย่าง',Address:'ที่อยู่ตัวอย่าง',TaxID:'1234567890123'};
   c.toast=message=>lastError=message;
@@ -87,4 +88,37 @@ test('manual customer document hints extract included VAT after quote discount',
   const hint=c._cdWarnHtml();
   assert.match(hint,/900.00/);assert.match(hint,/63.00/);assert.match(hint,/963.00/);
   assert.doesNotMatch(hint,/ยอดไม่ตรง/);
+});
+
+
+test('advance print leaves date blank and does not claim payment was received',()=>{
+  const c=runtime(),q={Title:'TEST',TotalAmount:1070,PricingMode:'inclusive'};
+  const invoice={Title:'AR-TEST',DocumentDate:'',Snapshot:JSON.stringify({quote:q,company:{},totals:c.retailReceiptTotals(q,[{Title:'Service',Quantity:1,UnitPrice:1070}])})};
+  const html=c.buildRetailReceiptHTML(invoice,'customer',true);
+  assert.match(html,/____ \/ ____ \/ ______/);assert.doesNotMatch(html,/รับเงินรวม VAT แล้ว/);
+  assert.match(c.buildRetailReceiptHTML(invoice,'company',true,true),/ฉบับตรวจสอบ/);
+});
+
+test('advance approval enforces assigned actor, revision, stale quote and print history without invoices or payments',()=>{
+  const source=fs.readFileSync('salepro/apps-script/Code.gs','utf8');
+  const quote={id:'q',Title:'TEST',ClientName:'Test',TotalAmount:1070,PricingMode:'inclusive',SaleEmail:'sale@example.com',ApproverEmail:'boss@example.com'};
+  const items=[{Title:'Service',QuoteID:'q',Quantity:1,UnitPrice:1070}];let records=[],released=0;
+  const c=vm.createContext({console,LockService:{getScriptLock:()=>({waitLock(){},releaseLock(){released++;}})},_uuid:()=> 'approval-q',listRows:name=>name==='Quotations'?[quote]:name==='QuoteItems'?items:name==='RetailReceiptApprovals'?records:[]});
+  vm.runInContext(source.slice(source.indexOf('// Advance retail receipt printing')),c);
+  c.retailApprovalWrite=r=>{records=[JSON.parse(JSON.stringify(r))];};
+  const req={quoteId:'q',_actor:{email:'sale@example.com'},op:'request',eligible:true,company:{CompanyName:'Test',Address:'Address',TaxID:'1234567890123'}};
+  let row=c.retailReceiptApproval(req).item;assert.equal(row.Status,'pending');
+  assert.throws(()=>c.retailReceiptApproval({...req,op:'print',revision:row.UpdatedAt}),/อนุมัติก่อนพิมพ์/);
+  assert.throws(()=>c.retailReceiptApproval({...req,op:'approve',revision:row.UpdatedAt}),/เฉพาะผู้อนุมัติ/);
+  assert.throws(()=>c.retailReceiptApproval({...req,op:'approve',revision:'old',_actor:{email:'boss@example.com'}}),/ข้อมูลเปลี่ยน/);
+  row=c.retailReceiptApproval({...req,op:'approve',revision:row.UpdatedAt,_actor:{email:'boss@example.com'}}).item;
+  assert.equal(row.Status,'approved');
+  row=c.retailReceiptApproval({...req,op:'print',revision:row.UpdatedAt}).item;
+  assert.equal(JSON.parse(row.History).at(-1).action,'print');
+  items[0].Title='Changed';
+  assert.throws(()=>c.retailReceiptApproval({...req,op:'print',revision:row.UpdatedAt}),/รายละเอียดงานเปลี่ยน/);
+  row=c.retailReceiptApproval({...req,op:'withdraw',revision:row.UpdatedAt}).item;
+  assert.equal(row.Status,'rejected');
+  row=c.retailReceiptApproval(req).item;assert.equal(row.Status,'pending');
+  assert.ok(JSON.parse(row.History).length>=5);assert.ok(released>=8);
 });

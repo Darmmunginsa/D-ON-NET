@@ -2395,6 +2395,8 @@ function openSaleTrackerModal(id) {
   const retailEligible=document.getElementById('cpo-retail-eligible');if(retailEligible)retailEligible.checked=false;
   const retailDate=document.getElementById('cpo-retail-date');if(retailDate)retailDate.value='';
   const retailStatus=document.getElementById('cpo-retail-status');if(retailStatus)retailStatus.textContent='';
+  const retailSigned=document.getElementById('cpo-retail-signed');if(retailSigned)retailSigned.value='';
+  loadRetailAdvance();
   renderPOStatusBar(q);
   renderPayDueDateDisplay(q);
   renderReminderDisplay();
