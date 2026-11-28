@@ -17,6 +17,19 @@ function retailReceiptTotals(quote,items){
   return {subtotal,discount,base,vat,gross,lines,documentNotes:items.filter(it=>it.Title==='__NOTE__').map(it=>String(it.Description||''))};
 }
 
+// Allocate the stored final total across product lines, preserving exact cents.
+function retailReceiptLineAmounts(totals){
+  const lines=totals.lines||[],gross=Math.round(Number(totals.gross)*100);
+  const weights=lines.map(it=>Number(it.Quantity)*Number(it.UnitPrice)*(1-Number(it.DiscountPct||0)/100));
+  const sum=weights.reduce((n,v)=>n+v,0);
+  if(!lines.length||!Number.isSafeInteger(gross)||gross<=0||!Number.isFinite(sum)||sum<=0||weights.some(v=>!Number.isFinite(v)||v<0))throw Error('รายละเอียดรายการในใบเสร็จไม่ครบ กรุณาตรวจต้นฉบับ');
+  const exact=weights.map(v=>v/sum*gross),cents=exact.map(Math.floor);
+  const order=exact.map((v,i)=>({i,remainder:v-cents[i]})).sort((a,b)=>b.remainder-a.remainder||a.i-b.i);
+  let remaining=gross-cents.reduce((n,v)=>n+v,0);
+  for(let i=0;i<remaining;i++)cents[order[i%order.length].i]++;
+  return cents.map(v=>v/100);
+}
+
 function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=false){
   const snapshot=JSON.parse(invoice.Snapshot);
   const {quote,company,totals}=snapshot;
@@ -30,11 +43,12 @@ function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=fal
   const receiptNote=String(quote.Note??customer.Note??'').trim();
   const insertedNotes=(totals.documentNotes||[]).filter(text=>String(text).trim());
   const noteRows=insertedNotes.map(text=>'<tr class="receipt-inserted-note"><td></td><td class="note-description" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5">'+esc(text)+'</td><td></td></tr>').join('');
-  const rows='<tr><td class="center">1</td><td>รับชำระตามใบเสนอราคา '+esc(quote.Title)+'</td><td class="num">'+money(totals.gross)+'</td></tr>'
-    +noteRows+Array.from({length:Math.max(0,6-[receiptNote,...insertedNotes].filter(Boolean).join('\n').split(/\r?\n/).length+1)},()=>'<tr class="empty"><td>&nbsp;</td><td></td><td></td></tr>').join('');
+  const lineAmounts=retailReceiptLineAmounts(totals);
+  const productRows=totals.lines.map((item,index)=>'<tr class="receipt-product"><td class="center">'+(index+1)+'</td><td><div class="receipt-product-name">'+esc(item.Title||'')+'</div>'+(item.Description?'<div class="receipt-product-detail">'+esc(item.Description)+'</div>':'')+'<div class="receipt-product-quantity">จำนวน '+esc(Number(item.Quantity).toLocaleString('th-TH',{maximumFractionDigits:3}))+' '+esc(item.Unit||'')+'</div></td><td class="num">'+money(lineAmounts[index])+'</td></tr>').join('');
+  const rows=productRows+noteRows+Array.from({length:Math.max(0,7-totals.lines.length-[receiptNote,...insertedNotes].filter(Boolean).join('\n').split(/\r?\n/).length)},()=>'<tr class="empty"><td>&nbsp;</td><td></td><td></td></tr>').join('');
   const renderCopy=copyKey=>`<article class="receipt-copy" data-copy="${copyKey}">
   <header><div class="brand">${logo?'<img class="company-logo" src="'+esc(logo)+'" alt="โลโก้บริษัท">':''}<div><h1>${esc(company.CompanyName)}</h1>${company.CompanyNameEn?'<p>'+esc(company.CompanyNameEn)+'</p>':''}<p class="small">${esc(company.Address)}</p><p class="small">โทร. ${esc(company.Phone)} · เลขประจำตัวผู้เสียภาษี ${esc(company.TaxID)}</p><p class="small">${esc(company.Branch||'สำนักงานใหญ่')}</p></div></div><div class="copy">${copyKey==='company'?'สำเนาบริษัท':'ต้นฉบับลูกค้า'}</div></header>
-  <h2>ใบเสร็จรับเงิน<small>RECEIPT</small></h2>
+  <h2>ใบเสร็จรับเงิน<small>RECEIPT</small></h2><p class="receipt-reference">อ้างอิงใบเสนอราคา ${esc(quote.Title)}</p>
   ${review?'<p class="review">ฉบับตรวจสอบ — ยังไม่อนุมัติให้ใช้รับเงิน</p>':''}
   <div class="meta"><div class="customer"><p>นามลูกค้า <span class="under">${esc(quote.ClientName)}</span></p><p>ที่อยู่ <span class="under">${esc(quote.CustomerAddress||quote.ClientAddress||customer.CustomerAddress||'')}</span></p><p>เลขประจำตัวผู้เสียภาษี <span class="under">${esc(quote.CustomerTaxID||quote.ClientTaxID||customer.CustomerTaxID||'')}</span></p></div><div class="document-meta"><p>เลขที่ <span class="under">${esc(invoice.Title)}</span></p><p>วันที่ <span class="under">${esc(date)}</span></p></div></div>
   <table><colgroup><col style="width:9%"><col style="width:66%"><col style="width:25%"></colgroup><thead><tr><th>ลำดับ</th><th>รายการ / เอกสารอ้างอิง</th><th>จำนวนเงิน</th></tr></thead><tbody>${rows}</tbody></table>
@@ -48,14 +62,14 @@ function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=fal
     @page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{margin:0 auto;padding:12px;color:#172b42;background:#e9edf2;font:11px/1.4 Tahoma,"Leelawadee UI",sans-serif}
     .receipt-sheet{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:281mm;min-height:194mm;margin:0 auto;background:white}
     .receipt-sheet:before{content:"";position:absolute;left:50%;top:0;bottom:0;border-left:1px dashed #9aa5b1;pointer-events:none}.cut-label{position:absolute;left:50%;top:1mm;transform:translateX(-50%);background:white;color:#64748b;font-size:8px;padding:2px;writing-mode:vertical-rl}
-    .receipt-copy{padding:4mm 5mm;min-width:0;break-inside:avoid}header{position:relative;padding-top:17px;min-height:80px}.brand{display:flex;gap:9px;align-items:center}.brand>div{min-width:0;overflow-wrap:anywhere}
+    .receipt-copy{padding:4mm 5mm;min-width:0;break-inside:avoid}header{position:relative;padding-top:17px;min-height:65px}.brand{display:flex;gap:9px;align-items:center}.brand>div{min-width:0;overflow-wrap:anywhere}
     .company-logo{display:block;max-width:100px;max-height:50px;width:auto;height:auto;object-fit:contain;flex-shrink:0}h1{font-size:14px;margin:0 0 3px;line-height:1.35}p{margin:2px 0}.small{font-size:9px;line-height:1.4}
     .copy{position:absolute;top:0;right:0;border:1px solid #69517f;border-radius:3px;padding:2px 8px;white-space:nowrap;font-size:10px}
-    h2{border:1.5px solid #69517f;border-radius:4px;width:130px;margin:10px auto;text-align:center;font-size:16px;line-height:1.3;padding:4px}h2 small{display:block;font-size:10px;font-weight:400}
+    h2{border:1.5px solid #69517f;border-radius:4px;width:130px;margin:6px auto;text-align:center;font-size:16px;line-height:1.3;padding:4px}h2 small{display:block;font-size:10px;font-weight:400}
     .meta{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:10px;margin:10px 0}.customer{min-width:0;overflow-wrap:anywhere}.under{border-bottom:1px dotted #b3bbc5;padding:1px 3px;overflow-wrap:anywhere}
-    table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group;background:#68517e;color:white;print-color-adjust:exact;-webkit-print-color-adjust:exact}th,td{border:1px solid #8d96a3;padding:5px}th{font-weight:500;text-align:center}tr{break-inside:avoid}.empty td{height:20px;padding:0 5px}.center{text-align:center}.num{text-align:right;white-space:nowrap}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group;background:#68517e;color:white;print-color-adjust:exact;-webkit-print-color-adjust:exact}th,td{border:1px solid #8d96a3;padding:4px}th{font-weight:500;text-align:center}tr{break-inside:avoid}.empty td{height:20px;padding:0 5px}.center{text-align:center}.num{text-align:right;white-space:nowrap}
     .total{display:grid;grid-template-columns:minmax(0,1fr) 140px;border:1px solid #606b78;border-top:0;break-inside:avoid}.words{padding:7px;border-right:1px solid #606b78;font-size:10px;overflow-wrap:anywhere}.amount{padding:6px;display:flex;gap:5px;justify-content:space-between;align-items:center}.amount strong{font-size:14px;white-space:nowrap}.amount>span{white-space:nowrap}.document-meta p{display:grid;grid-template-columns:32px minmax(0,1fr);gap:3px;align-items:baseline;white-space:nowrap}.document-meta .under{white-space:nowrap;font-size:10px;padding:1px 0}
-    .receipt-remarks{margin:7px 0;padding:6px;border:1px solid #bcc5d1;font-size:10px;white-space:pre-line;overflow-wrap:anywhere;break-inside:avoid}.payment{padding:10px 5px;line-height:1.9;font-size:10px}.note{text-align:center;font-size:8px;margin:7px 0}.signatures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid #606b78;break-inside:avoid;font-size:9px}.signatures>div{padding:10px 5px 7px;min-height:78px;border-right:1px solid #606b78;overflow-wrap:anywhere}.signatures>div:last-child{border:0}.line{margin-top:13px;border-bottom:1px dotted #b3bbc5}.review{border:1px solid #be123c;color:#be123c;padding:5px;font-size:10px}
+    .receipt-product-name{font-weight:600;overflow-wrap:anywhere}.receipt-product-detail{white-space:pre-line;overflow-wrap:anywhere;font-size:10px;margin-top:3px}.receipt-product-quantity{font-size:10px;color:#526175;margin-top:3px}.receipt-reference{font-size:9px;margin:2px 0}.receipt-remarks{margin:7px 0;padding:6px;border:1px solid #bcc5d1;font-size:10px;white-space:pre-line;overflow-wrap:anywhere;break-inside:avoid}.payment{padding:6px 5px;line-height:1.55;font-size:10px}.note{text-align:center;font-size:8px;margin:7px 0}.signatures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid #606b78;break-inside:avoid;font-size:9px}.signatures>div{padding:10px 5px 7px;min-height:62px;border-right:1px solid #606b78;overflow-wrap:anywhere}.signatures>div:last-child{border:0}.line{margin-top:13px;border-bottom:1px dotted #b3bbc5}.review{border:1px solid #be123c;color:#be123c;padding:5px;font-size:10px}
     @media print{body{padding:0;background:white}.receipt-sheet{width:100%;margin:0;min-height:0;break-inside:avoid}.receipt-copy{padding-top:2mm;padding-bottom:0}.total,.payment,.signatures{break-inside:avoid}}
 </style></head><body><main class="receipt-sheet"><span class="cut-label">แนวตัด</span>${renderCopy('customer')}${renderCopy('company')}</main></body></html>`;
 }

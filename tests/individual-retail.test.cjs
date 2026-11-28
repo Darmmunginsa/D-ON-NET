@@ -262,3 +262,20 @@ test('paired receipt prints original and company copy on one landscape sheet wit
   assert.equal((html.match(/1,070.00/g)||[]).length,4);
   assert.match(html,/แนวตัด/);assert.match(html,/border-left:1px dashed/);assert.doesNotMatch(html,/VAT|ภาษีมูลค่าเพิ่ม/);
 });
+
+
+test('receipt shows saved product descriptions, quantities and final line amounts on both copies',()=>{
+ const c=runtime(),q={Title:'TEST',TotalAmount:11128},items=[{Title:'UPS T-1500',Description:'1500VA / 1350W\nWarranty 1 year',Quantity:1,Unit:'เครื่อง',UnitPrice:3400},{Title:'UPS T-3000',Description:'3000VA / 2700W',Quantity:1,Unit:'เครื่อง',UnitPrice:7000}];
+ const totals=c.retailReceiptTotals(q,items),invoice={Title:'AR-TEST',DocumentDate:'2026-11-28',Snapshot:JSON.stringify({quote:q,company:{},totals})};const before=invoice.Snapshot;
+ const html=c.buildRetailReceiptHTML(invoice,'both',true);
+ assert.equal((html.match(/class="receipt-product"/g)||[]).length,4);
+ for(const value of ['UPS T-1500','UPS T-3000','1500VA / 1350W','Warranty 1 year','จำนวน 1 เครื่อง','3,638.00','7,490.00'])assert.ok(html.includes(value),value);
+ assert.equal(invoice.Snapshot,before);assert.doesNotMatch(html,/VAT|ภาษีมูลค่าเพิ่ม/);
+});
+
+test('line totals reconcile to saved gross after line and quotation discounts with exact rounding',()=>{
+ const c=runtime(),q={PricingMode:'inclusive',DiscountPct:10,TotalAmount:0.09};
+ const totals=c.retailReceiptTotals(q,[{Title:'A',Quantity:1,UnitPrice:0.05},{Title:'B',Quantity:1,UnitPrice:0.05}]);
+ const amounts=c.retailReceiptLineAmounts(totals);assert.equal(Math.round(amounts.reduce((s,v)=>s+v,0)*100),9);assert.deepEqual(Array.from(amounts),[0.05,0.04]);
+ const other=c.retailReceiptTotals({TotalAmount:1444.5,DiscountPct:10},[{Title:'A',Quantity:2,UnitPrice:1000,DiscountPct:25}]);assert.equal(c.retailReceiptLineAmounts(other)[0],1444.5);
+});
