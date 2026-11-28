@@ -1755,6 +1755,7 @@ function _cdSeedRowsFromItems(){
   const items=_cdItemsCache||[];
   if(!items.length) return [{t:'item',no:'',pn:'',name:'',desc:'',qty:'',unit:'',price:'',amount:''}];
   return items.map(function(it){
+    if(it.Title==='__NOTE__')return {t:'note',name:'',desc:it.Description||'',sourceItemId:it.id||''};
     const q=parseFloat(it.Quantity||0), p=parseFloat((it._cdPrice!=null?it._cdPrice:it.UnitPrice)||0), d=parseFloat(it.DiscountPct||0)/100;
     const amt=q*p*(1-d);
     return { t:'item', no:'', pn:(it.PartNumber||it.PartNo||it.Code||it.ProductCode||''),
@@ -1915,10 +1916,10 @@ function isMarkerItem(i) {
   return t === '__BLANK__' || t === '__PAGEBREAK__' || t === '__NOTE__' || t.startsWith('__GROUP__:');
 }
 
-async function getQuoteItemsForST() {
+async function getQuoteItemsForST(includeNotes=false) {
   try {
     const all = await getListItems(CONFIG.lists.quoteItems);
-    return all.filter(function(i) { return String(i.QuoteID) === String(stQuoteId) && !isMarkerItem(i); });
+    return all.filter(function(i) { return String(i.QuoteID) === String(stQuoteId) && (!isMarkerItem(i)||(includeNotes&&i.Title==='__NOTE__')); });
   } catch(e) { return []; }
 }
 
@@ -1975,13 +1976,13 @@ async function printCustomerDoc(kind, copy) {
   try { q._docSeq = await ensureCustDocSeq(q); } catch(e) { console.warn('doc seq', e.message); }
   if (typeof loadCustomers === 'function') { try { await loadCustomers(); } catch(e) {} }
   else if (typeof loadCustomerCodes === 'function') { loadCustomerCodes(); }
-  _cdItemsCache = await getQuoteItemsForST();
+  _cdItemsCache = await getQuoteItemsForST(true);
   // แนบราคาจริงจากใบเสนอราคา (QuoteItemExtra.price มาก่อน UnitPrice) — กันราคาข้อความ/ต่องวด/แก้เองหาย
   try {
     const _allRows=(await getListItems(CONFIG.lists.quoteItems)).filter(i=>String(i.QuoteID)===String(stQuoteId));
     const _ex=(typeof getQuoteItemExtra==='function')?(getQuoteItemExtra(stQuoteId)||[]):[];
     let _k=0;
-    _allRows.forEach((row,fi)=>{ if(typeof isMarkerItem==='function'&&isMarkerItem(row))return; const ex=_ex[fi]||{}; const raw=(ex&&ex.price!==undefined&&ex.price!=='')?ex.price:row.UnitPrice; const pn=parseFloat(String(raw).replace(/,/g,'')); const t=_cdItemsCache[_k++]; if(t)t._cdPrice=isNaN(pn)?0:pn; });
+    _allRows.forEach((row,fi)=>{ if(typeof isMarkerItem==='function'&&isMarkerItem(row))return; const ex=_ex[fi]||{}; const raw=(ex&&ex.price!==undefined&&ex.price!=='')?ex.price:row.UnitPrice; const pn=parseFloat(String(raw).replace(/,/g,'')); const t=_cdItemsCache.filter(i=>!isMarkerItem(i))[_k++]; if(t)t._cdPrice=isNaN(pn)?0:pn; });
   } catch(e){ console.warn('cd price align', e.message); }
   _cdQCache = q;
   openCDPreview(kind, copy);   // เปิดพรีวิวแยกซ้าย-ขวา (editor | เอกสารจริง)
@@ -2082,7 +2083,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   const _amtNum = v => { const s=String(v==null?'':v).trim(); if(s===''||!/^-?[\d,]*\.?\d*$/.test(s)) return 0; const n=parseFloat(s.replace(/,/g,'')); return isFinite(n)?n:0; };
   const subTotal = kind==='billing' ? q._billing.totals.net : _manualOn
     ? _manualRows.reduce((s,r)=> s + (_isGN(r)?0:_amtNum(r.amount)), 0)
-    : items.reduce((s,it)=>{ const d=parseFloat(it.DiscountPct||0)/100; return s + parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d); }, 0);
+    : items.filter(it=>!isMarkerItem(it)).reduce((s,it)=>{ const d=parseFloat(it.DiscountPct||0)/100; return s + parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d); }, 0);
   const discountAmt = kind==='billing' ? 0 : subTotal * (Number(q.DiscountPct)||0) / 100;
   const amountAfterDiscount=subTotal-discountAmt;
   const inclusive=kind!=='billing'&&q.PricingMode==='inclusive';
@@ -2143,12 +2144,15 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
       })+'</tr>';
     });
   } else {
+    let productNumber=0;
     rowArr = items.map((it,i)=>{
+      if(isMarkerItem(it))return it.Title==='__NOTE__'?'<tr class="inserted-document-note"><td colspan="'+visCols.length+'" style="padding:6px 10px;white-space:pre-line;overflow-wrap:anywhere;line-height:1.5">'+esc(it.Description||'')+'</td></tr>':'';
+      productNumber++;
       const d=parseFloat(it.DiscountPct||0)/100, line=parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d);
       const nameCell = '<div style="font-weight:500">'+esc(it.Title||it.Description||'-')+'</div>'
         + ((it.Description&&it.Title)?'<div style="font-size:10px;color:#555;margin-top:2px;white-space:pre-line;line-height:1.5">'+esc(it.Description)+'</div>':'');
       return '<tr style="vertical-align:top">'+_itemTds({
-        seq:  (i+1),
+        seq:  productNumber,
         pn:   esc(it.PartNumber||it.PartNo||it.Code||it.ProductCode||''),
         name: nameCell,
         qty:  fmt2(it.Quantity||0),
@@ -2157,6 +2161,11 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
         amt:  fmt2(line)
       })+'</tr>';
     });
+  }
+  // Older saved manual layouts were seeded without inserted note rows.
+  if(_manualOn){
+    const normalize=v=>String(v||'').replace(/\r\n/g,'\n').trim();
+    items.filter(it=>it.Title==='__NOTE__'&&!_manualRows.some(r=>r.t==='note'&&((it.id&&r.sourceItemId===it.id)||normalize(r.desc)===normalize(it.Description)||normalize([r.name,r.desc].filter(Boolean).join('\n'))===normalize(it.Description)))).forEach(it=>rowArr.push('<tr class="inserted-document-note"><td colspan="'+visCols.length+'" style="padding:6px 10px;white-space:pre-line;overflow-wrap:anywhere;line-height:1.5">'+esc(it.Description||'')+'</td></tr>'));
   }
   // จุดขึ้นหน้าใหม่ (เก็บ index ของแถวที่จะตัดหน้าหลังแถวนั้น) — เก็บใน manual.breaks
   const _breaks = (manual && Array.isArray(manual.breaks)) ? manual.breaks.slice().filter(n=>n>=0&&n<rowArr.length) : [];

@@ -14,7 +14,7 @@ function retailReceiptTotals(quote,items){
   const vat=inclusive?round(after-base):round(base*0.07);
   const gross=inclusive?after:round(base+vat);
   if(!(gross>0)||Math.abs(gross-Number(quote.TotalAmount))>0.02)throw Error('ยอดรายการไม่ตรงกับใบเสนอราคา กรุณาตรวจต้นฉบับ');
-  return {subtotal,discount,base,vat,gross,lines};
+  return {subtotal,discount,base,vat,gross,lines,documentNotes:items.filter(it=>it.Title==='__NOTE__').map(it=>String(it.Description||''))};
 }
 
 function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=false){
@@ -27,7 +27,7 @@ function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=fal
   const money=value=>Number(value).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
   const customer=typeof quotesData!=='undefined'?quotesData.find(row=>String(row.id)===String(invoice.QuoteID))||{}:{};
   const date=advance?'____ / ____ / ______':String(invoice.DocumentDate||'').split('-').reverse().join('/');
-  const receiptNote=String(quote.Note??customer.Note??'').trim();
+  const receiptNote=[String(quote.Note??customer.Note??'').trim(),...(totals.documentNotes||[])].filter(text=>String(text).trim()).join('\n\n');
   const rows='<tr><td class="center">1</td><td>รับชำระตามใบเสนอราคา '+esc(quote.Title)+'</td><td class="num">'+money(totals.gross)+'</td></tr>'
     +Array.from({length:Math.max(1,6-(receiptNote?receiptNote.split(/\r?\n/).length:1)+1)},()=>'<tr class="empty"><td>&nbsp;</td><td></td><td></td></tr>').join('');
   const renderCopy=copyKey=>`<article class="receipt-copy" data-copy="${copyKey}">
@@ -75,7 +75,7 @@ async function issueRetailReceipt(){
     const invoices=await getListItems('SalesTaxInvoices');
     const existing=invoices.filter(row=>String(row.QuoteID)===String(quoteId));
     const issued=existing.find(row=>row.DocumentType==='abbreviated'&&row.Snapshot);
-    if(issued){printViaIframe(buildRetailReceiptHTML(issued,document.getElementById('cpo-copy')?.value==='company'?'company':'customer'));status.textContent='เปิดเอกสารเดิม '+issued.Title;return;}
+    if(issued){printViaIframe(await buildRetailReceiptPrintHTML(issued,document.getElementById('cpo-copy')?.value==='company'?'company':'customer'));status.textContent='เปิดเอกสารเดิม '+issued.Title;return;}
     if(existing.length)throw Error('งานนี้มีใบกำกับภาษีแล้ว กรุณาตรวจเอกสารเดิมก่อนออกเพิ่ม');
     const approvalResult=await _call({action:'retailReceiptApproval',op:'get',quoteId});
     const approval=approvalResult.item;
@@ -103,7 +103,7 @@ async function issueRetailReceipt(){
     }
     const saved=await createListItem('SalesTaxInvoices',invoice);
     status.textContent='ออกเอกสาร '+invoice.Title+' และบันทึก VAT แล้ว';
-    printViaIframe(buildRetailReceiptHTML({...invoice,...saved},document.getElementById('cpo-copy')?.value==='company'?'company':'customer'));
+    printViaIframe(await buildRetailReceiptPrintHTML({...invoice,...saved},document.getElementById('cpo-copy')?.value==='company'?'company':'customer'));
     if(String(stQuoteId)===String(quoteId))await loadSTTaxInvoices(quoteId);
   }catch(error){status.textContent=error.message;toast(error.message,'error');}
   finally{retailReceiptBusy=false;}
@@ -129,7 +129,7 @@ async function retailAdvanceAction(op,quoteId=stQuoteId,revision,copy){
     const req={action:'retailReceiptApproval',op,quoteId,revision:revision||retailAdvanceRecord?.UpdatedAt};
     if(op==='request'){req.eligible=document.getElementById('cpo-retail-eligible').checked;req.company=Object.fromEntries(['CompanyName','Address','TaxID','Phone','Branch','FooterText'].map(k=>[k,companySettings[k]||'']));}
     const result=await _call(req);
-    if(op==='print')printViaIframe(buildRetailReceiptHTML({...result.item,DocumentDate:''},(copy||document.getElementById('cpo-copy')?.value)==='company'?'company':'customer',true));
+    if(op==='print')printViaIframe(await buildRetailReceiptPrintHTML({...result.item,DocumentDate:''},(copy||document.getElementById('cpo-copy')?.value)==='company'?'company':'customer',true));
     if(op==='request'||op==='notify')toast('คำขอ'+(result.item.Status==='approved'?'อนุมัติแล้ว':': '+retailApprovalEmailMessage(result.item)),result.item.EmailStatus==='failed'?'warning':'success');
     else toast(op==='print'?'บันทึกประวัติการพิมพ์แล้ว':'บันทึกผลแล้ว','success');
     if(String(quoteId)===String(stQuoteId))await loadRetailAdvance();
@@ -159,7 +159,7 @@ async function renderRetailApprovals(){
       const actions=record.Status==='approved'?[['พิมพ์เว้นวันที่','print']]:[['ตรวจเอกสาร','preview'],...(mayDecide?[['อนุมัติ','approve'],['ไม่อนุมัติ','reject']]:[])];
 
       for(const [label,action] of actions){const button=document.createElement('button');button.className='btn btn-sm'+(action==='print'?' btn-primary':'');button.textContent=label;
-        button.onclick=()=>action==='preview'?printViaIframe(buildRetailReceiptHTML({...record,DocumentDate:''},'company',true,true)):retailAdvanceAction(action,record.QuoteID,record.UpdatedAt,'both');card.append(button);}
+        button.onclick=async()=>{try{if(action==='preview')printViaIframe(await buildRetailReceiptPrintHTML({...record,DocumentDate:''},'company',true,true));else await retailAdvanceAction(action,record.QuoteID,record.UpdatedAt,'both');}catch(error){toast(error.message,'error');}};card.append(button);}
       if(record.Status==='approved'){const hint=document.createElement('small');hint.style.display='block';hint.textContent='A4 แนวนอน · ต้นฉบับลูกค้าและสำเนาบริษัทในหน้าเดียว · หรือเปิดงานขาย > PO ลูกค้า > ใบเสร็จอย่างย่อ > พิมพ์เว้นวันที่';card.append(hint);}
       box.append(card);
     }
@@ -175,4 +175,13 @@ function retailApprovalEmailMessage(record){
   if(record.EmailStatus==='failed')return 'บันทึกคำขอแล้ว แต่อีเมลไม่สำเร็จ: '+(record.EmailError||'โปรดลองส่งอีกครั้ง');
   if(record.EmailStatus==='sending')return 'กำลังส่งอีเมล / ยังยืนยันผลไม่ได้ กรุณาโหลดสถานะ';
   return 'คำขอนี้ยังไม่ได้ส่งอีเมลแจ้งผู้อนุมัติ';
+}
+
+async function buildRetailReceiptPrintHTML(invoice,...options){
+  const snapshot=JSON.parse(invoice.Snapshot);
+  if(!Array.isArray(snapshot.totals.documentNotes)&&invoice.QuoteID){
+    const rows=await getListItems(CONFIG.lists.quoteItems);
+    snapshot.totals.documentNotes=rows.filter(it=>String(it.QuoteID)===String(invoice.QuoteID)&&it.Title==='__NOTE__').map(it=>String(it.Description||''));
+  }
+  return buildRetailReceiptHTML({...invoice,Snapshot:JSON.stringify(snapshot)},...options);
 }
