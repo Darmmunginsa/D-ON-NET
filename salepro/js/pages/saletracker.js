@@ -2114,6 +2114,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
     return '<td style="padding:5px 8px;text-align:'+align+';'+ff+_bR(c)+'white-space:'+wsp+'">'+v+'</td>';
   }).join('');
 
+  const documentNoteRow=(name,desc)=>'<tr class="inserted-document-note" style="vertical-align:top">'+_itemTds({seq:'',pn:'',qty:'',unit:'',price:'',amt:'',name:'<div class="note-description" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5">'+(name?'<b>'+esc(name)+'</b>\n':'')+esc(desc||'')+'</div>'})+'</tr>';
   // rowArr = อาเรย์ของ <tr> (เพื่อแบ่งหน้าได้), markSeq = เลขลำดับที่แสดงของแต่ละ index (ใช้โชว์ในเครื่องมือแบ่งหน้า)
   let rowArr;
   if (_manualOn) {
@@ -2125,7 +2126,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
         return '<tr><td colspan="'+visCols.length+'" style="padding:6px 10px;font-weight:700;text-align:'+al+';background:'+NAVY+'0d;color:'+NAVY+'">'+esc(r.name||r.desc||'')+'</td></tr>';
       }
       if (r.t==='note') {
-        return '<tr><td colspan="'+visCols.length+'" style="padding:5px 10px;line-height:1.5">'+(r.name?'<b>'+esc(r.name)+'</b> ':'')+'<span style="white-space:pre-line">'+esc(r.desc||'')+'</span></td></tr>';
+        return documentNoteRow(r.name,r.desc);
       }
       _auto++;
       const nm = esc(r.name||''), ds = esc(r.desc||'');
@@ -2146,7 +2147,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   } else {
     let productNumber=0;
     rowArr = items.map((it,i)=>{
-      if(isMarkerItem(it))return it.Title==='__NOTE__'?'<tr class="inserted-document-note"><td colspan="'+visCols.length+'" style="padding:6px 10px;white-space:pre-line;overflow-wrap:anywhere;line-height:1.5">'+esc(it.Description||'')+'</td></tr>':'';
+      if(isMarkerItem(it))return it.Title==='__NOTE__'?documentNoteRow('',it.Description):'';
       productNumber++;
       const d=parseFloat(it.DiscountPct||0)/100, line=parseFloat(it.Quantity||0)*parseFloat(it.UnitPrice||0)*(1-d);
       const nameCell = '<div style="font-weight:500">'+esc(it.Title||it.Description||'-')+'</div>'
@@ -2165,7 +2166,7 @@ function buildCustomerDocHTML(kind, copyKey, q, items, po, co, manual, referNote
   // Older saved manual layouts were seeded without inserted note rows.
   if(_manualOn){
     const normalize=v=>String(v||'').replace(/\r\n/g,'\n').trim();
-    items.filter(it=>it.Title==='__NOTE__'&&!_manualRows.some(r=>r.t==='note'&&((it.id&&r.sourceItemId===it.id)||normalize(r.desc)===normalize(it.Description)||normalize([r.name,r.desc].filter(Boolean).join('\n'))===normalize(it.Description)))).forEach(it=>rowArr.push('<tr class="inserted-document-note"><td colspan="'+visCols.length+'" style="padding:6px 10px;white-space:pre-line;overflow-wrap:anywhere;line-height:1.5">'+esc(it.Description||'')+'</td></tr>'));
+    items.filter(it=>it.Title==='__NOTE__'&&!_manualRows.some(r=>r.t==='note'&&((it.id&&r.sourceItemId===it.id)||normalize(r.desc)===normalize(it.Description)||normalize([r.name,r.desc].filter(Boolean).join('\n'))===normalize(it.Description)))).forEach(it=>rowArr.push(documentNoteRow('',it.Description)));
   }
   // จุดขึ้นหน้าใหม่ (เก็บ index ของแถวที่จะตัดหน้าหลังแถวนั้น) — เก็บใน manual.breaks
   const _breaks = (manual && Array.isArray(manual.breaks)) ? manual.breaks.slice().filter(n=>n>=0&&n<rowArr.length) : [];

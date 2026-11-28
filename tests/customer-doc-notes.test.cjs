@@ -57,3 +57,19 @@ test('paired receipt retrieves tool notes for older approvals and preserves the 
  const html=await c.buildRetailReceiptPrintHTML(invoice,'both',true);assert.equal((html.match(/Scope of work/g)||[]).length,2);assert.doesNotMatch(html,/__NOTE__/);assert.equal(invoice.Snapshot,before);assert.match(html,/1,070.00/);
  const totals=c.retailReceiptTotals(quote,[...items,noteRow]);assert.equal(totals.gross,1070);assert.equal(totals.documentNotes[0],inserted);
 });
+
+
+test('tool notes occupy only description cells in quotation, customer documents and paired receipts',()=>{
+ const c=runtime();const q={...quote,Note:'',Terms:''};
+ for(const columns of [{pn:true,qty:true,unit:true,price:true,disc:true,total:true},{pn:false,qty:true,unit:false,price:false,disc:false,total:true}]){
+  const d=c.buildPDFData(q,[...items,{__note:true,noteText:inserted}]);d.cols=columns;d.zoneFonts={info:11,items:11,totals:11,notes:11};d.colLines=true;
+  const html=c.renderPDFHTML(d),row=html.match(/<tr class="quotation-inserted-note">([\s\S]*?)<\/tr>/)[1];
+  assert.doesNotMatch(row,/colspan/);assert.equal((row.match(/<td /g)||[]).length,2+Object.values(columns).filter(Boolean).length);assert.match(row,/class="note-description"/);
+ }
+ for(const kind of ['tax','delivery','receipt','tempdelivery'])for(const manual of [null,{on:true,rows:[{t:'item',name:'Service',qty:1,price:1000,amount:1000},{t:'note',desc:inserted,sourceItemId:'n1'}]}]){
+  const html=c.buildCustomerDocHTML(kind,'customer',q,[...items,noteRow],{},{},manual,''),row=html.match(/<tr class="inserted-document-note"[^>]*>([\s\S]*?)<\/tr>/)[1];
+  assert.doesNotMatch(row,/colspan/);assert.match(row,/class="note-description"/);assert.equal((row.match(/<td /g)||[]).length,kind==='tempdelivery'?3:5);
+ }
+ const html=c.buildRetailReceiptHTML({Title:'AR',DocumentDate:'2026-11-28',Snapshot:JSON.stringify({quote:q,company:{},totals:c.retailReceiptTotals(q,[...items,noteRow])})});
+ const rows=[...html.matchAll(/<tr class="receipt-inserted-note">([\s\S]*?)<\/tr>/g)];assert.equal(rows.length,2);for(const row of rows){assert.equal((row[1].match(/<td/g)||[]).length,3);assert.doesNotMatch(row[1],/colspan/);assert.match(row[1],/^<td><\/td><td class="note-description"/);}
+});

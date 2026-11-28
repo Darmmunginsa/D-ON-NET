@@ -27,9 +27,11 @@ function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=fal
   const money=value=>Number(value).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
   const customer=typeof quotesData!=='undefined'?quotesData.find(row=>String(row.id)===String(invoice.QuoteID))||{}:{};
   const date=advance?'____ / ____ / ______':String(invoice.DocumentDate||'').split('-').reverse().join('/');
-  const receiptNote=[String(quote.Note??customer.Note??'').trim(),...(totals.documentNotes||[])].filter(text=>String(text).trim()).join('\n\n');
+  const receiptNote=String(quote.Note??customer.Note??'').trim();
+  const insertedNotes=(totals.documentNotes||[]).filter(text=>String(text).trim());
+  const noteRows=insertedNotes.map(text=>'<tr class="receipt-inserted-note"><td></td><td class="note-description" style="white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5">'+esc(text)+'</td><td></td></tr>').join('');
   const rows='<tr><td class="center">1</td><td>รับชำระตามใบเสนอราคา '+esc(quote.Title)+'</td><td class="num">'+money(totals.gross)+'</td></tr>'
-    +Array.from({length:Math.max(1,6-(receiptNote?receiptNote.split(/\r?\n/).length:1)+1)},()=>'<tr class="empty"><td>&nbsp;</td><td></td><td></td></tr>').join('');
+    +noteRows+Array.from({length:Math.max(0,6-[receiptNote,...insertedNotes].filter(Boolean).join('\n').split(/\r?\n/).length+1)},()=>'<tr class="empty"><td>&nbsp;</td><td></td><td></td></tr>').join('');
   const renderCopy=copyKey=>`<article class="receipt-copy" data-copy="${copyKey}">
   <header><div class="brand">${logo?'<img class="company-logo" src="'+esc(logo)+'" alt="โลโก้บริษัท">':''}<div><h1>${esc(company.CompanyName)}</h1>${company.CompanyNameEn?'<p>'+esc(company.CompanyNameEn)+'</p>':''}<p class="small">${esc(company.Address)}</p><p class="small">โทร. ${esc(company.Phone)} · เลขประจำตัวผู้เสียภาษี ${esc(company.TaxID)}</p><p class="small">${esc(company.Branch||'สำนักงานใหญ่')}</p></div></div><div class="copy">${copyKey==='company'?'สำเนาบริษัท':'ต้นฉบับลูกค้า'}</div></header>
   <h2>ใบเสร็จรับเงิน<small>RECEIPT</small></h2>
