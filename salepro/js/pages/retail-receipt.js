@@ -27,31 +27,35 @@ function buildRetailReceiptHTML(invoice,copy='customer',advance=false,review=fal
   const money=value=>Number(value).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
   const customer=typeof quotesData!=='undefined'?quotesData.find(row=>String(row.id)===String(invoice.QuoteID))||{}:{};
   const date=advance?'____ / ____ / ______':String(invoice.DocumentDate||'').split('-').reverse().join('/');
+  const receiptNote=String(quote.Note??customer.Note??'').trim();
   const rows='<tr><td class="center">1</td><td>รับชำระตามใบเสนอราคา '+esc(quote.Title)+'</td><td class="num">'+money(totals.gross)+'</td></tr>'
-    +Array.from({length:11},()=>'<tr class="empty"><td>&nbsp;</td><td></td><td></td></tr>').join('');
-  return `<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบเสร็จรับเงิน ${esc(invoice.Title)}</title>
-  <style>
-    @page{size:A4;margin:12mm}*{box-sizing:border-box}body{margin:0 auto;padding:16px;max-width:820px;color:#172b42;font:13px/1.5 Tahoma,"Leelawadee UI",sans-serif}
-    header{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.brand{display:flex;gap:18px;align-items:center;max-width:80%}
-    .company-logo{display:block;max-width:190px;max-height:72px;width:auto;height:auto;object-fit:contain}h1{font-size:21px;margin:0 0 4px}p{margin:3px 0}.small{font-size:11px}
-    .copy{border:1px solid #69517f;border-radius:3px;padding:5px 12px;white-space:nowrap;font-size:11px}
-    h2{border:2px solid #69517f;border-radius:5px;width:180px;margin:22px auto;text-align:center;font-size:19px;line-height:1.4;padding:5px}h2 small{display:block;font-size:12px;font-weight:400}
-    .meta{display:flex;justify-content:space-between;gap:24px;margin:16px 0}.customer{flex:1}.under{display:inline-block;min-width:160px;border-bottom:1px dotted #b3bbc5;padding:2px 6px}
-    table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group;background:#68517e;color:white}th,td{border:1px solid #8d96a3;padding:6px 8px}th{font-weight:500;text-align:center}tr{break-inside:avoid}.empty td{height:23px;padding:0 8px}.center{text-align:center}.num{text-align:right;white-space:nowrap}
-    .total{display:flex;border:1px solid #606b78;border-top:0;align-items:stretch;break-inside:avoid}.words{padding:10px;flex:1;border-right:1px solid #606b78;font-size:12px}.amount{padding:8px 12px;min-width:220px;display:flex;justify-content:space-between;align-items:center}.amount strong{font-size:18px}
-    .payment{padding:17px 12px;line-height:2}.note{text-align:center;font-size:10px;margin:12px 0}.signatures{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #606b78;break-inside:avoid}.signatures>div{padding:18px 12px 12px;min-height:105px;border-right:1px solid #606b78}.signatures>div:last-child{border:0}.line{margin-top:16px;border-bottom:1px dotted #b3bbc5}.review{border:2px solid #be123c;color:#be123c;padding:10px}
-    @media print{body{padding:0;max-width:none}.total,.payment,.signatures{break-inside:avoid}}
-  </style></head><body>
-  <header><div class="brand">${logo?'<img class="company-logo" src="'+esc(logo)+'" alt="โลโก้บริษัท">':''}<div><h1>${esc(company.CompanyName)}</h1>${company.CompanyNameEn?'<p>'+esc(company.CompanyNameEn)+'</p>':''}<p class="small">${esc(company.Address)}</p><p class="small">โทร. ${esc(company.Phone)} · เลขประจำตัวผู้เสียภาษี ${esc(company.TaxID)}</p><p class="small">${esc(company.Branch||'สำนักงานใหญ่')}</p></div></div><div class="copy">${copy==='company'?'สำเนาบริษัท':'ต้นฉบับลูกค้า'}</div></header>
+    +Array.from({length:Math.max(1,6-(receiptNote?receiptNote.split(/\r?\n/).length:1)+1)},()=>'<tr class="empty"><td>&nbsp;</td><td></td><td></td></tr>').join('');
+  const renderCopy=copyKey=>`<article class="receipt-copy" data-copy="${copyKey}">
+  <header><div class="brand">${logo?'<img class="company-logo" src="'+esc(logo)+'" alt="โลโก้บริษัท">':''}<div><h1>${esc(company.CompanyName)}</h1>${company.CompanyNameEn?'<p>'+esc(company.CompanyNameEn)+'</p>':''}<p class="small">${esc(company.Address)}</p><p class="small">โทร. ${esc(company.Phone)} · เลขประจำตัวผู้เสียภาษี ${esc(company.TaxID)}</p><p class="small">${esc(company.Branch||'สำนักงานใหญ่')}</p></div></div><div class="copy">${copyKey==='company'?'สำเนาบริษัท':'ต้นฉบับลูกค้า'}</div></header>
   <h2>ใบเสร็จรับเงิน<small>RECEIPT</small></h2>
   ${review?'<p class="review">ฉบับตรวจสอบ — ยังไม่อนุมัติให้ใช้รับเงิน</p>':''}
-  <div class="meta"><div class="customer"><p>นามลูกค้า <span class="under">${esc(quote.ClientName)}</span></p><p>ที่อยู่ <span class="under">${esc(quote.CustomerAddress||quote.ClientAddress||customer.CustomerAddress||'')}</span></p><p>เลขประจำตัวผู้เสียภาษี <span class="under">${esc(quote.CustomerTaxID||quote.ClientTaxID||customer.CustomerTaxID||'')}</span></p></div><div><p>เลขที่ <span class="under">${esc(invoice.Title)}</span></p><p>วันที่ <span class="under">${esc(date)}</span></p></div></div>
+  <div class="meta"><div class="customer"><p>นามลูกค้า <span class="under">${esc(quote.ClientName)}</span></p><p>ที่อยู่ <span class="under">${esc(quote.CustomerAddress||quote.ClientAddress||customer.CustomerAddress||'')}</span></p><p>เลขประจำตัวผู้เสียภาษี <span class="under">${esc(quote.CustomerTaxID||quote.ClientTaxID||customer.CustomerTaxID||'')}</span></p></div><div class="document-meta"><p>เลขที่ <span class="under">${esc(invoice.Title)}</span></p><p>วันที่ <span class="under">${esc(date)}</span></p></div></div>
   <table><colgroup><col style="width:9%"><col style="width:66%"><col style="width:25%"></colgroup><thead><tr><th>ลำดับ</th><th>รายการ / เอกสารอ้างอิง</th><th>จำนวนเงิน</th></tr></thead><tbody>${rows}</tbody></table>
   <div class="total"><div class="words">ตัวอักษร: ${esc(bahtText(totals.gross))}</div><div class="amount"><span>รวมเงิน<br><small>TOTAL</small></span><strong>${money(totals.gross)}</strong></div></div>
+  ${receiptNote?'<div class="receipt-remarks"><b>หมายเหตุ:</b> '+esc(receiptNote)+'</div>':''}
   <div class="payment">□ เงินสด &nbsp; __________________ บาท<br>□ เงินโอน &nbsp; __________________ บาท<br>□ เช็คธนาคาร __________________ เลขที่ __________________<br>ลงวันที่ __________________ จำนวนเงิน __________________ บาท</div>
   <p class="note">กรณีชำระด้วยเช็ค ใบเสร็จรับเงินจะสมบูรณ์เมื่อบริษัทฯ ได้รับเงินแล้วเท่านั้น</p>
   <div class="signatures"><div>ผู้รับเงิน<div class="line"></div><p>ลงวันที่ __________________</p></div><div>ผู้รับใบเสร็จ<div class="line"></div><p>ลงวันที่ __________________</p></div><div>ในนาม ${esc(company.CompanyName)}<div class="line"></div><p class="center">ผู้มีอำนาจลงนาม</p></div></div>
-  </body></html>`;
+  </article>`;
+  return `<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบเสร็จรับเงิน ${esc(invoice.Title)}</title><style>
+    @page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{margin:0 auto;padding:12px;color:#172b42;background:#e9edf2;font:11px/1.4 Tahoma,"Leelawadee UI",sans-serif}
+    .receipt-sheet{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:281mm;min-height:194mm;margin:0 auto;background:white}
+    .receipt-sheet:before{content:"";position:absolute;left:50%;top:0;bottom:0;border-left:1px dashed #9aa5b1;pointer-events:none}.cut-label{position:absolute;left:50%;top:1mm;transform:translateX(-50%);background:white;color:#64748b;font-size:8px;padding:2px;writing-mode:vertical-rl}
+    .receipt-copy{padding:4mm 5mm;min-width:0;break-inside:avoid}header{position:relative;padding-top:17px;min-height:80px}.brand{display:flex;gap:9px;align-items:center}.brand>div{min-width:0;overflow-wrap:anywhere}
+    .company-logo{display:block;max-width:100px;max-height:50px;width:auto;height:auto;object-fit:contain;flex-shrink:0}h1{font-size:14px;margin:0 0 3px;line-height:1.35}p{margin:2px 0}.small{font-size:9px;line-height:1.4}
+    .copy{position:absolute;top:0;right:0;border:1px solid #69517f;border-radius:3px;padding:2px 8px;white-space:nowrap;font-size:10px}
+    h2{border:1.5px solid #69517f;border-radius:4px;width:130px;margin:10px auto;text-align:center;font-size:16px;line-height:1.3;padding:4px}h2 small{display:block;font-size:10px;font-weight:400}
+    .meta{display:grid;grid-template-columns:minmax(0,1fr) 132px;gap:10px;margin:10px 0}.customer{min-width:0;overflow-wrap:anywhere}.under{border-bottom:1px dotted #b3bbc5;padding:1px 3px;overflow-wrap:anywhere}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group;background:#68517e;color:white;print-color-adjust:exact;-webkit-print-color-adjust:exact}th,td{border:1px solid #8d96a3;padding:5px}th{font-weight:500;text-align:center}tr{break-inside:avoid}.empty td{height:20px;padding:0 5px}.center{text-align:center}.num{text-align:right;white-space:nowrap}
+    .total{display:grid;grid-template-columns:minmax(0,1fr) 140px;border:1px solid #606b78;border-top:0;break-inside:avoid}.words{padding:7px;border-right:1px solid #606b78;font-size:10px;overflow-wrap:anywhere}.amount{padding:6px;display:flex;gap:5px;justify-content:space-between;align-items:center}.amount strong{font-size:14px;white-space:nowrap}.amount>span{white-space:nowrap}.document-meta p{display:grid;grid-template-columns:32px minmax(0,1fr);gap:3px;align-items:baseline;white-space:nowrap}.document-meta .under{white-space:nowrap;font-size:10px;padding:1px 0}
+    .receipt-remarks{margin:7px 0;padding:6px;border:1px solid #bcc5d1;font-size:10px;white-space:pre-line;overflow-wrap:anywhere;break-inside:avoid}.payment{padding:10px 5px;line-height:1.9;font-size:10px}.note{text-align:center;font-size:8px;margin:7px 0}.signatures{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid #606b78;break-inside:avoid;font-size:9px}.signatures>div{padding:10px 5px 7px;min-height:78px;border-right:1px solid #606b78;overflow-wrap:anywhere}.signatures>div:last-child{border:0}.line{margin-top:13px;border-bottom:1px dotted #b3bbc5}.review{border:1px solid #be123c;color:#be123c;padding:5px;font-size:10px}
+    @media print{body{padding:0;background:white}.receipt-sheet{width:100%;margin:0;min-height:0;break-inside:avoid}.receipt-copy{padding-top:2mm;padding-bottom:0}.total,.payment,.signatures{break-inside:avoid}}
+</style></head><body><main class="receipt-sheet"><span class="cut-label">แนวตัด</span>${renderCopy('customer')}${renderCopy('company')}</main></body></html>`;
 }
 
 let retailReceiptBusy=false;
@@ -153,10 +157,10 @@ async function renderRetailApprovals(){
       const recipient=document.createElement('p');recipient.textContent='ผู้อนุมัติ: '+record.ApproverEmail;card.append(recipient);
       const mayDecide=account===String(record.ApproverEmail||'').trim().toLowerCase()||account==='admin@dongroups.com';
       const actions=record.Status==='approved'?[['พิมพ์เว้นวันที่','print']]:[['ตรวจเอกสาร','preview'],...(mayDecide?[['อนุมัติ','approve'],['ไม่อนุมัติ','reject']]:[])];
-      const copySelect=document.createElement('select');copySelect.setAttribute('aria-label','สำเนาที่ต้องการพิมพ์');for(const [value,label] of [['customer','ต้นฉบับลูกค้า'],['company','สำเนาบริษัท']]){const option=document.createElement('option');option.value=value;option.textContent=label;copySelect.append(option);}if(record.Status==='approved')card.append(copySelect);
+
       for(const [label,action] of actions){const button=document.createElement('button');button.className='btn btn-sm'+(action==='print'?' btn-primary':'');button.textContent=label;
-        button.onclick=()=>action==='preview'?printViaIframe(buildRetailReceiptHTML({...record,DocumentDate:''},'company',true,true)):retailAdvanceAction(action,record.QuoteID,record.UpdatedAt,copySelect.value||'customer');card.append(button);}
-      if(record.Status==='approved'){const hint=document.createElement('small');hint.style.display='block';hint.textContent='เลือกพิมพ์ได้ทันที หรือเปิดงานขาย > PO ลูกค้า > ใบเสร็จอย่างย่อ > พิมพ์เว้นวันที่';card.append(hint);}
+        button.onclick=()=>action==='preview'?printViaIframe(buildRetailReceiptHTML({...record,DocumentDate:''},'company',true,true)):retailAdvanceAction(action,record.QuoteID,record.UpdatedAt,'both');card.append(button);}
+      if(record.Status==='approved'){const hint=document.createElement('small');hint.style.display='block';hint.textContent='A4 แนวนอน · ต้นฉบับลูกค้าและสำเนาบริษัทในหน้าเดียว · หรือเปิดงานขาย > PO ลูกค้า > ใบเสร็จอย่างย่อ > พิมพ์เว้นวันที่';card.append(hint);}
       box.append(card);
     }
   }catch(error){

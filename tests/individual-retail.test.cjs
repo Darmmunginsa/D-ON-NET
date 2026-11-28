@@ -225,7 +225,7 @@ test('receipt logo uses company settings for existing approvals, respects snapsh
   const c=runtime(),q={Title:'TEST',TotalAmount:1070,PricingMode:'inclusive'},totals=c.retailReceiptTotals(q,[{Title:'Service',Quantity:1,UnitPrice:1070}]);
   const make=company=>({Title:'AR-TEST',DocumentDate:'2026-11-27',Snapshot:JSON.stringify({quote:q,company,totals})});
   c.companySettings={LogoURL:'https://example.com/logo.png'};
-  for(const copy of ['customer','company']){const html=c.buildRetailReceiptHTML(make({}),copy,true);assert.match(html,/class="company-logo" src="https:\/\/example.com\/logo.png"/);assert.match(html,/max-width:190px;max-height:72px/);}
+  for(const copy of ['customer','company']){const html=c.buildRetailReceiptHTML(make({}),copy,true);assert.match(html,/class="company-logo" src="https:\/\/example.com\/logo.png"/);assert.match(html,/max-width:100px;max-height:50px/);}
   assert.match(c.buildRetailReceiptHTML(make({LogoURL:'https://example.com/saved.png'})),/src="https:\/\/example.com\/saved.png"/);
   c.companySettings={LogoURL:'javascript:alert(1)'};assert.doesNotMatch(c.buildRetailReceiptHTML(make({})),/<img/);
   c.companySettings={LogoBase64:'data:image/png;base64,aGVsbG8='};assert.match(c.buildRetailReceiptHTML(make({}), 'company',true,true),/src="data:image\/png;base64,aGVsbG8="/);
@@ -248,4 +248,17 @@ test('receipt-only layout hides tax rows in every copy while retaining gross and
     }
     assert.equal(JSON.stringify(invoice),before);
   }
+});
+
+
+test('paired receipt prints original and company copy on one landscape sheet with identical numbers',()=>{
+  const c=runtime(),q={Title:'JK-PAIR',ClientName:'Customer',TotalAmount:1070,PricingMode:'inclusive'};
+  const invoice={Title:'AR-PAIR',DocumentDate:'2026-11-28',Snapshot:JSON.stringify({quote:q,company:{CompanyName:'Test'},totals:c.retailReceiptTotals(q,[{Title:'Service',Quantity:1,UnitPrice:1070}])})};
+  const html=c.buildRetailReceiptHTML(invoice,'company',true);
+  assert.match(html,/@page\{size:A4 landscape/);
+  assert.equal((html.match(/<article class="receipt-copy"/g)||[]).length,2);
+  assert.equal((html.match(/data-copy="customer"/g)||[]).length,1);assert.equal((html.match(/data-copy="company"/g)||[]).length,1);
+  assert.equal((html.match(/เลขที่ <span class="under">AR-PAIR/g)||[]).length,2);
+  assert.equal((html.match(/1,070.00/g)||[]).length,4);
+  assert.match(html,/แนวตัด/);assert.match(html,/border-left:1px dashed/);assert.doesNotMatch(html,/VAT|ภาษีมูลค่าเพิ่ม/);
 });
